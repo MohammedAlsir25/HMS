@@ -1,0 +1,239 @@
+import { useState, useEffect, useCallback } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
+import { Input } from '../../components/ui/Input';
+import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
+import { api } from '../../lib/api';
+import OpticsProducts from './OpticsProducts';
+
+const paymentMethods = [
+  { value: 'CASH', label: 'Cash' },
+  { value: 'CARD', label: 'Card' },
+  { value: 'INSURANCE', label: 'Insurance' },
+  { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
+];
+
+export default function OpticsPOS() {
+  const [items, setItems] = useState([]);
+  const [cart, setCart] = useState([]);
+  const [search, setSearch] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('CASH');
+  const [patientName, setPatientName] = useState('');
+  const [rxDetails, setRxDetails] = useState({ sph: '', cyl: '', axis: '' });
+  const [loading, setLoading] = useState(true);
+  const [completing, setCompleting] = useState(false);
+  const [receipt, setReceipt] = useState(null);
+  const [activeTab, setActiveTab] = useState('sale');
+
+  useEffect(() => {
+    api.get('/pos/items?category=optics')
+      .then(setItems)
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const addToCart = (item) => {
+    setCart((prev) => {
+      const existing = prev.find((c) => c.id === item.id);
+      if (existing) {
+        return prev.map((c) => c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c);
+      }
+      return [...prev, { id: item.id, name: item.name, sku: item.sku, price: Number(item.price), quantity: 1 }];
+    });
+  };
+
+  const removeFromCart = (id) => setCart((prev) => prev.filter((c) => c.id !== id));
+  const updateQty = (id, qty) => setCart((prev) => prev.map((c) => c.id === id ? { ...c, quantity: Math.max(1, qty) } : c));
+  const total = cart.reduce((sum, c) => sum + c.price * c.quantity, 0);
+
+  const filteredItems = items.filter((i) =>
+    !search || i.name.toLowerCase().includes(search.toLowerCase()) || i.sku.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const handleComplete = useCallback(async () => {
+    if (cart.length === 0) return;
+    setCompleting(true);
+    const rxNote = [rxDetails.sph, rxDetails.cyl, rxDetails.axis].filter(Boolean).join(' / ');
+    try {
+      const result = await api.post('/pos/transact', {
+        type: 'OPTICS',
+        items: cart.map((c) => ({ id: c.id, quantity: c.quantity, name: c.name })),
+        paymentMethod,
+        amount: total,
+        patientName: patientName || null,
+        description: rxNote ? `RX: ${rxNote} -- Sale for ${patientName || 'walk-in'}` : null,
+      });
+      setReceipt(result.transaction);
+      setCart([]);
+      setPatientName('');
+      setPaymentMethod('CASH');
+      setRxDetails({ sph: '', cyl: '', axis: '' });
+    } catch { /* ignore */ }
+    setCompleting(false);
+  }, [cart, paymentMethod, total, patientName, rxDetails]);
+
+  if (receipt) {
+    return (
+      <div className="max-w-md mx-auto mt-12">
+        <Card>
+          <CardHeader>
+            <CardTitle>Receipt</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+              <p className="text-lg font-bold text-green-700">Transaction Complete</p>
+              <p className="text-caption text-green-600">ID: {receipt.id.slice(0, 8)}</p>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-body">
+                <span className="text-graphite">Amount</span>
+                <span className="font-semibold text-obsidian">${Number(receipt.amount).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-body">
+                <span className="text-graphite">Payment</span>
+                <Badge variant="primary" size="sm">{receipt.paymentMethod}</Badge>
+              </div>
+              <div className="flex justify-between text-body">
+                <span className="text-graphite">Date</span>
+                <span className="text-obsidian">{new Date(receipt.createdAt).toLocaleString()}</span>
+              </div>
+            </div>
+            <Button className="w-full" onClick={() => setReceipt(null)}>New Sale</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-heading-sm font-semibold text-obsidian">Optics POS</h1>
+          <p className="text-body text-slate mt-1">Dispense frames, lenses & process payments</p>
+        </div>
+      </div>
+
+      <div className="flex gap-1 border-b border-silver">
+        <button className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'sale' ? 'border-b-2 border-lilac-bloom text-obsidian' : 'text-slate hover:text-obsidian'}`}
+          onClick={() => setActiveTab('sale')}>Sale</button>
+        <button className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'products' ? 'border-b-2 border-lilac-bloom text-obsidian' : 'text-slate hover:text-obsidian'}`}
+          onClick={() => setActiveTab('products')}>Products</button>
+      </div>
+
+      {activeTab === 'products' ? <OpticsProducts /> : null}
+      {activeTab === 'sale' ? (
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Optical Products</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Input
+                label="Search"
+                placeholder="Search by name or SKU..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="mb-3"
+              />
+              {loading && <p className="text-body text-slate">Loading inventory...</p>}
+              {!loading && (
+                <div className="max-h-80 overflow-y-auto space-y-1">
+                  {filteredItems.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-bone transition-colors">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-body text-obsidian truncate">{item.name}</p>
+                        <p className="text-caption text-slate">{item.sku} · Stock: {item.quantity}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                        <span className="text-body font-medium text-obsidian">${Number(item.price).toFixed(2)}</span>
+                        <Button size="sm" onClick={() => addToCart(item)} disabled={item.quantity < 1}>Add</Button>
+                      </div>
+                    </div>
+                  ))}
+                  {filteredItems.length === 0 && <p className="text-body text-slate text-center py-4">No items found</p>}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Cart ({cart.length})</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {cart.length === 0 && <p className="text-body text-slate text-center py-4">Cart is empty</p>}
+              {cart.map((c) => (
+                <div key={c.id} className="flex items-center justify-between pb-2 border-b border-bone last:border-0">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-body text-obsidian truncate">{c.name}</p>
+                    <p className="text-caption text-slate">${c.price.toFixed(2)} each</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0 ml-2">
+                    <select className="w-14 px-1 py-1 bg-paper border border-silver rounded text-caption"
+                      value={c.quantity}
+                      onChange={(e) => updateQty(c.id, parseInt(e.target.value))}>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                    <button className="text-slate hover:text-red-500 touch-target p-1" onClick={() => removeFromCart(c.id)}>
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {cart.length > 0 && (
+                <div className="pt-2 border-t border-silver">
+                  <div className="flex justify-between text-body font-semibold">
+                    <span>Total</span>
+                    <span>${total.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {cart.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Prescription & Payment</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Input label="Patient Name" value={patientName} onChange={(e) => setPatientName(e.target.value)} placeholder="Optional" />
+                <div className="grid grid-cols-3 gap-2">
+                  <Input label="SPH" value={rxDetails.sph} onChange={(e) => setRxDetails((r) => ({ ...r, sph: e.target.value }))} placeholder="0.00" />
+                  <Input label="CYL" value={rxDetails.cyl} onChange={(e) => setRxDetails((r) => ({ ...r, cyl: e.target.value }))} placeholder="0.00" />
+                  <Input label="AXIS" value={rxDetails.axis} onChange={(e) => setRxDetails((r) => ({ ...r, axis: e.target.value }))} placeholder="0" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-graphite block mb-1">Method</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {paymentMethods.map((m) => (
+                      <button
+                        key={m.value}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors touch-target
+                          ${paymentMethod === m.value ? 'bg-lilac-bloom text-obsidian' : 'bg-bone text-graphite hover:bg-silver'}`}
+                        onClick={() => setPaymentMethod(m.value)}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <Button className="w-full" onClick={handleComplete} disabled={completing}>
+                  {completing ? 'Processing...' : `Charge $${total.toFixed(2)}`}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+  ) : null}
+    </div>
+  );
+}

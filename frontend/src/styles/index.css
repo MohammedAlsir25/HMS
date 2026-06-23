@@ -1,0 +1,35 @@
+@import "tailwindcss";
+@import "../../../theme.css";
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    min-height: 100dvh;
+  }
+
+  /* Touch target minimum for tablet */
+  @media (hover: none) and (pointer: coarse) {
+    button, a, input, select, textarea, [role="button"] {
+      min-height: 48px;
+      min-width: 48px;
+    }
+  }
+}
+
+@layer components {
+  .touch-target {
+    @apply min-h-[48px] min-w-[48px];
+  }
+
+  .card-surface {
+    @apply bg-paper border border-silver rounded-3xl shadow-md;
+  }
+
+  .card-surface-elevated {
+    @apply bg-paper border border-silver rounded-3xl-3 shadow-md;
+  }
+}

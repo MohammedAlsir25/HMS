@@ -1,0 +1,704 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ClinicType {
+  MEDICINE
+  ENT
+  DENTAL
+  RETINA
+  GLAUCOMA
+  ORBIT
+  PEDS_OPHTH
+  GEN_OPHTH
+  OPTOMETRY
+}
+
+enum AppointmentType {
+  WALKIN
+  RESERVATION
+}
+
+enum VisitType {
+  NEW_VISIT
+  FOLLOW_UP
+}
+
+enum DiabetesType {
+  NONE
+  TYPE1
+  TYPE2
+  GESTATIONAL
+}
+
+enum AppointmentStatus {
+  RESERVED
+  WAITING
+  CALLED
+  IN_PROGRESS
+  COMPLETED
+  NO_SHOW
+  CANCELLED
+}
+
+enum ReferralType {
+  INTERNAL_CLINIC
+  PHARMACY_DISPATCH
+  OPTICS_DISPATCH
+  LAB_DISPATCH
+}
+
+enum ReferralStatus {
+  PENDING
+  DISPATCHED
+  FULFILLED
+  CANCELLED
+}
+
+enum SurgeryStatus {
+  SCHEDULED
+  PREP
+  IN_SURGERY
+  RECOVERY
+  COMPLETED
+  CANCELLED
+}
+
+enum TransactionType {
+  RECEPTION
+  PHARMACY
+  OPTICS
+  LAB
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  INSURANCE
+  BANK_TRANSFER
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String
+  fullName      String
+  phone         String?
+  avatarUrl     String?
+  isActive      Boolean  @default(true)
+  lastLogin     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  roleId  String
+  role    Role   @relation(fields: [roleId], references: [id])
+  clinicId String?
+  clinic  Clinic? @relation(fields: [clinicId], references: [id])
+
+  appointments Apppointment[]
+  shifts       Shift[]
+  createdPatients Patient[]    @relation("PatientCreator")
+  cashierTransactions Transaction[] @relation("Cashier")
+  auditLogs    AuditLog[]
+  employees    Employee[]
+  approvedLeaves LeaveRequest[] @relation("LeaveApprover")
+  requestedOrders  DiagnosticOrder[] @relation("OrderRequester")
+  assignedOrders   DiagnosticOrder[] @relation("OrderAssignee")
+  enteredResults   DiagnosticOrderTest[] @relation("ResultEnterer")
+
+  @@map("users")
+}
+
+model Role {
+  id          String @id @default(uuid())
+  name        String @unique
+  description String?
+  permissions Json   @default("{}")
+
+  users User[]
+
+  @@map("roles")
+}
+
+model Clinic {
+  id        String      @id @default(uuid())
+  name      String
+  nameAr    String?
+  slug      String      @unique
+  type      ClinicType
+  isActive  Boolean     @default(true)
+
+  users        User[]
+  appointments Apppointment[]
+  clinicalRecords ClinicalRecord[]
+  referralsFrom  Referral[] @relation("FromClinic")
+  referralsTo    Referral[] @relation("ToClinic")
+  diagnosticOrders DiagnosticOrder[]
+
+  department Department?
+
+  @@map("clinics")
+}
+
+enum DepartmentType {
+  CLINIC
+  PHARMACY
+  LAB
+  SURGERY
+  ADMIN
+  HR
+  FINANCE
+  IT
+  NURSING
+  OTHER
+}
+
+model Department {
+  id        String         @id @default(uuid())
+  name      String
+  nameAr    String?
+  slug      String         @unique
+  type      DepartmentType
+  isActive  Boolean        @default(true)
+
+  clinicId String? @unique
+  clinic   Clinic? @relation(fields: [clinicId], references: [id])
+
+  employees   Employee[]
+  expenses     Expense[]
+  transactions Transaction[]
+
+  @@map("departments")
+}
+
+enum ExpenseCategory {
+  SALARY
+  SUPPLIES
+  UTILITIES
+  RENT
+  EQUIPMENT
+  MAINTENANCE
+  MARKETING
+  OTHER
+}
+
+model Expense {
+  id            String          @id @default(uuid())
+  amount        Decimal
+  category      ExpenseCategory
+  description   String
+  date          DateTime        @default(now())
+  paidTo        String?
+  paymentMethod String?
+  notes         String?
+  receiptUrl    String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  @@map("expenses")
+}
+
+model Patient {
+  id               String       @id @default(uuid())
+  mrn              String       @unique
+  fullName         String
+  phone            String?
+  nationalId       String?      @unique
+  email            String?
+  dateOfBirth      DateTime?
+  gender           String?
+  diabetesType     DiabetesType @default(NONE)
+  chronicConditions String[]    @default([])
+  address          String?
+  notes            String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  createdById String
+  createdBy   User   @relation("PatientCreator", fields: [createdById], references: [id])
+
+  appointments     Apppointment[]
+  clinicalRecords  ClinicalRecord[]
+  referrals        Referral[]
+  surgeries        Surgery[]
+  files            PatientFile[]
+  diagnosticOrders DiagnosticOrder[]
+
+  @@map("patients")
+}
+
+model PatientFile {
+  id           String   @id @default(uuid())
+  originalName String
+  storedPath   String
+  mimeType     String
+  size         Int
+  createdAt    DateTime @default(now())
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  @@map("patient_files")
+}
+
+model Apppointment {
+  id        String            @id @default(uuid())
+  token     Int
+  type      AppointmentType
+  status    AppointmentStatus @default(WAITING)
+  priority  Int               @default(0)
+  visitType VisitType?        @default(NEW_VISIT)
+  notes     String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  patientId String
+  patient   Patient  @relation(fields: [patientId], references: [id])
+  clinicId  String
+  clinic    Clinic   @relation(fields: [clinicId], references: [id])
+  doctorId  String
+  doctor    User     @relation(fields: [doctorId], references: [id])
+
+  @@map("appointments")
+}
+
+model Icd10Code {
+  id         String   @id @default(uuid())
+  code       String   @unique
+  name       String
+  category   String?
+  createdAt  DateTime @default(now())
+
+  @@map("icd10_codes")
+}
+
+model VitalSign {
+  id          String   @id @default(uuid())
+  bloodPressureSystolic  Int?
+  bloodPressureDiastolic Int?
+  heartRate    Int?
+  temperature  Decimal?
+  spo2         Int?
+  bloodGlucose Int?
+  weight       Decimal?
+  recordedAt   DateTime @default(now())
+
+  clinicalRecordId String
+  clinicalRecord   ClinicalRecord @relation(fields: [clinicalRecordId], references: [id])
+
+  @@map("vital_signs")
+}
+
+model Symptom {
+  id          String @id @default(uuid())
+  name        String
+  bodyArea    String?
+  onset       String?  // acute, subacute, chronic
+  duration    String?
+  severity    Int?     // 1-10
+  description String?
+
+  clinicalRecordId String
+  clinicalRecord   ClinicalRecord @relation(fields: [clinicalRecordId], references: [id])
+
+  @@map("symptoms")
+}
+
+model Medication {
+  id          String @id @default(uuid())
+  drugName    String
+  dosage      String?
+  frequency   String?
+  duration    String?
+  route       String?
+  notes       String?
+
+  clinicalRecordId String
+  clinicalRecord   ClinicalRecord @relation(fields: [clinicalRecordId], references: [id])
+
+  @@map("medications")
+}
+
+model ClinicalRecord {
+  id                String   @id @default(uuid())
+  encounterDate     DateTime @default(now())
+  diagnosis         String?
+  prescriptions     String?
+  clinicSpecificJson Json?   @default("{}")
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+  clinicId  String
+  clinic    Clinic  @relation(fields: [clinicId], references: [id])
+
+  vitalSigns   VitalSign[]
+  symptoms     Symptom[]
+  medications  Medication[]
+
+  @@map("clinical_records")
+}
+
+model Referral {
+  id         String         @id @default(uuid())
+  type       ReferralType
+  status     ReferralStatus @default(PENDING)
+  notes      String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  fromClinicId String
+  fromClinic   Clinic  @relation("FromClinic", fields: [fromClinicId], references: [id])
+  toClinicId   String?
+  toClinic     Clinic? @relation("ToClinic", fields: [toClinicId], references: [id])
+  patientId    String
+  patient      Patient @relation(fields: [patientId], references: [id])
+
+  diagnosticOrders DiagnosticOrder[]
+
+  @@map("referrals")
+}
+
+model Surgery {
+  id        String         @id @default(uuid())
+  orRoom    Int
+  startTime DateTime
+  endTime   DateTime
+  status    SurgeryStatus  @default(SCHEDULED)
+  notes     String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  @@map("surgeries")
+}
+
+model InventoryItem {
+  id          String  @id @default(uuid())
+  name        String
+  nameAr      String?
+  sku         String  @unique
+  category    String
+  quantity    Int     @default(0)
+  price       Decimal @default(0)
+  minStock    Int     @default(0)
+  expiryDate  DateTime?
+  isActive    Boolean @default(true)
+
+  locations   InventoryLocation[]
+  transactions InventoryTransaction[]
+
+  @@map("inventory_items")
+}
+
+model InventoryLocation {
+  id        String @id @default(uuid())
+  name      String
+  quantity  Int    @default(0)
+
+  itemId String
+  item   InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@map("inventory_locations")
+}
+
+model InventoryTransaction {
+  id       String   @id @default(uuid())
+  type     String
+  quantity Int
+  notes    String?
+  createdAt DateTime @default(now())
+
+  itemId     String
+  item       InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@map("inventory_transactions")
+}
+
+model Transaction {
+  id            String          @id @default(uuid())
+  type          TransactionType
+  amount        Decimal
+  paymentMethod PaymentMethod
+  description   String?
+  createdAt     DateTime        @default(now())
+
+  shiftId   String
+  shift     Shift  @relation(fields: [shiftId], references: [id])
+  cashierId String
+  cashier   User   @relation("Cashier", fields: [cashierId], references: [id])
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  @@map("transactions")
+}
+
+model Shift {
+  id            String    @id @default(uuid())
+  openedAt      DateTime  @default(now())
+  closedAt      DateTime?
+  expectedTotal Decimal?
+  actualTotal   Decimal?
+  notes         String?
+
+  userId String
+  user   User         @relation(fields: [userId], references: [id])
+  transactions Transaction[]
+
+  @@map("shifts")
+}
+
+enum DiagnosticOrderType {
+  LAB
+}
+
+enum DiagnosticOrderStatus {
+  SUBMITTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ResultFlag {
+  NORMAL
+  HIGH
+  LOW
+  CRITICAL_HIGH
+  CRITICAL_LOW
+  ABNORMAL
+}
+
+model DiagnosticTest {
+  id             String   @id @default(uuid())
+  orderType      DiagnosticOrderType
+  code           String
+  name           String
+  nameAr         String?
+  category       String
+  specimen       String?
+  unit           String?
+  refRangeText   String?
+  refRangeLow    Decimal?
+  refRangeHigh   Decimal?
+  lowCritical    Decimal?
+  highCritical   Decimal?
+  price          Decimal?
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  panelTests  DiagnosticPanelTest[]
+  testOrders  DiagnosticOrderTest[]
+
+  @@unique([orderType, code])
+  @@map("diagnostic_tests")
+}
+
+model DiagnosticPanel {
+  id        String   @id @default(uuid())
+  orderType DiagnosticOrderType
+  name      String
+  nameAr    String?
+  isActive  Boolean  @default(true)
+
+  panelTests  DiagnosticPanelTest[]
+  orders DiagnosticOrder[]
+
+  @@map("diagnostic_panels")
+}
+
+model DiagnosticPanelTest {
+  panelId String
+  panel   DiagnosticPanel @relation(fields: [panelId], references: [id])
+  testId  String
+  test    DiagnosticTest  @relation(fields: [testId], references: [id])
+
+  @@id([panelId, testId])
+  @@map("diagnostic_panel_tests")
+}
+
+model DiagnosticOrder {
+  id             String                @id @default(uuid())
+  orderType      DiagnosticOrderType   @default(LAB)
+  status         DiagnosticOrderStatus @default(SUBMITTED)
+  priority       Int                   @default(0)
+  clinicalNotes  String?
+  resultNotes    String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  completedAt    DateTime?
+
+  requestedById  String
+  requestedBy    User    @relation("OrderRequester", fields: [requestedById], references: [id])
+  fromClinicId   String
+  fromClinic     Clinic  @relation(fields: [fromClinicId], references: [id])
+  patientId      String
+  patient        Patient @relation(fields: [patientId], references: [id])
+  assignedToId   String?
+  assignedTo     User?   @relation("OrderAssignee", fields: [assignedToId], references: [id])
+  panelId        String?
+  panel          DiagnosticPanel? @relation(fields: [panelId], references: [id])
+  referralId     String?
+  referral       Referral? @relation(fields: [referralId], references: [id])
+
+  tests DiagnosticOrderTest[]
+
+  @@map("diagnostic_orders")
+}
+
+model DiagnosticOrderTest {
+  id              String    @id @default(uuid())
+  value           String?
+  unit            String?
+  refRangeLow     Decimal?
+  refRangeHigh    Decimal?
+  refRangeText    String?
+  flag            ResultFlag @default(NORMAL)
+  notes           String?
+  resultEnteredAt DateTime?
+  resultEnteredById String?
+  resultEnteredBy   User?    @relation("ResultEnterer", fields: [resultEnteredById], references: [id])
+  isAbnormal      Boolean   @default(false)
+
+  orderId String
+  order   DiagnosticOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  testId  String
+  test    DiagnosticTest @relation(fields: [testId], references: [id])
+
+  @@unique([orderId, testId])
+  @@map("diagnostic_order_tests")
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  PERSONAL
+  MATERNITY
+  UNPAID
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+}
+
+enum PayrollStatus {
+  DRAFT
+  PAID
+  CANCELLED
+}
+
+model Employee {
+  id         String   @id @default(uuid())
+  employeeCode String @unique
+  fullName   String
+  phone      String?
+  email      String?
+  gender     String?
+  position   String
+  department String
+  baseSalary Decimal  @default(0)
+  hireDate   DateTime
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  departmentId String?
+  dept         Department? @relation(fields: [departmentId], references: [id])
+
+  userId String?
+  user   User?  @relation(fields: [userId], references: [id])
+
+  payrollRecords PayrollRecord[]
+  attendance     Attendance[]
+  leaveRequests  LeaveRequest[]
+
+  @@map("employees")
+}
+
+model PayrollRecord {
+  id        String   @id @default(uuid())
+  period    String
+  grossPay  Decimal
+  deductions Decimal @default(0)
+  netPay    Decimal
+  status    PayrollStatus @default(DRAFT)
+  paidAt    DateTime?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+
+  @@map("payroll_records")
+}
+
+model Attendance {
+  id        String   @id @default(uuid())
+  date      DateTime
+  checkIn   DateTime?
+  checkOut  DateTime?
+  status    AttendanceStatus @default(PRESENT)
+  notes     String?
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+
+  @@unique([employeeId, date])
+  @@map("attendance")
+}
+
+model LeaveRequest {
+  id         String       @id @default(uuid())
+  type       LeaveType
+  startDate  DateTime
+  endDate    DateTime
+  status     LeaveStatus  @default(PENDING)
+  reason     String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  approvedById String?
+  approvedBy   User?    @relation("LeaveApprover", fields: [approvedById], references: [id])
+
+  @@map("leave_requests")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  entity    String
+  entityId  String?
+  details   Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
