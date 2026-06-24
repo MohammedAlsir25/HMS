@@ -39,11 +39,7 @@ export default function LoginPage() {
     <div className="min-h-dvh flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 rounded-2xl bg-lilac-bloom flex items-center justify-center">
-              <span className="text-2xl font-bold text-obsidian">JH</span>
-            </div>
-          </div>
+            <img src="/logo.png" alt="AL Jawahir Hospital" className="h-14 w-auto mb-2" />
           <h1 className="text-heading-sm font-switzer font-semibold text-obsidian text-center">
             AL Jawahir Hospital
           </h1>
