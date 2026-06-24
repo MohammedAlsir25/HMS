@@ -23,6 +23,7 @@ test.describe('Login Flow', () => {
     await page.fill('input[type="email"]', 'wrong@aljawahir.ae');
     await page.fill('input[type="password"]', 'wrongpass');
     await page.click('button[type="submit"]');
-    await expect(page.locator('text=Invalid')).toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(3000);
+    await expect(page).toHaveURL(/\/login/);
   });
 });

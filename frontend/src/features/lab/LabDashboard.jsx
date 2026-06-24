@@ -118,6 +118,7 @@ function NewRequestModal({ open, onClose, onCreated }) {
   const [priority, setPriority] = useState('ROUTINE');
   const [clinicalNotes, setClinicalNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [testSearch, setTestSearch] = useState('');
 
   useEffect(() => {
     if (!open) {
@@ -128,6 +129,7 @@ function NewRequestModal({ open, onClose, onCreated }) {
       setSelectedTests([]);
       setPriority('ROUTINE');
       setClinicalNotes('');
+      setTestSearch('');
     }
   }, [open]);
 
@@ -162,6 +164,20 @@ function NewRequestModal({ open, onClose, onCreated }) {
     );
   }, []);
 
+  const filteredTests = testCatalog.filter((test) =>
+    !testSearch || test.name.toLowerCase().includes(testSearch.toLowerCase()) ||
+    (test.category && test.category.toLowerCase().includes(testSearch.toLowerCase()))
+  );
+
+  const groupedTests = filteredTests.reduce((acc, test) => {
+    const cat = test.category || 'Other';
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(test);
+    return acc;
+  }, {});
+
+  const sortedCategories = Object.keys(groupedTests).sort();
+
   const handleSubmit = useCallback(async () => {
     if (!selectedPatient || selectedTests.length === 0) return;
     setSubmitting(true);
@@ -179,7 +195,7 @@ function NewRequestModal({ open, onClose, onCreated }) {
   }, [selectedPatient, selectedTests, priority, clinicalNotes, onCreated, onClose]);
 
   return (
-    <Modal open={open} onClose={onClose} title={t('lab.requestTest')}>
+    <Modal open={open} onClose={onClose} title={t('lab.requestTest')} className="max-w-4xl">
       <div className="space-y-4">
         {step === 'patient' && (
           <>
@@ -209,48 +225,82 @@ function NewRequestModal({ open, onClose, onCreated }) {
 
         {step === 'tests' && selectedPatient && (
           <>
-            <div className="bg-bone rounded-lg px-4 py-3">
-              <p className="text-body font-medium text-obsidian">{selectedPatient.fullName}</p>
-              <p className="text-caption text-slate">{selectedPatient.mrn}</p>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium text-graphite block mb-1">{t('lab.priority')}</label>
-              <div className="flex gap-2">
-                {['ROUTINE', 'URGENT', 'STAT'].map((p) => (
-                  <button
-                    key={p}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors touch-target
-                      ${priority === p ? 'bg-lilac-bloom text-obsidian' : 'bg-bone text-graphite hover:bg-silver'}`}
-                    onClick={() => setPriority(p)}
-                  >
-                    {p}
-                  </button>
-                ))}
+            <div className="flex items-center justify-between bg-bone rounded-lg px-4 py-3">
+              <div>
+                <p className="text-body font-medium text-obsidian">{selectedPatient.fullName}</p>
+                <p className="text-caption text-slate">{selectedPatient.mrn}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-caption font-medium text-graphite">{selectedTests.length} selected</span>
               </div>
             </div>
 
-            <div>
-              <label className="text-sm font-medium text-graphite block mb-1">{t('lab.category')}</label>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {testCatalog.map((test) => (
-                  <label key={test.id} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-bone cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedTests.includes(test.id)}
-                      onChange={() => toggleTest(test.id)}
-                      className="accent-lilac-bloom"
-                    />
-                    <div className="flex-1">
-                      <span className="text-body text-obsidian">{test.name}</span>
-                      {test.category && <span className="text-caption text-slate ml-2">({test.category})</span>}
+            <div className="flex items-center gap-4 flex-wrap">
+              <div>
+                <label className="text-sm font-medium text-graphite block mb-1">{t('lab.priority')}</label>
+                <div className="flex gap-2">
+                  {['ROUTINE', 'URGENT', 'STAT'].map((p) => (
+                    <button
+                      key={p}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors touch-target
+                        ${priority === p ? 'bg-lilac-bloom text-obsidian' : 'bg-bone text-graphite hover:bg-silver'}`}
+                      onClick={() => setPriority(p)}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex-1 min-w-[200px]">
+                <Input
+                  label="Filter tests"
+                  placeholder="Search by name or category..."
+                  value={testSearch}
+                  onChange={(e) => setTestSearch(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="max-h-[50vh] overflow-y-auto space-y-4">
+              {sortedCategories.map((category) => {
+                const catTests = groupedTests[category];
+                const catSelected = catTests.filter((t) => selectedTests.includes(t.id)).length;
+                return (
+                  <div key={category} className="bg-bone rounded-xl p-4 space-y-2">
+                    <div className="flex items-center justify-between sticky top-0 bg-bone pb-1">
+                      <h3 className="font-semibold text-obsidian text-sm uppercase tracking-wider">{category}</h3>
+                      <span className="text-caption text-slate">{catSelected}/{catTests.length} selected</span>
                     </div>
-                    {test.price && <span className="text-caption text-slate">{test.price}</span>}
-                  </label>
-                ))}
-              </div>
-              {testCatalog.length === 0 && (
-                <p className="text-caption text-slate">{t('common.noData')}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1">
+                      {catTests.map((test) => (
+                        <label
+                          key={test.id}
+                          className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors
+                            ${selectedTests.includes(test.id) ? 'bg-lilac-bloom/20' : 'hover:bg-paper'}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedTests.includes(test.id)}
+                            onChange={() => toggleTest(test.id)}
+                            className="accent-lilac-bloom shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-body text-obsidian block truncate">{test.name}</span>
+                            {test.specimen && (
+                              <span className="text-caption text-slate block truncate">{test.specimen}</span>
+                            )}
+                          </div>
+                          {test.price != null && (
+                            <span className="text-caption text-slate shrink-0">AED {Number(test.price).toFixed(0)}</span>
+                          )}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              {sortedCategories.length === 0 && (
+                <p className="text-caption text-slate text-center py-8">{t('common.noData')}</p>
               )}
             </div>
 
@@ -266,7 +316,7 @@ function NewRequestModal({ open, onClose, onCreated }) {
 
             <div className="flex gap-2">
               <Button onClick={handleSubmit} disabled={selectedTests.length === 0 || submitting}>
-                {submitting ? 'Submitting...' : t('lab.submit')}
+                {submitting ? 'Submitting...' : `Submit (${selectedTests.length} tests)`}
               </Button>
               <Button variant="secondary" onClick={() => setStep('patient')}>Change Patient</Button>
             </div>

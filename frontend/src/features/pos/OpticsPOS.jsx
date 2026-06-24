@@ -24,6 +24,9 @@ export default function OpticsPOS() {
   const [completing, setCompleting] = useState(false);
   const [receipt, setReceipt] = useState(null);
   const [activeTab, setActiveTab] = useState('sale');
+  const [referrals, setReferrals] = useState([]);
+  const [referralsLoading, setReferralsLoading] = useState(false);
+  const [activeReferralId, setActiveReferralId] = useState(null);
 
   useEffect(() => {
     api.get('/pos/items?category=optics')
@@ -46,6 +49,27 @@ export default function OpticsPOS() {
   const updateQty = (id, qty) => setCart((prev) => prev.map((c) => c.id === id ? { ...c, quantity: Math.max(1, qty) } : c));
   const total = cart.reduce((sum, c) => sum + c.price * c.quantity, 0);
 
+  const loadReferrals = useCallback(async () => {
+    setReferralsLoading(true);
+    try {
+      const data = await api.get('/referrals?type=OPTICS_DISPATCH&status=PENDING');
+      setReferrals(data || []);
+    } catch {
+      setReferrals([]);
+    }
+    setReferralsLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'referrals') loadReferrals();
+  }, [activeTab, loadReferrals]);
+
+  const handleDispenseReferral = useCallback((referral) => {
+    setPatientName(referral.patient?.fullName || '');
+    setActiveReferralId(referral.id);
+    setActiveTab('sale');
+  }, []);
+
   const filteredItems = items.filter((i) =>
     !search || i.name.toLowerCase().includes(search.toLowerCase()) || i.sku.toLowerCase().includes(search.toLowerCase())
   );
@@ -62,12 +86,14 @@ export default function OpticsPOS() {
         amount: total,
         patientName: patientName || null,
         description: rxNote ? `RX: ${rxNote} -- Sale for ${patientName || 'walk-in'}` : null,
+        referralId: activeReferralId || undefined,
       });
       setReceipt(result.transaction);
       setCart([]);
       setPatientName('');
       setPaymentMethod('CASH');
       setRxDetails({ sph: '', cyl: '', axis: '' });
+      setActiveReferralId(null);
     } catch { /* ignore */ }
     setCompleting(false);
   }, [cart, paymentMethod, total, patientName, rxDetails]);
@@ -117,10 +143,38 @@ export default function OpticsPOS() {
       <div className="flex gap-1 border-b border-silver">
         <button className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'sale' ? 'border-b-2 border-lilac-bloom text-obsidian' : 'text-slate hover:text-obsidian'}`}
           onClick={() => setActiveTab('sale')}>Sale</button>
+        <button className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'referrals' ? 'border-b-2 border-lilac-bloom text-obsidian' : 'text-slate hover:text-obsidian'}`}
+          onClick={() => setActiveTab('referrals')}>Referrals</button>
         <button className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'products' ? 'border-b-2 border-lilac-bloom text-obsidian' : 'text-slate hover:text-obsidian'}`}
           onClick={() => setActiveTab('products')}>Products</button>
       </div>
 
+      {activeTab === 'referrals' ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Pending Optics Referrals</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {referralsLoading ? (
+              <p className="text-body text-slate">Loading...</p>
+            ) : referrals.length === 0 ? (
+              <p className="text-body text-slate text-center py-8">No pending referrals</p>
+            ) : (
+              <div className="space-y-3">
+                {referrals.map((ref) => (
+                  <div key={ref.id} className="bg-bone rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-obsidian">{ref.patient?.fullName || 'Unknown'}</p>
+                      <p className="text-caption text-slate">{ref.patient?.mrn}</p>
+                    </div>
+                    <Button size="sm" onClick={() => handleDispenseReferral(ref)}>Dispense</Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
       {activeTab === 'products' ? <OpticsProducts /> : null}
       {activeTab === 'sale' ? (
 

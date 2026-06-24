@@ -1,4 +1,5 @@
 export function Table({ columns, data, onRowClick, className = '' }) {
+  const rows = Array.isArray(data) ? data : [];
   return (
     <div className="overflow-x-auto -mx-4 sm:mx-0">
       <table className={`w-full border-collapse ${className}`}>
@@ -16,7 +17,7 @@ export function Table({ columns, data, onRowClick, className = '' }) {
           </tr>
         </thead>
         <tbody>
-          {data.map((row, idx) => (
+          {rows.map((row, idx) => (
             <tr
               key={row.id || idx}
               className={`border-b border-silver/50 transition-colors
@@ -30,7 +31,7 @@ export function Table({ columns, data, onRowClick, className = '' }) {
               ))}
             </tr>
           ))}
-          {data.length === 0 && (
+          {rows.length === 0 && (
             <tr>
               <td colSpan={columns.length} className="px-4 py-8 text-center text-slate text-body">
                 No data available

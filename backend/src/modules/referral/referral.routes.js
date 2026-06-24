@@ -6,6 +6,14 @@ import { PERMISSIONS } from '../../middleware/rbac.js';
 const router = Router();
 const prisma = new PrismaClient();
 
+const REFERRAL_INCLUDE = {
+  patient: { select: { fullName: true, mrn: true } },
+  fromClinic: { select: { name: true, slug: true } },
+  toClinic: { select: { name: true, slug: true } },
+  medications: true,
+  tests: { include: { test: true } },
+};
+
 async function resolveClinic(identifier) {
   let clinic = await prisma.clinic.findUnique({ where: { id: identifier } });
   if (!clinic) clinic = await prisma.clinic.findUnique({ where: { slug: identifier } });
@@ -23,11 +31,7 @@ router.get('/', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), asyn
     }
     const referrals = await prisma.referral.findMany({
       where,
-      include: {
-        patient: { select: { fullName: true, mrn: true } },
-        fromClinic: { select: { name: true, slug: true } },
-        toClinic: { select: { name: true, slug: true } },
-      },
+      include: REFERRAL_INCLUDE,
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
@@ -39,7 +43,7 @@ router.get('/', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), asyn
 
 router.post('/', authenticate, requirePermission(PERMISSIONS.CLINICAL_WRITE), async (req, res) => {
   try {
-    const { patientId, fromClinicId, toClinicId, type, notes } = req.body;
+    const { patientId, fromClinicId, toClinicId, type, notes, medications, testIds } = req.body;
     if (!patientId || !fromClinicId || !type) {
       return res.status(400).json({ message: 'patientId, fromClinicId, and type are required' });
     }
@@ -50,22 +54,56 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CLINICAL_WRITE), as
       const toClinic = await resolveClinic(resolvedToClinicId);
       resolvedToClinicId = toClinic ? toClinic.id : null;
     }
+
+    const data = {
+      patientId,
+      fromClinicId: fromClinic.id,
+      toClinicId: resolvedToClinicId,
+      type,
+      notes: notes || null,
+    };
+
+    if (type === 'PHARMACY_DISPATCH' && medications?.length) {
+      data.medications = {
+        create: medications.map((m) => ({
+          drugName: m.drugName,
+          dosage: m.dosage || null,
+          frequency: m.frequency || null,
+          duration: m.duration || null,
+          route: m.route || null,
+          notes: m.notes || null,
+        })),
+      };
+    }
+
+    if (type === 'LAB_DISPATCH' && testIds?.length) {
+      data.tests = {
+        create: testIds.map((testId) => ({ testId })),
+      };
+    }
+
     const referral = await prisma.referral.create({
-      data: {
-        patientId,
-        fromClinicId: fromClinic.id,
-        toClinicId: resolvedToClinicId,
-        type,
-        notes: notes || null,
-      },
-      include: {
-        patient: { select: { fullName: true, mrn: true } },
-        fromClinic: { select: { name: true, slug: true } },
-        toClinic: { select: { name: true, slug: true } },
-      },
+      data,
+      include: REFERRAL_INCLUDE,
     });
+
+    if (type === 'LAB_DISPATCH' && testIds?.length) {
+      await prisma.diagnosticOrder.create({
+        data: {
+          orderType: 'LAB',
+          patientId,
+          fromClinicId: fromClinic.id,
+          requestedById: req.user.id,
+          referralId: referral.id,
+          clinicalNotes: notes || null,
+          tests: { create: testIds.map((testId) => ({ testId })) },
+        },
+      });
+    }
+
     res.status(201).json(referral);
   } catch (err) {
+    console.error('Referral create error:', err);
     res.status(500).json({ message: 'Internal server error' });
   }
 });
@@ -78,11 +116,7 @@ router.patch('/:id/status', authenticate, requirePermission(PERMISSIONS.CLINICAL
     const referral = await prisma.referral.update({
       where: { id: req.params.id },
       data: { status },
-      include: {
-        patient: { select: { fullName: true, mrn: true } },
-        fromClinic: { select: { name: true, slug: true } },
-        toClinic: { select: { name: true, slug: true } },
-      },
+      include: REFERRAL_INCLUDE,
     });
     res.json(referral);
   } catch (err) {

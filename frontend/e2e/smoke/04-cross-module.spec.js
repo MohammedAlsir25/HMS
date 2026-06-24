@@ -45,7 +45,7 @@ test.describe('Cross-Module — Referral Flow', () => {
     // Select target clinic (Internal Clinic is default)
     const clinicSelect = page.locator('select').first();
     if (await clinicSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await clinicSelect.selectOption('glaucoma');
+      await clinicSelect.selectOption('Glaucoma Clinic');
     }
 
     // Create the referral

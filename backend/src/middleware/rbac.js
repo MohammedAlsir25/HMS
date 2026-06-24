@@ -75,6 +75,7 @@ export const DEFAULT_ROLES = {
     name: 'Pharmacist',
     permissions: [
       PERMISSIONS.PATIENT_READ,
+      PERMISSIONS.CLINICAL_READ,
       PERMISSIONS.PHARMACY_READ,
       PERMISSIONS.PHARMACY_WRITE,
     ],

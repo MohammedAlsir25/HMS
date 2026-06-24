@@ -162,6 +162,7 @@ router.get('/orders', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_RE
     });
     res.json(orders);
   } catch (err) {
+    console.error('Lab orders fetch error:', err);
     res.status(500).json({ message: 'Internal server error' });
   }
 });

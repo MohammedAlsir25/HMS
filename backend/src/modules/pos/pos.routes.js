@@ -296,7 +296,7 @@ const TYPE_DEPT_SLUG = { PHARMACY: 'pharmacy', OPTICS: 'optics' };
 
 router.post('/transact', authenticate, requirePermission(PERMISSIONS.PHARMACY_WRITE), async (req, res) => {
   try {
-    const { type, items, paymentMethod, amount, description, patientName, departmentId } = req.body;
+    const { type, items, paymentMethod, amount, description, patientName, departmentId, referralId } = req.body;
     if (!type || !['PHARMACY', 'OPTICS'].includes(type)) {
       return res.status(400).json({ message: 'type must be PHARMACY or OPTICS' });
     }
@@ -359,6 +359,14 @@ router.post('/transact', authenticate, requirePermission(PERMISSIONS.PHARMACY_WR
       await prisma.inventoryItem.update({
         where: { id: item.id },
         data: { quantity: { decrement: qty } },
+      });
+    }
+
+    if (referralId) {
+      const refType = type === 'PHARMACY' ? 'PHARMACY_DISPATCH' : 'OPTICS_DISPATCH';
+      await prisma.referral.updateMany({
+        where: { id: referralId, type: refType, status: 'PENDING' },
+        data: { status: 'FULFILLED' },
       });
     }
 

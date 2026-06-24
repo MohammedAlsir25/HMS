@@ -98,6 +98,28 @@ async function main() {
     },
   });
 
+  await prisma.user.upsert({
+    where: { email: 'pharmacy@aljawahir.ae' },
+    update: {},
+    create: {
+      email: 'pharmacy@aljawahir.ae',
+      passwordHash,
+      fullName: 'Pharmacist',
+      roleId: roles.PHARMACIST.id,
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: 'optics@aljawahir.ae' },
+    update: {},
+    create: {
+      email: 'optics@aljawahir.ae',
+      passwordHash,
+      fullName: 'Optician',
+      roleId: roles.OPTICIAN.id,
+    },
+  });
+
   const icd10Codes = [
     { code: 'E11.9', name: 'Type 2 diabetes mellitus without complications', category: 'Endocrine' },
     { code: 'E10.9', name: 'Type 1 diabetes mellitus without complications', category: 'Endocrine' },

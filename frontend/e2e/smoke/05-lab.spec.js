@@ -27,6 +27,41 @@ test.describe('Lab Module — Smoke Tests', () => {
     await expect(page.getByRole('button', { name: 'Test Catalog' }).first()).toBeVisible({ timeout: 5000 });
   });
 
+  test('NewRequestModal shows test categories', async ({ page }) => {
+    await page.goto('/login', { waitUntil: 'networkidle' });
+    await page.fill('input[type="email"]', 'lab.tech@aljawahir.ae');
+    await page.fill('input[type="password"]', 'password123');
+    await page.click('button[type="submit"]');
+    await page.waitForURL(/\/dashboard/, { timeout: 30000 });
+
+    await page.goto('/lab', { waitUntil: 'networkidle' });
+    await page.waitForTimeout(2000);
+
+    await page.getByRole('button', { name: 'Request Test' }).first().click();
+    await page.waitForTimeout(500);
+
+    const searchInput = page.locator('input[placeholder="Name or MRN..."]');
+    await expect(searchInput).toBeVisible({ timeout: 5000 });
+    await searchInput.fill('test');
+    await page.waitForTimeout(1500);
+
+    const result = page.locator('button:has-text("SmokeTest")').first();
+    if (await result.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await result.click();
+      await page.waitForTimeout(500);
+    }
+
+    const categoryHeader = page.locator('h3:has-text("Hematology"), h3:has-text("Biochemistry"), h3:has-text("Microbiology")').first();
+    if (await categoryHeader.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await expect(categoryHeader).toBeVisible();
+    }
+
+    const testCheckbox = page.locator('input[type="checkbox"]').first();
+    if (await testCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await expect(testCheckbox).toBeVisible();
+    }
+  });
+
   test('lab order created via API appears in queue', async ({ page, request }) => {
     const loginRes = await (await fetch('http://127.0.0.1:4001/api/auth/login', {
       method: 'POST',

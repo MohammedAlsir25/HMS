@@ -55,5 +55,6 @@ export async function checkInPatient(request, token, patientId, clinicId) {
     const body = await res.text();
     throw new Error(`checkIn failed (${res.status()}): ${body}`);
   }
-  return await res.json();
+  const data = await res.json();
+  return data.appointment || data;
 }

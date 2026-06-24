@@ -368,8 +368,35 @@ model Referral {
   patient      Patient @relation(fields: [patientId], references: [id])
 
   diagnosticOrders DiagnosticOrder[]
+  medications      ReferralMedication[]
+  tests            ReferralTest[]
 
   @@map("referrals")
+}
+
+model ReferralMedication {
+  id         String   @id @default(uuid())
+  drugName   String
+  dosage     String?
+  frequency  String?
+  duration   String?
+  route      String?
+  notes      String?
+  referralId String
+  referral   Referral @relation(fields: [referralId], references: [id], onDelete: Cascade)
+
+  @@map("referral_medications")
+}
+
+model ReferralTest {
+  id         String   @id @default(uuid())
+  referralId String
+  referral   Referral @relation(fields: [referralId], references: [id], onDelete: Cascade)
+  testId     String
+  test       DiagnosticTest @relation(fields: [testId], references: [id])
+
+  @@unique([referralId, testId])
+  @@map("referral_tests")
 }
 
 model Surgery {
@@ -506,8 +533,9 @@ model DiagnosticTest {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  panelTests  DiagnosticPanelTest[]
-  testOrders  DiagnosticOrderTest[]
+  panelTests     DiagnosticPanelTest[]
+  testOrders     DiagnosticOrderTest[]
+  referralTests  ReferralTest[]
 
   @@unique([orderType, code])
   @@map("diagnostic_tests")
