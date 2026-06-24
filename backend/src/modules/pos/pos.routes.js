@@ -323,10 +323,21 @@ router.post('/transact', authenticate, requirePermission(PERMISSIONS.PHARMACY_WR
       shift = await prisma.shift.create({ data: { userId: req.user.id } });
     }
 
+    let totalCogs = 0;
+    const inventoryTxData = [];
+    for (const item of items) {
+      const dbItem = await prisma.inventoryItem.findUnique({ where: { id: item.id } });
+      const unitCost = dbItem?.costPrice || 0;
+      const qty = item.quantity || 1;
+      totalCogs += Number(unitCost) * qty;
+      inventoryTxData.push({ item, unitCost, qty });
+    }
+
     const transaction = await prisma.transaction.create({
       data: {
         type,
         amount,
+        cogs: totalCogs,
         paymentMethod,
         description: description || (patientName ? `Sale for ${patientName}` : null),
         shiftId: shift.id,
@@ -335,18 +346,19 @@ router.post('/transact', authenticate, requirePermission(PERMISSIONS.PHARMACY_WR
       },
     });
 
-    for (const item of items) {
+    for (const { item, unitCost, qty } of inventoryTxData) {
       await prisma.inventoryTransaction.create({
         data: {
           type: 'SALE',
-          quantity: -(item.quantity || 1),
+          quantity: -qty,
+          unitCost,
           notes: item.name || null,
           itemId: item.id,
         },
       });
       await prisma.inventoryItem.update({
         where: { id: item.id },
-        data: { quantity: { decrement: item.quantity || 1 } },
+        data: { quantity: { decrement: qty } },
       });
     }
 

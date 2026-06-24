@@ -16,17 +16,26 @@ async function main() {
     });
   }
 
-  const clinics = await Promise.all([
-    prisma.clinic.upsert({ where: { slug: 'medicine' }, update: {}, create: { name: 'Medicine Clinic', slug: 'medicine', type: 'MEDICINE' } }),
-    prisma.clinic.upsert({ where: { slug: 'ent' }, update: {}, create: { name: 'ENT Clinic', slug: 'ent', type: 'ENT' } }),
-    prisma.clinic.upsert({ where: { slug: 'dental' }, update: {}, create: { name: 'Dental Clinic', slug: 'dental', type: 'DENTAL' } }),
-    prisma.clinic.upsert({ where: { slug: 'retina' }, update: {}, create: { name: 'Retina Clinic', slug: 'retina', type: 'RETINA' } }),
-    prisma.clinic.upsert({ where: { slug: 'glaucoma' }, update: {}, create: { name: 'Glaucoma Clinic', slug: 'glaucoma', type: 'GLAUCOMA' } }),
-    prisma.clinic.upsert({ where: { slug: 'orbit' }, update: {}, create: { name: 'Orbit Clinic', slug: 'orbit', type: 'ORBIT' } }),
-    prisma.clinic.upsert({ where: { slug: 'pediatrics-ophth' }, update: {}, create: { name: 'Pediatrics Ophthalmology', slug: 'pediatrics-ophth', type: 'PEDS_OPHTH' } }),
-    prisma.clinic.upsert({ where: { slug: 'general-ophth' }, update: {}, create: { name: 'General Ophthalmology', slug: 'general-ophth', type: 'GEN_OPHTH' } }),
-    prisma.clinic.upsert({ where: { slug: 'optometry' }, update: {}, create: { name: 'Optometry Clinic', slug: 'optometry', type: 'OPTOMETRY' } }),
-  ]);
+  const clinicData = [
+    { slug: 'medicine', name: 'Medicine Clinic', type: 'MEDICINE', consultationFee: 150, followUpFee: 100 },
+    { slug: 'ent', name: 'ENT Clinic', type: 'ENT', consultationFee: 200, followUpFee: 150 },
+    { slug: 'dental', name: 'Dental Clinic', type: 'DENTAL', consultationFee: 250, followUpFee: 180 },
+    { slug: 'retina', name: 'Retina Clinic', type: 'RETINA', consultationFee: 300, followUpFee: 200 },
+    { slug: 'glaucoma', name: 'Glaucoma Clinic', type: 'GLAUCOMA', consultationFee: 300, followUpFee: 200 },
+    { slug: 'orbit', name: 'Orbit Clinic', type: 'ORBIT', consultationFee: 350, followUpFee: 250 },
+    { slug: 'pediatrics-ophth', name: 'Pediatrics Ophthalmology', type: 'PEDS_OPHTH', consultationFee: 250, followUpFee: 180 },
+    { slug: 'general-ophth', name: 'General Ophthalmology', type: 'GEN_OPHTH', consultationFee: 200, followUpFee: 150 },
+    { slug: 'optometry', name: 'Optometry Clinic', type: 'OPTOMETRY', consultationFee: 100, followUpFee: 75 },
+  ];
+  const clinics = await Promise.all(
+    clinicData.map(({ slug, name, type, consultationFee, followUpFee }) =>
+      prisma.clinic.upsert({
+        where: { slug },
+        update: { consultationFee, followUpFee },
+        create: { name, slug, type, consultationFee, followUpFee },
+      }),
+    ),
+  );
 
   const passwordHash = await bcrypt.hash('password123', 12);
 

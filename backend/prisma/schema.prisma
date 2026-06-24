@@ -133,6 +133,8 @@ model Clinic {
   slug      String      @unique
   type      ClinicType
   isActive  Boolean     @default(true)
+  consultationFee Decimal?
+  followUpFee     Decimal?
 
   users        User[]
   appointments Apppointment[]
@@ -420,6 +422,7 @@ model InventoryTransaction {
   id       String   @id @default(uuid())
   type     String
   quantity Int
+  unitCost Decimal?
   notes    String?
   createdAt DateTime @default(now())
 
@@ -433,6 +436,7 @@ model Transaction {
   id            String          @id @default(uuid())
   type          TransactionType
   amount        Decimal
+  cogs          Decimal         @default(0)
   paymentMethod PaymentMethod
   description   String?
   createdAt     DateTime        @default(now())

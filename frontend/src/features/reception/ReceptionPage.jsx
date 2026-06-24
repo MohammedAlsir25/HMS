@@ -35,6 +35,8 @@ export default function ReceptionPage() {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [selectedClinic, setSelectedClinic] = useState('');
   const [appointmentType, setAppointmentType] = useState('WALKIN');
+  const [collectPayment, setCollectPayment] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [queue, setQueue] = useState([]);
   const [queueStats, setQueueStats] = useState([]);
   const [queueLoading, setQueueLoading] = useState(false);
@@ -93,17 +95,22 @@ export default function ReceptionPage() {
   const handleCheckIn = useCallback(async () => {
     if (!selectedPatient || !selectedClinic) return;
     try {
-      const appt = await api.post('/reception/check-in', {
+      const result = await api.post('/reception/check-in', {
         patientId: selectedPatient.id,
         clinicId: selectedClinic,
         type: appointmentType,
+        collectPayment: collectPayment || undefined,
+        paymentMethod: collectPayment ? paymentMethod : undefined,
       });
+      const appt = result.appointment || result;
       setQueue((prev) => [...prev, appt]);
       setSelectedPatient(null);
+      setCollectPayment(false);
+      setPaymentMethod('CASH');
       setSearchQuery('');
       setSearchResults([]);
     } catch { /* ignore */ }
-  }, [selectedPatient, selectedClinic, appointmentType]);
+  }, [selectedPatient, selectedClinic, appointmentType, collectPayment, paymentMethod]);
 
   const handleStatusChange = useCallback(async (id, status) => {
     try {
@@ -236,6 +243,33 @@ export default function ReceptionPage() {
                       ))}
                     </select>
                 </div>
+                {(() => {
+                  const c = clinics.find((x) => x.id === selectedClinic);
+                  const fee = appointmentType === 'RESERVATION' ? null : (c?.consultationFee);
+                  if (!fee || Number(fee) <= 0) return null;
+                  return (
+                    <div className="space-y-3 border border-silver rounded-lg p-3">
+                      <div className="flex items-center gap-2">
+                        <input type="checkbox" id="collectPaymentExisting" checked={collectPayment} onChange={(e) => setCollectPayment(e.target.checked)} className="rounded border-silver" />
+                        <label htmlFor="collectPaymentExisting" className="text-sm text-graphite">{t('reception.collectPayment')}</label>
+                      </div>
+                      <p className="text-sm text-graphite">
+                        {t('reception.consultationFee')}: <span className="font-semibold text-obsidian">{Number(fee).toFixed(2)} AED</span>
+                      </p>
+                      {collectPayment && (
+                        <div>
+                          <label className="block text-sm font-medium text-graphite mb-1">{t('reception.paymentMethod')}</label>
+                          <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="w-full rounded-lg border border-silver bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
+                            <option value="CASH">{t('reception.cash')}</option>
+                            <option value="CARD">{t('reception.card')}</option>
+                            <option value="INSURANCE">{t('reception.insurance')}</option>
+                            <option value="BANK_TRANSFER">{t('reception.bankTransfer')}</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 <Button className="w-full" disabled={!selectedClinic} onClick={handleCheckIn}>
                   {t('reception.checkIn')} — {appointmentType === 'WALKIN' ? t('reception.walkin') : t('reception.reservation')}
                 </Button>

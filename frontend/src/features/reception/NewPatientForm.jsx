@@ -20,6 +20,8 @@ export default function NewPatientForm({ clinics, onPatientCreated }) {
     clinicId: clinics?.[0]?.id || '',
     visitType: 'NEW_VISIT',
     checkInNow: true,
+    collectPayment: false,
+    paymentMethod: 'CASH',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -50,12 +52,15 @@ export default function NewPatientForm({ clinics, onPatientCreated }) {
           clinicId: form.clinicId,
           type: 'WALKIN',
           visitType: form.visitType,
+          collectPayment: form.collectPayment || undefined,
+          paymentMethod: form.collectPayment ? form.paymentMethod : undefined,
         });
       }
       setForm({
         fullName: '', phone: '', nationalId: '', email: '', dateOfBirth: '',
         gender: '', diabetesType: 'NONE', address: '', notes: '',
         clinicId: clinics?.[0]?.id || '', visitType: 'NEW_VISIT', checkInNow: true,
+        collectPayment: false, paymentMethod: 'CASH',
       });
       if (onPatientCreated) onPatientCreated(patient);
     } catch (err) {
@@ -108,20 +113,49 @@ export default function NewPatientForm({ clinics, onPatientCreated }) {
             <label htmlFor="checkInNow" className="text-sm text-graphite">{t('reception.checkInAfterReg')}</label>
           </div>
           {form.checkInNow && (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-graphite mb-1">{t('reception.clinic')}</label>
-                <select value={form.clinicId} onChange={set('clinicId')} className="w-full rounded-lg border border-silver bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
-                  {clinics.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-graphite mb-1">{t('reception.clinic')}</label>
+                  <select value={form.clinicId} onChange={set('clinicId')} className="w-full rounded-lg border border-silver bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
+                    {clinics.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-graphite mb-1">{t('reception.visitType')}</label>
+                  <select value={form.visitType} onChange={set('visitType')} className="w-full rounded-lg border border-silver bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
+                    <option value="NEW_VISIT">{t('reception.newVisit')}</option>
+                    <option value="FOLLOW_UP">{t('reception.followUp')}</option>
+                  </select>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-graphite mb-1">{t('reception.visitType')}</label>
-                <select value={form.visitType} onChange={set('visitType')} className="w-full rounded-lg border border-silver bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
-                  <option value="NEW_VISIT">{t('reception.newVisit')}</option>
-                  <option value="FOLLOW_UP">{t('reception.followUp')}</option>
-                </select>
-              </div>
+              {(() => {
+                const c = clinics.find((x) => x.id === form.clinicId);
+                const fee = form.visitType === 'FOLLOW_UP' ? c?.followUpFee : c?.consultationFee;
+                if (!fee || Number(fee) <= 0) return null;
+                return (
+                  <div className="space-y-3 border border-silver rounded-lg p-3">
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" id="collectPayment" checked={form.collectPayment} onChange={setBool('collectPayment')} className="rounded border-silver" />
+                      <label htmlFor="collectPayment" className="text-sm text-graphite">{t('reception.collectPayment')}</label>
+                    </div>
+                    <p className="text-sm text-graphite">
+                      {t(form.visitType === 'FOLLOW_UP' ? 'reception.followUpFee' : 'reception.consultationFee')}: <span className="font-semibold text-obsidian">{Number(fee).toFixed(2)} AED</span>
+                    </p>
+                    {form.collectPayment && (
+                      <div>
+                        <label className="block text-sm font-medium text-graphite mb-1">{t('reception.paymentMethod')}</label>
+                        <select value={form.paymentMethod} onChange={set('paymentMethod')} className="w-full rounded-lg border border-silver bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
+                          <option value="CASH">{t('reception.cash')}</option>
+                          <option value="CARD">{t('reception.card')}</option>
+                          <option value="INSURANCE">{t('reception.insurance')}</option>
+                          <option value="BANK_TRANSFER">{t('reception.bankTransfer')}</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
           {error && <p className="text-sm text-red-500">{error}</p>}

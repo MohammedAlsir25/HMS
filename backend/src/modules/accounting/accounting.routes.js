@@ -24,6 +24,7 @@ router.get('/summary', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_RE
     ]);
 
     const sum = (txs) => txs.reduce((acc, t) => acc + Number(t.amount), 0);
+    const sumCogs = (txs) => txs.reduce((acc, t) => acc + Number(t.cogs || 0), 0);
     const byMethod = (txs) => {
       const map = {};
       txs.forEach((t) => { map[t.paymentMethod] = (map[t.paymentMethod] || 0) + Number(t.amount); });
@@ -35,11 +36,16 @@ router.get('/summary', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_RE
       return map;
     };
 
+    const format = (txs) => ({
+      total: sum(txs), cogs: sumCogs(txs), grossProfit: sum(txs) - sumCogs(txs),
+      count: txs.length, byMethod: byMethod(txs), byType: byType(txs),
+    });
+
     res.json({
-      today: { total: sum(todayTx), count: todayTx.length, byMethod: byMethod(todayTx), byType: byType(todayTx) },
-      week: { total: sum(weekTx), count: weekTx.length },
-      month: { total: sum(monthTx), count: monthTx.length },
-      allTime: { total: sum(totalTx), count: totalTx.length },
+      today: format(todayTx),
+      week: format(weekTx),
+      month: format(monthTx),
+      allTime: format(totalTx),
       openShift: openShift || null,
     });
   } catch (err) {
@@ -348,41 +354,61 @@ router.get('/pnl', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_READ),
       if (startDate) expenseDateFilter.date.gte = new Date(startDate);
       if (endDate) expenseDateFilter.date.lte = new Date(endDate);
     }
-    const [transactions, expenses] = await Promise.all([
-      prisma.transaction.findMany({
+    const [txGroups, expenseGroups, departments] = await Promise.all([
+      prisma.transaction.groupBy({
+        by: ['departmentId'],
         where: dateFilter,
-        include: { department: { select: { id: true, name: true, slug: true } } },
+        _sum: { amount: true, cogs: true },
+        _count: true,
       }),
-      prisma.expense.findMany({
+      prisma.expense.groupBy({
+        by: ['departmentId'],
         where: expenseDateFilter,
-        include: { department: { select: { id: true, name: true, slug: true } } },
+        _sum: { amount: true },
+        _count: true,
       }),
+      prisma.department.findMany({ select: { id: true, name: true, slug: true } }),
     ]);
-    const deptData = {};
-    for (const t of transactions) {
-      const key = t.departmentId || 'uncategorized';
-      if (!deptData[key]) deptData[key] = { departmentId: t.departmentId, department: t.department, revenue: 0, expense: 0, txCount: 0, expenseCount: 0 };
-      deptData[key].revenue += Number(t.amount);
-      deptData[key].txCount += 1;
+    const deptMap = {};
+    for (const g of txGroups) {
+      const key = g.departmentId || 'uncategorized';
+      deptMap[key] = {
+        departmentId: g.departmentId,
+        department: departments.find((d) => d.id === g.departmentId) || null,
+        revenue: Number(g._sum.amount) || 0,
+        cogs: Number(g._sum.cogs) || 0,
+        expense: 0,
+        txCount: g._count,
+        expenseCount: 0,
+      };
     }
-    for (const e of expenses) {
-      const key = e.departmentId || 'uncategorized';
-      if (!deptData[key]) deptData[key] = { departmentId: e.departmentId, department: e.department, revenue: 0, expense: 0, txCount: 0, expenseCount: 0 };
-      deptData[key].expense += Number(e.amount);
-      deptData[key].expenseCount += 1;
+    for (const g of expenseGroups) {
+      const key = g.departmentId || 'uncategorized';
+      if (!deptMap[key]) {
+        deptMap[key] = {
+          departmentId: g.departmentId,
+          department: departments.find((d) => d.id === g.departmentId) || null,
+          revenue: 0, cogs: 0, expense: 0, txCount: 0, expenseCount: 0,
+        };
+      }
+      deptMap[key].expense += Number(g._sum.amount) || 0;
+      deptMap[key].expenseCount += g._count;
     }
-    const departments = Object.values(deptData).map((d) => ({
+    const deptRows = Object.values(deptMap).map((d) => ({
       ...d,
-      net: d.revenue - d.expense,
+      grossProfit: d.revenue - d.cogs,
+      net: d.revenue - d.cogs - d.expense,
     }));
-    const totals = departments.reduce((acc, d) => ({
+    const totals = deptRows.reduce((acc, d) => ({
       revenue: acc.revenue + d.revenue,
+      cogs: acc.cogs + d.cogs,
       expense: acc.expense + d.expense,
+      grossProfit: acc.grossProfit + d.grossProfit,
       net: acc.net + d.net,
       txCount: acc.txCount + d.txCount,
       expenseCount: acc.expenseCount + d.expenseCount,
-    }), { revenue: 0, expense: 0, net: 0, txCount: 0, expenseCount: 0 });
-    res.json({ departments, totals });
+    }), { revenue: 0, cogs: 0, expense: 0, grossProfit: 0, net: 0, txCount: 0, expenseCount: 0 });
+    res.json({ departments: deptRows, totals });
   } catch (err) {
     console.error('PNL error:', err);
     res.status(500).json({ message: 'Internal server error' });

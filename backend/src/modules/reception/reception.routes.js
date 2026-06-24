@@ -94,12 +94,21 @@ router.post('/patients', authenticate, requirePermission(PERMISSIONS.PATIENT_CRE
 
 router.post('/check-in', authenticate, requirePermission(PERMISSIONS.APPOINTMENT_WRITE), async (req, res) => {
   try {
-    const { patientId, clinicId, type, visitType, priority, notes } = req.body;
+    const { patientId, clinicId, type, visitType, priority, notes, collectPayment, paymentMethod } = req.body;
     if (!patientId || !clinicId) return res.status(400).json({ message: 'patientId and clinicId are required' });
     const patient = await prisma.patient.findUnique({ where: { id: patientId } });
     if (!patient) return res.status(404).json({ message: 'Patient not found' });
     const clinic = await resolveClinic(clinicId);
     if (!clinic) return res.status(404).json({ message: 'Clinic not found' });
+    if (collectPayment) {
+      if (!req.user.permissions.includes(PERMISSIONS.ACCOUNTING_WRITE)) {
+        return res.status(403).json({ message: 'Insufficient permissions to collect payment' });
+      }
+      const fee = visitType === 'FOLLOW_UP' ? clinic.followUpFee : clinic.consultationFee;
+      if (!fee || Number(fee) <= 0) {
+        return res.status(400).json({ message: 'No fee configured for this clinic' });
+      }
+    }
     const token = await nextToken(clinic.id);
     const appointment = await prisma.apppointment.create({
       data: {
@@ -115,7 +124,27 @@ router.post('/check-in', authenticate, requirePermission(PERMISSIONS.APPOINTMENT
       },
       include: { patient: { select: { fullName: true, mrn: true, nationalId: true } } },
     });
-    res.status(201).json(appointment);
+    let transaction = null;
+    if (collectPayment) {
+      const fee = visitType === 'FOLLOW_UP' ? clinic.followUpFee : clinic.consultationFee;
+      const department = await prisma.department.findFirst({ where: { clinicId: clinic.id } });
+      let shift = await prisma.shift.findFirst({ where: { userId: req.user.id, closedAt: null } });
+      if (!shift) {
+        shift = await prisma.shift.create({ data: { userId: req.user.id } });
+      }
+      transaction = await prisma.transaction.create({
+        data: {
+          type: 'RECEPTION',
+          amount: fee,
+          paymentMethod: paymentMethod || 'CASH',
+          description: `${visitType === 'FOLLOW_UP' ? 'Follow-up' : 'Consultation'} fee - ${clinic.name}`,
+          shiftId: shift.id,
+          cashierId: req.user.id,
+          departmentId: department ? department.id : null,
+        },
+      });
+    }
+    res.status(201).json({ appointment, transaction });
   } catch (err) {
     console.error('Check-in error:', err);
     res.status(500).json({ message: 'Internal server error' });

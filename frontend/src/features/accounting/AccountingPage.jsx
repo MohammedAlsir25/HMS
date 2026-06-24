@@ -448,34 +448,23 @@ export default function AccountingPage() {
           {summary && (
             <>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-caption text-slate">{t('accounting.today')}</p>
-                    <p className="text-heading-sm font-semibold text-obsidian">{formatCurrency(summary.today?.total || 0)}</p>
-                    <p className="text-caption text-slate">{summary.today?.count || 0} {t('accounting.transactions', 'transactions')}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-caption text-slate">{t('accounting.thisWeek')}</p>
-                    <p className="text-heading-sm font-semibold text-obsidian">{formatCurrency(summary.week?.total || 0)}</p>
-                    <p className="text-caption text-slate">{summary.week?.count || 0} {t('accounting.transactions')}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-caption text-slate">{t('accounting.thisMonth')}</p>
-                    <p className="text-heading-sm font-semibold text-obsidian">{formatCurrency(summary.month?.total || 0)}</p>
-                    <p className="text-caption text-slate">{summary.month?.count || 0} {t('accounting.transactions')}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-caption text-slate">{t('accounting.allTime')}</p>
-                    <p className="text-heading-sm font-semibold text-obsidian">{formatCurrency(summary.allTime?.total || 0)}</p>
-                    <p className="text-caption text-slate">{summary.allTime?.count || 0} {t('accounting.transactions')}</p>
-                  </CardContent>
-                </Card>
+                {['today', 'week', 'month', 'allTime'].map((period) => {
+                  const d = summary[period];
+                  const labelKey = period === 'today' ? 'accounting.today' : period === 'week' ? 'accounting.thisWeek' : period === 'month' ? 'accounting.thisMonth' : 'accounting.allTime';
+                  return (
+                    <Card key={period}>
+                      <CardContent className="p-4">
+                        <p className="text-caption text-slate">{t(labelKey)}</p>
+                        <p className="text-heading-sm font-semibold text-obsidian">{formatCurrency(d?.total || 0)}</p>
+                        <p className="text-caption text-slate">{d?.count || 0} {t('accounting.transactions')}</p>
+                        <div className="mt-2 pt-2 border-t border-silver text-xs text-slate space-y-0.5">
+                          <p>{t('accounting.cogsShort')}: <span className="text-orange-600 font-medium">{formatCurrency(d?.cogs || 0)}</span></p>
+                          <p>{t('accounting.grossProfitShort')}: <span className={((d?.total || 0) - (d?.cogs || 0)) >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>{formatCurrency((d?.total || 0) - (d?.cogs || 0))}</span></p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
 
               <div className="flex items-center gap-2">
@@ -545,19 +534,27 @@ export default function AccountingPage() {
 
               {pnlData && (
                 <Card>
-                  <CardHeader><CardTitle>Profit & Loss (30 days)</CardTitle></CardHeader>
+                  <CardHeader><CardTitle>{t('accounting.pnl')} (30 days)</CardTitle></CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
                       <div className="p-4 bg-green-50 rounded-lg">
-                        <p className="text-caption text-green-700">Revenue</p>
+                        <p className="text-caption text-green-700">{t('accounting.revenue')}</p>
                         <p className="text-heading-sm font-bold text-green-800">{formatCurrency(pnlData.totals?.revenue || 0)}</p>
                       </div>
+                      <div className="p-4 bg-orange-50 rounded-lg">
+                        <p className="text-caption text-orange-700">{t('accounting.cogsShort')}</p>
+                        <p className="text-heading-sm font-bold text-orange-800">{formatCurrency(pnlData.totals?.cogs || 0)}</p>
+                      </div>
+                      <div className="p-4 bg-blue-50 rounded-lg">
+                        <p className="text-caption text-blue-700">{t('accounting.grossProfitShort')}</p>
+                        <p className="text-heading-sm font-bold text-blue-800">{formatCurrency(pnlData.totals?.grossProfit || 0)}</p>
+                      </div>
                       <div className="p-4 bg-red-50 rounded-lg">
-                        <p className="text-caption text-red-700">Expenses</p>
+                        <p className="text-caption text-red-700">{t('accounting.expense')}</p>
                         <p className="text-heading-sm font-bold text-red-800">{formatCurrency(pnlData.totals?.expense || 0)}</p>
                       </div>
                       <div className={`p-4 rounded-lg ${(pnlData.totals?.net || 0) >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
-                        <p className={`text-caption ${(pnlData.totals?.net || 0) >= 0 ? 'text-green-700' : 'text-red-700'}`}>Net Income</p>
+                        <p className={`text-caption ${(pnlData.totals?.net || 0) >= 0 ? 'text-green-700' : 'text-red-700'}`}>{t('accounting.netIncomeShort')}</p>
                         <p className={`text-heading-sm font-bold ${(pnlData.totals?.net || 0) >= 0 ? 'text-green-800' : 'text-red-800'}`}>
                           {formatCurrency(pnlData.totals?.net || 0)}
                         </p>
@@ -567,9 +564,15 @@ export default function AccountingPage() {
                       <Table
                         columns={[
                           { key: 'department', header: 'Department', render: (v) => v?.name || 'Uncategorized' },
-                          { key: 'revenue', header: 'Revenue', render: (v) => formatCurrency(v) },
-                          { key: 'expense', header: 'Expenses', render: (v) => <span className="text-red-600">{formatCurrency(v)}</span> },
-                          { key: 'net', header: 'Net', render: (v, r) => (
+                          { key: 'revenue', header: t('accounting.revenue'), render: (v) => formatCurrency(v) },
+                          { key: 'cogs', header: t('accounting.cogsShort'), render: (v) => <span className="text-orange-600">{formatCurrency(v)}</span> },
+                          { key: 'grossProfit', header: t('accounting.grossProfitShort'), render: (v, r) => (
+                            <span className={v >= 0 ? 'text-blue-600 font-semibold' : 'text-red-600 font-semibold'}>
+                              {formatCurrency(v)}
+                            </span>
+                          )},
+                          { key: 'expense', header: t('accounting.expense'), render: (v) => <span className="text-red-600">{formatCurrency(v)}</span> },
+                          { key: 'net', header: t('accounting.netIncomeShort'), render: (v, r) => (
                             <span className={v >= 0 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
                               {formatCurrency(v)}
                             </span>
