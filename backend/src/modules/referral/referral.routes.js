@@ -6,12 +6,21 @@ import { PERMISSIONS } from '../../middleware/rbac.js';
 const router = Router();
 const prisma = new PrismaClient();
 
+async function resolveClinic(identifier) {
+  let clinic = await prisma.clinic.findUnique({ where: { id: identifier } });
+  if (!clinic) clinic = await prisma.clinic.findUnique({ where: { slug: identifier } });
+  return clinic;
+}
+
 router.get('/', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), async (req, res) => {
   try {
     const { patientId, fromClinicId } = req.query;
     const where = {};
     if (patientId) where.patientId = patientId;
-    if (fromClinicId) where.fromClinicId = fromClinicId;
+    if (fromClinicId) {
+      const clinic = await resolveClinic(fromClinicId);
+      if (clinic) where.fromClinicId = clinic.id;
+    }
     const referrals = await prisma.referral.findMany({
       where,
       include: {
@@ -34,11 +43,18 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CLINICAL_WRITE), as
     if (!patientId || !fromClinicId || !type) {
       return res.status(400).json({ message: 'patientId, fromClinicId, and type are required' });
     }
+    const fromClinic = await resolveClinic(fromClinicId);
+    if (!fromClinic) return res.status(404).json({ message: 'From clinic not found' });
+    let resolvedToClinicId = toClinicId || null;
+    if (resolvedToClinicId) {
+      const toClinic = await resolveClinic(resolvedToClinicId);
+      resolvedToClinicId = toClinic ? toClinic.id : null;
+    }
     const referral = await prisma.referral.create({
       data: {
         patientId,
-        fromClinicId,
-        toClinicId: toClinicId || null,
+        fromClinicId: fromClinic.id,
+        toClinicId: resolvedToClinicId,
         type,
         notes: notes || null,
       },

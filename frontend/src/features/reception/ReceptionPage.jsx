@@ -11,19 +11,6 @@ import FileUploader from './FileUploader';
 
 const TABS = ['newPatient', 'reservations', 'queue'];
 
-const clinicList = [
-  { id: 'placeholder', name: 'Select clinic...', slug: '' },
-  { id: 'medicine', name: 'Medicine', slug: 'medicine' },
-  { id: 'ent', name: 'ENT', slug: 'ent' },
-  { id: 'dental', name: 'Dental', slug: 'dental' },
-  { id: 'retina', name: 'Retina', slug: 'retina' },
-  { id: 'glaucoma', name: 'Glaucoma', slug: 'glaucoma' },
-  { id: 'orbit', name: 'Orbit', slug: 'orbit' },
-  { id: 'pediatrics-ophth', name: 'Peds Ophth', slug: 'pediatrics-ophth' },
-  { id: 'general-ophth', name: 'Gen Ophth', slug: 'general-ophth' },
-  { id: 'optometry', name: 'Optometry', slug: 'optometry' },
-];
-
 const statusConfig = {
   WAITING: { label: 'Waiting', variant: 'warning' },
   CALLED: { label: 'Called', variant: 'info' },
@@ -32,8 +19,6 @@ const statusConfig = {
   CANCELLED: { variant: 'danger' },
   NO_SHOW: { variant: 'danger' },
 };
-
-const clinics = clinicList.filter((c) => c.slug);
 
 function calcAge(dob) {
   if (!dob) return null;
@@ -44,6 +29,7 @@ function calcAge(dob) {
 export default function ReceptionPage() {
   const { t } = useTranslation();
   const [tab, setTab] = useState('queue');
+  const [clinics, setClinics] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
@@ -58,6 +44,10 @@ export default function ReceptionPage() {
   const [callingNext, setCallingNext] = useState(false);
   const queueRef = useRef(null);
   queueRef.current = queue;
+
+  useEffect(() => {
+    api.get('/clinics').then(setClinics).catch(() => {});
+  }, []);
 
   const loadQueue = useCallback(async (clinicId) => {
     if (!clinicId) return;
@@ -234,16 +224,17 @@ export default function ReceptionPage() {
                 </div>
                 <div>
                   <label className="text-sm font-medium text-graphite block mb-1">{t('reception.clinic')}</label>
-                  <select
-                    className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian
-                      focus:outline-none focus:ring-2 focus:ring-lilac-bloom focus:border-transparent"
-                    value={selectedClinic}
-                    onChange={(e) => setSelectedClinic(e.target.value)}
-                  >
-                    {clinicList.map((c) => (
-                      <option key={c.id} value={c.id} disabled={!c.slug}>{c.name}</option>
-                    ))}
-                  </select>
+                    <select
+                      className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian
+                        focus:outline-none focus:ring-2 focus:ring-lilac-bloom focus:border-transparent"
+                      value={selectedClinic}
+                      onChange={(e) => setSelectedClinic(e.target.value)}
+                    >
+                      <option value="">{t('reception.selectClinic')}</option>
+                      {clinics.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
                 </div>
                 <Button className="w-full" disabled={!selectedClinic} onClick={handleCheckIn}>
                   {t('reception.checkIn')} — {appointmentType === 'WALKIN' ? t('reception.walkin') : t('reception.reservation')}

@@ -4,18 +4,6 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { api } from '../../lib/api';
 
-const clinicList = [
-  { id: 'medicine', name: 'Medicine' },
-  { id: 'ent', name: 'ENT' },
-  { id: 'dental', name: 'Dental' },
-  { id: 'retina', name: 'Retina' },
-  { id: 'glaucoma', name: 'Glaucoma' },
-  { id: 'orbit', name: 'Orbit' },
-  { id: 'pediatrics-ophth', name: 'Peds Ophth' },
-  { id: 'general-ophth', name: 'Gen Ophth' },
-  { id: 'optometry', name: 'Optometry' },
-];
-
 export default function CrossReferralModal({ open, onClose, fromClinicId, onCreated }) {
   const [step, setStep] = useState('patient');
   const [searchQuery, setSearchQuery] = useState('');
@@ -25,6 +13,11 @@ export default function CrossReferralModal({ open, onClose, fromClinicId, onCrea
   const [referralType, setReferralType] = useState('INTERNAL_CLINIC');
   const [toClinicId, setToClinicId] = useState('');
   const [notes, setNotes] = useState('');
+  const [clinics, setClinics] = useState([]);
+
+  useEffect(() => {
+    if (open) api.get('/clinics').then(setClinics).catch(() => {});
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -131,7 +124,7 @@ export default function CrossReferralModal({ open, onClose, fromClinicId, onCrea
                   onChange={(e) => setToClinicId(e.target.value)}
                 >
                   <option value="">Select clinic...</option>
-                  {clinicList.filter((c) => c.id !== fromClinicId).map((c) => (
+                  {clinics.filter((c) => c.id !== fromClinicId).map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>

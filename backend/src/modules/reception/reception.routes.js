@@ -17,6 +17,12 @@ const upload = multer({
   },
 });
 
+async function resolveClinic(identifier) {
+  let clinic = await prisma.clinic.findUnique({ where: { id: identifier } });
+  if (!clinic) clinic = await prisma.clinic.findUnique({ where: { slug: identifier } });
+  return clinic;
+}
+
 function generateMRN() {
   const year = new Date().getFullYear();
   const rand = String(Math.floor(Math.random() * 99999)).padStart(5, '0');
@@ -92,9 +98,9 @@ router.post('/check-in', authenticate, requirePermission(PERMISSIONS.APPOINTMENT
     if (!patientId || !clinicId) return res.status(400).json({ message: 'patientId and clinicId are required' });
     const patient = await prisma.patient.findUnique({ where: { id: patientId } });
     if (!patient) return res.status(404).json({ message: 'Patient not found' });
-    const clinic = await prisma.clinic.findUnique({ where: { id: clinicId } });
+    const clinic = await resolveClinic(clinicId);
     if (!clinic) return res.status(404).json({ message: 'Clinic not found' });
-    const token = await nextToken(clinicId);
+    const token = await nextToken(clinic.id);
     const appointment = await prisma.apppointment.create({
       data: {
         token,
@@ -104,7 +110,7 @@ router.post('/check-in', authenticate, requirePermission(PERMISSIONS.APPOINTMENT
         visitType: visitType || 'NEW_VISIT',
         notes: notes || null,
         patientId,
-        clinicId,
+        clinicId: clinic.id,
         doctorId: req.user.id,
       },
       include: { patient: { select: { fullName: true, mrn: true, nationalId: true } } },
@@ -122,9 +128,9 @@ router.post('/reservations', authenticate, requirePermission(PERMISSIONS.APPOINT
     if (!patientId || !clinicId) return res.status(400).json({ message: 'patientId and clinicId are required' });
     const patient = await prisma.patient.findUnique({ where: { id: patientId } });
     if (!patient) return res.status(404).json({ message: 'Patient not found' });
-    const clinic = await prisma.clinic.findUnique({ where: { id: clinicId } });
+    const clinic = await resolveClinic(clinicId);
     if (!clinic) return res.status(404).json({ message: 'Clinic not found' });
-    const token = await nextToken(clinicId);
+    const token = await nextToken(clinic.id);
     const appointment = await prisma.apppointment.create({
       data: {
         token,
@@ -133,7 +139,7 @@ router.post('/reservations', authenticate, requirePermission(PERMISSIONS.APPOINT
         priority: 0,
         notes: notes || null,
         patientId,
-        clinicId,
+        clinicId: clinic.id,
         doctorId: req.user.id,
       },
       include: { patient: { select: { fullName: true, mrn: true, nationalId: true } } },
@@ -148,7 +154,10 @@ router.get('/reservations', authenticate, requirePermission(PERMISSIONS.APPOINTM
   try {
     const { clinicId, q } = req.query;
     const where = { status: 'RESERVED' };
-    if (clinicId) where.clinicId = clinicId;
+    if (clinicId) {
+      const clinic = await resolveClinic(clinicId);
+      if (clinic) where.clinicId = clinic.id;
+    }
     if (q && q.length >= 2) {
       where.patient = {
         OR: [
@@ -271,9 +280,11 @@ router.get('/queue/stats', authenticate, requirePermission(PERMISSIONS.APPOINTME
 
 router.get('/queue/:clinicId', authenticate, requirePermission(PERMISSIONS.APPOINTMENT_READ), async (req, res) => {
   try {
+    const clinic = await resolveClinic(req.params.clinicId);
+    if (!clinic) return res.status(404).json({ message: 'Clinic not found' });
     const appointments = await prisma.apppointment.findMany({
       where: {
-        clinicId: req.params.clinicId,
+        clinicId: clinic.id,
         status: { in: ['WAITING', 'CALLED', 'IN_PROGRESS'] },
       },
       include: { patient: { select: { fullName: true, mrn: true, dateOfBirth: true, phone: true, notes: true } } },
@@ -296,9 +307,11 @@ router.get('/queue/:clinicId', authenticate, requirePermission(PERMISSIONS.APPOI
 
 router.post('/queue/:clinicId/call-next', authenticate, requirePermission(PERMISSIONS.APPOINTMENT_WRITE), async (req, res) => {
   try {
+    const clinic = await resolveClinic(req.params.clinicId);
+    if (!clinic) return res.status(404).json({ message: 'Clinic not found' });
     const next = await prisma.apppointment.findFirst({
       where: {
-        clinicId: req.params.clinicId,
+        clinicId: clinic.id,
         status: 'WAITING',
       },
       orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
