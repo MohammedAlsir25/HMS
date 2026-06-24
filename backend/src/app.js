@@ -22,7 +22,15 @@ import departmentsRoutes from './modules/departments/departments.routes.js';
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: config.frontendUrl, credentials: true }));
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);
+    const normalize = (s) => s.replace(/\/+$/, '');
+    const allowed = normalize(config.frontendUrl);
+    cb(null, allowed === normalize(origin));
+  },
+  credentials: true,
+}));
 app.use(compression({ level: 6 }));
 app.use(morgan('short'));
 app.use(express.json({ limit: '10mb' }));
