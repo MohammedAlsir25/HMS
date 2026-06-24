@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 
 router.post("/pharmacy/items", authenticate, requirePermission(PERMISSIONS.PHARMACY_WRITE), async (req, res) => {
   try {
-    const { name, nameAr, sku, price, initialQuantity, minStock, expiryDate } = req.body;
+    const { name, nameAr, sku, price, costPrice, initialQuantity, minStock, expiryDate } = req.body;
     if (!name || !sku) return res.status(400).json({ message: "Name and SKU are required" });
     const existing = await prisma.inventoryItem.findUnique({ where: { sku } });
     if (existing) return res.status(409).json({ message: "Item with this SKU already exists" });
@@ -21,6 +21,7 @@ router.post("/pharmacy/items", authenticate, requirePermission(PERMISSIONS.PHARM
         category: "pharmacy",
         quantity: initialQuantity || 0,
         price: price || 0,
+        costPrice: costPrice || 0,
         minStock: minStock || 0,
         expiryDate: expiryDate ? new Date(expiryDate) : null,
       },
@@ -34,7 +35,7 @@ router.post("/pharmacy/items", authenticate, requirePermission(PERMISSIONS.PHARM
 
 router.post("/optics/items", authenticate, requirePermission(PERMISSIONS.OPTICS_WRITE), async (req, res) => {
   try {
-    const { name, nameAr, sku, price, initialQuantity, minStock } = req.body;
+    const { name, nameAr, sku, price, costPrice, initialQuantity, minStock } = req.body;
     if (!name || !sku) return res.status(400).json({ message: "Name and SKU are required" });
     const existing = await prisma.inventoryItem.findUnique({ where: { sku } });
     if (existing) return res.status(409).json({ message: "Item with this SKU already exists" });
@@ -46,6 +47,7 @@ router.post("/optics/items", authenticate, requirePermission(PERMISSIONS.OPTICS_
         category: "optics",
         quantity: initialQuantity || 0,
         price: price || 0,
+        costPrice: costPrice || 0,
         minStock: minStock || 0,
       },
     });

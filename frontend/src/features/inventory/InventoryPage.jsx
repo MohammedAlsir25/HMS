@@ -16,6 +16,7 @@ const columns = [
     <span className={v <= row.minStock ? 'text-red-500 font-semibold' : ''}>{v}</span>
   )},
   { key: 'price', header: 'Price', render: (v) => `$${Number(v).toFixed(2)}` },
+  { key: 'costPrice', header: 'Cost', render: (v) => v ? `$${Number(v).toFixed(2)}` : '-' },
   { key: 'minStock', header: 'Min Stock' },
 ];
 
@@ -26,7 +27,7 @@ export default function InventoryPage() {
   const [showModal, setShowModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [transactions, setTransactions] = useState([]);
-  const [form, setForm] = useState({ name: '', sku: '', category: '', quantity: 0, price: 0, minStock: 0 });
+  const [form, setForm] = useState({ name: '', sku: '', category: '', quantity: 0, price: 0, costPrice: 0, minStock: 0 });
   const [txForm, setTxForm] = useState({ type: 'IN', quantity: 1, notes: '' });
 
   const loadItems = async () => {
@@ -63,7 +64,7 @@ export default function InventoryPage() {
     try {
       await api.post('/inventory/items', form);
       setShowModal(false);
-      setForm({ name: '', sku: '', category: '', quantity: 0, price: 0, minStock: 0 });
+      setForm({ name: '', sku: '', category: '', quantity: 0, price: 0, costPrice: 0, minStock: 0 });
       loadItems();
     } catch (err) {
       alert(err.message || 'Failed to create item');
@@ -137,6 +138,7 @@ export default function InventoryPage() {
                   <p className="text-body"><span className="font-medium">Category:</span> {selectedItem.category}</p>
                   <p className="text-body"><span className="font-medium">Quantity:</span> {selectedItem.quantity}</p>
                   <p className="text-body"><span className="font-medium">Price:</span> ${Number(selectedItem.price).toFixed(2)}</p>
+                  {selectedItem.costPrice != null && <p className="text-body"><span className="font-medium">Cost:</span> ${Number(selectedItem.costPrice).toFixed(2)}</p>}
                   <p className="text-body"><span className="font-medium">Min Stock:</span> {selectedItem.minStock}</p>
                   {selectedItem.quantity <= selectedItem.minStock && (
                     <Badge variant="danger">Low Stock</Badge>
@@ -208,6 +210,7 @@ export default function InventoryPage() {
           </div>
           <Input label="Initial Quantity" type="number" min="0" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: parseInt(e.target.value) || 0 })} />
           <Input label="Price" type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: parseFloat(e.target.value) || 0 })} />
+          <Input label="Cost Price" type="number" min="0" step="0.01" value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: parseFloat(e.target.value) || 0 })} />
           <Input label="Min Stock Level" type="number" min="0" value={form.minStock} onChange={(e) => setForm({ ...form, minStock: parseInt(e.target.value) || 0 })} />
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="secondary" onClick={() => setShowModal(false)} className="flex-1">Cancel</Button>

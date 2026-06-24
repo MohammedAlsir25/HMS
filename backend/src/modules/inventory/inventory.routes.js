@@ -52,14 +52,14 @@ router.get('/items/:id', authenticate, requirePermission(PERMISSIONS.WAREHOUSE_R
 
 router.post('/items', authenticate, requirePermission(PERMISSIONS.WAREHOUSE_WRITE), async (req, res) => {
   try {
-    const { name, nameAr, sku, category, quantity, price, minStock } = req.body;
+    const { name, nameAr, sku, category, quantity, price, costPrice, minStock } = req.body;
     if (!name || !sku || !category) {
       return res.status(400).json({ message: 'Name, SKU, and category are required' });
     }
     const existing = await prisma.inventoryItem.findUnique({ where: { sku } });
     if (existing) return res.status(409).json({ message: 'Item with this SKU already exists' });
     const item = await prisma.inventoryItem.create({
-      data: { name, nameAr, sku, category, quantity: quantity || 0, price: price || 0, minStock: minStock || 0 },
+      data: { name, nameAr, sku, category, quantity: quantity || 0, price: price || 0, costPrice: costPrice || 0, minStock: minStock || 0 },
     });
     res.status(201).json(item);
   } catch (err) {
@@ -70,10 +70,10 @@ router.post('/items', authenticate, requirePermission(PERMISSIONS.WAREHOUSE_WRIT
 
 router.patch('/items/:id', authenticate, requirePermission(PERMISSIONS.WAREHOUSE_WRITE), async (req, res) => {
   try {
-    const { name, nameAr, category, price, minStock, isActive } = req.body;
+    const { name, nameAr, category, price, costPrice, minStock, isActive } = req.body;
     const item = await prisma.inventoryItem.update({
       where: { id: req.params.id },
-      data: { name, nameAr, category, price, minStock, isActive },
+      data: { name, nameAr, category, price, costPrice, minStock, isActive },
     });
     res.json(item);
   } catch (err) {

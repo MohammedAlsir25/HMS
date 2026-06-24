@@ -1,26 +1,15 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
+import { getSupabase, getBucket } from '../../lib/supabase.js';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
 import { PERMISSIONS } from '../../middleware/rbac.js';
 
 const router = Router();
 const prisma = new PrismaClient();
 
-const UPLOAD_DIR = path.resolve('uploads');
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
-  filename: (_req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
-    cb(null, `${unique}-${file.originalname}`);
-  },
-});
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype === 'application/pdf') cb(null, true);
@@ -207,15 +196,24 @@ router.post('/files', authenticate, requirePermission(PERMISSIONS.PATIENT_CREATE
     const patient = await prisma.patient.findUnique({ where: { id: patientId } });
     if (!patient) return res.status(404).json({ message: 'Patient not found' });
     const records = await Promise.all(
-      req.files.map((f) =>
-        prisma.patientFile.create({
-          data: { originalName: f.originalname, storedPath: f.filename, mimeType: f.mimetype, size: f.size, patientId },
-        })
-      ),
+      req.files.map(async (f) => {
+        const supabase = await getSupabase();
+        const bucket = await getBucket();
+        const storagePath = `patients/${patientId}/${Date.now()}-${f.originalname}`;
+        const { error } = await supabase.storage.from(bucket).upload(storagePath, f.buffer, {
+          contentType: f.mimetype,
+          upsert: false,
+        });
+        if (error) throw new Error(`Supabase upload failed: ${error.message}`);
+        return prisma.patientFile.create({
+          data: { originalName: f.originalname, storedPath: storagePath, mimeType: f.mimetype, size: f.size, patientId },
+        });
+      }),
     );
     res.status(201).json(records);
   } catch (err) {
-    res.status(500).json({ message: 'Internal server error' });
+    console.error('File upload error:', err);
+    res.status(500).json({ message: err.message || 'Internal server error' });
   }
 });
 
@@ -235,9 +233,11 @@ router.get('/files/download/:id', authenticate, requirePermission(PERMISSIONS.PA
   try {
     const file = await prisma.patientFile.findUnique({ where: { id: req.params.id } });
     if (!file) return res.status(404).json({ message: 'File not found' });
-    const filePath = path.join(UPLOAD_DIR, file.storedPath);
-    if (!fs.existsSync(filePath)) return res.status(404).json({ message: 'File not found on disk' });
-    res.download(filePath, file.originalName);
+    const supabase = await getSupabase();
+    const bucket = await getBucket();
+    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(file.storedPath, 3600);
+    if (error || !data) return res.status(500).json({ message: 'Failed to generate download link' });
+    res.redirect(data.signedUrl);
   } catch (err) {
     res.status(500).json({ message: 'Internal server error' });
   }

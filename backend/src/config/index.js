@@ -16,6 +16,11 @@ export const config = {
   bcrypt: {
     rounds: 12,
   },
+  supabase: {
+    url: process.env.SUPABASE_URL || '',
+    serviceKey: process.env.SUPABASE_SERVICE_KEY || '',
+    storageBucket: process.env.SUPABASE_STORAGE_BUCKET || 'jh-uploads',
+  },
   gemini: {
     apiKey: process.env.GEMINI_API_KEY || '',
     model: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
