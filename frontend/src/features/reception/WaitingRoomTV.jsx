@@ -56,7 +56,7 @@ export default function WaitingRoomTV() {
         <>
           <div className="mb-4 flex items-center gap-4">
             <div className="flex items-center gap-2 text-sm text-slate">
-              <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-500 dark:bg-green-400 animate-pulse" />
               <span>{totalWaiting} patients waiting across {clinicSlugs.length} clinics</span>
             </div>
           </div>
@@ -93,18 +93,18 @@ export default function WaitingRoomTV() {
 
                   {inProgress && (
                     <div className="mb-2">
-                      <p className="text-xs text-green-400 uppercase tracking-wider mb-1">Now Serving</p>
-                      <div className="bg-green-500/20 border border-green-500/40 rounded-xl p-3 text-center">
-                        <p className="text-5xl font-bold text-green-400">#{String(inProgress.token).padStart(3, '0')}</p>
+                      <p className="text-xs text-green-400 dark:text-green-300 uppercase tracking-wider mb-1">Now Serving</p>
+                      <div className="bg-green-500/20 dark:bg-green-500/30 border border-green-500/40 dark:border-green-500/60 rounded-xl p-3 text-center">
+                        <p className="text-5xl font-bold text-green-400 dark:text-green-300">#{String(inProgress.token).padStart(3, '0')}</p>
                       </div>
                     </div>
                   )}
 
                   {called && !inProgress && (
                     <div className="mb-2">
-                      <p className="text-xs text-sky-400 uppercase tracking-wider mb-1">Called</p>
-                      <div className="bg-sky-500/20 border border-sky-500/40 rounded-xl p-3 text-center">
-                        <p className="text-5xl font-bold text-sky-400">#{String(called.token).padStart(3, '0')}</p>
+                      <p className="text-xs text-sky-400 dark:text-sky-300 uppercase tracking-wider mb-1">Called</p>
+                      <div className="bg-sky-500/20 dark:bg-sky-500/30 border border-sky-500/40 dark:border-sky-500/60 rounded-xl p-3 text-center">
+                        <p className="text-5xl font-bold text-sky-400 dark:text-sky-300">#{String(called.token).padStart(3, '0')}</p>
                       </div>
                     </div>
                   )}
@@ -117,7 +117,7 @@ export default function WaitingRoomTV() {
                       {waiting.slice(0, 15).map((a) => (
                         <span key={a.token}
                           className={`inline-flex items-center justify-center w-10 h-10 rounded-lg text-base font-bold
-                            ${a.priority > 0 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' : 'bg-white/5 text-slate border border-white/10'}`}
+                            ${a.priority > 0 ? 'bg-amber-500/20 dark:bg-amber-500/30 text-amber-400 dark:text-amber-300 border border-amber-500/40 dark:border-amber-500/60' : 'bg-white/5 text-slate border border-white/10'}`}
                           title={`Token ${a.token}${a.priority > 0 ? ` (Priority ${a.priority})` : ''}`}>
                           {String(a.token).padStart(2, '0')}
                         </span>
@@ -137,7 +137,7 @@ export default function WaitingRoomTV() {
       )}
 
       <div className="mt-6 text-center text-sm text-slate">
-        <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse" />
+        <span className="inline-block w-2 h-2 rounded-full bg-green-500 dark:bg-green-400 mr-2 animate-pulse" />
         Live &middot; Updates every 8 seconds
       </div>
     </div>

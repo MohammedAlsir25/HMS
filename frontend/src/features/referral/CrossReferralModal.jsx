@@ -176,7 +176,7 @@ export default function CrossReferralModal({ open, onClose, fromClinicId, onCrea
                       <div className="flex items-center justify-between">
                         <span className="text-caption font-medium text-graphite">Medication #{idx + 1}</span>
                         <button onClick={() => setMedications((prev) => prev.filter((_, i) => i !== idx))}
-                          className="text-red-400 hover:text-red-600 text-caption touch-target">Remove</button>
+                          className="text-red-400 hover:text-red-600 dark:hover:text-red-400 text-caption touch-target">Remove</button>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                         <Input label="Drug Name" placeholder="e.g. Paracetamol" value={med.drugName}

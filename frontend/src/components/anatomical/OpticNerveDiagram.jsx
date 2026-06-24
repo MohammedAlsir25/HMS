@@ -39,13 +39,13 @@ export default function OpticNerveDiagram({ side = 'OD', onSectorSelect, selecte
       <svg viewBox="0 0 200 200" className="w-56 h-56">
         <defs>
           <radialGradient id="discGrad" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#fff4e6" />
-            <stop offset="60%" stopColor="#fce4c5" />
-            <stop offset="100%" stopColor="#f5d5a0" />
+            <stop offset="0%" stopColor="var(--color-obsidian)" stopOpacity="0.08" />
+            <stop offset="60%" stopColor="var(--color-obsidian)" stopOpacity="0.12" />
+            <stop offset="100%" stopColor="var(--color-obsidian)" stopOpacity="0.18" />
           </radialGradient>
           <radialGradient id="cupGrad" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#f0d9b5" />
-            <stop offset="100%" stopColor="#e8c9a0" />
+            <stop offset="0%" stopColor="var(--color-obsidian)" stopOpacity="0.22" />
+            <stop offset="100%" stopColor="var(--color-obsidian)" stopOpacity="0.28" />
           </radialGradient>
         </defs>
 
@@ -68,10 +68,10 @@ export default function OpticNerveDiagram({ side = 'OD', onSectorSelect, selecte
             <path
               key={ch.id}
               d={`M ${innerLeft.x} ${innerLeft.y} L ${outerLeft.x} ${outerLeft.y} A ${rOuter} ${rOuter} 0 0 1 ${outerRight.x} ${outerRight.y} L ${innerRight.x} ${innerRight.y} A ${rMid} ${rMid} 0 0 0 ${innerLeft.x} ${innerLeft.y} Z`}
-              fill={selected ? '#c084fc' : '#f5e6d0'}
-              stroke={selected ? '#a855f7' : '#d4c4a8'}
+              fill={selected ? 'var(--color-lilac-bloom)' : 'var(--color-bone)'}
+              stroke={selected ? 'var(--color-lilac-bloom)' : 'var(--color-silver)'}
               strokeWidth="1"
-              opacity={selected ? 0.7 : 0.4}
+              opacity={selected ? 0.7 : 0.6}
               className="cursor-pointer hover:opacity-70 transition-opacity"
               onClick={() => handleSectorClick(ch.id)}
             />
@@ -97,14 +97,14 @@ export default function OpticNerveDiagram({ side = 'OD', onSectorSelect, selecte
           );
         })}
 
-        <circle cx={cx} cy={cy} r={rInner} fill="url(#cupGrad)" stroke="#d4c4a8" strokeWidth="1" />
-        <circle cx={cx} cy={cy} r={rInner - 6} fill="#e0cca8" opacity={0.5} />
+        <circle cx={cx} cy={cy} r={rInner} fill="url(#cupGrad)" stroke="var(--color-silver)" strokeWidth="1" />
+        <circle cx={cx} cy={cy} r={rInner - 6} fill="var(--color-bone)" opacity={0.8} />
 
-        <circle cx={cx} cy={cy} r={rOuter} fill="none" stroke="#d4c4a8" strokeWidth="1.5" />
-        <circle cx={cx} cy={cy} r={rMid} fill="none" stroke="#d4c4a8" strokeWidth="0.5" strokeDasharray="3 2" />
+        <circle cx={cx} cy={cy} r={rOuter} fill="none" stroke="var(--color-silver)" strokeWidth="1.5" />
+        <circle cx={cx} cy={cy} r={rMid} fill="none" stroke="var(--color-silver)" strokeWidth="0.5" strokeDasharray="3 2" />
 
-        <line x1={cx} y1={cy - rOuter} x2={cx} y2={cy + rOuter} stroke="#d4c4a8" strokeWidth="0.3" strokeDasharray="2 2" />
-        <line x1={cx - rOuter} y1={cy} x2={cx + rOuter} y2={cy} stroke="#d4c4a8" strokeWidth="0.3" strokeDasharray="2 2" />
+        <line x1={cx} y1={cy - rOuter} x2={cx} y2={cy + rOuter} stroke="var(--color-silver)" strokeWidth="0.3" strokeDasharray="2 2" />
+        <line x1={cx - rOuter} y1={cy} x2={cx + rOuter} y2={cy} stroke="var(--color-silver)" strokeWidth="0.3" strokeDasharray="2 2" />
 
         <text x={cx} y={cy + 4} textAnchor="middle" dominantBaseline="central" className="text-[7px] fill-slate font-medium pointer-events-none">Cup</text>
       </svg>

@@ -26,11 +26,11 @@ export default function DrugNameAutocomplete({ value, onChange, clinicSlug }) {
   };
 
   const stockColor = (qty, min) => {
-    if (!min) return 'text-green-600';
+    if (!min) return 'text-green-600 dark:text-green-400';
     const ratio = qty / min;
-    if (ratio <= 0.5) return 'text-red-500';
-    if (ratio <= 1) return 'text-amber-500';
-    return 'text-green-600';
+    if (ratio <= 0.5) return 'text-red-500 dark:text-red-400';
+    if (ratio <= 1) return 'text-amber-500 dark:text-amber-400';
+    return 'text-green-600 dark:text-green-400';
   };
 
   return (
@@ -69,7 +69,7 @@ export default function DrugNameAutocomplete({ value, onChange, clinicSlug }) {
                   Stock: {item.quantity}
                 </span>
                 {item.quantity > 0 && item.quantity <= (item.minStock || 0) && (
-                  <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded">Low</span>
+                  <span className="text-xs bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded">Low</span>
                 )}
               </div>
             </div>

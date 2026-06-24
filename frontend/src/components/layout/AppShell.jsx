@@ -3,10 +3,13 @@ import { useResponsive } from '../../hooks/useResponsive';
 import { useAuthStore } from '../../stores/authStore';
 import StaggeredMenu from './StaggeredMenu';
 import TabletNav from './TabletNav';
+import UserProfileDropdown from './UserProfileDropdown';
+import SettingsModal from '../../features/settings/SettingsModal';
 
 export default function AppShell({ children }) {
   const { isMobile } = useResponsive();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const user = useAuthStore((s) => s.user);
   const isAdmin = user?.role === 'Super Admin';
 
@@ -37,6 +40,9 @@ export default function AppShell({ children }) {
             </button>
           )}
           <img src="/logo.png" alt="AL Jawahir Hospital" className="h-9 w-auto" />
+          <div className="ml-auto">
+            <UserProfileDropdown onSettings={() => setSettingsOpen(true)} />
+          </div>
         </div>
       </header>
 
@@ -52,6 +58,8 @@ export default function AppShell({ children }) {
       </main>
 
       {isMobile && <TabletNav />}
+
+      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }

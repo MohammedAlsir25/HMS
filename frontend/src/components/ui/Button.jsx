@@ -4,7 +4,7 @@ const variants = {
   primary: 'bg-lilac-bloom text-obsidian hover:brightness-95 active:brightness-90',
   secondary: 'bg-obsidian text-paper hover:bg-graphite active:bg-obsidian',
   ghost: 'bg-transparent text-obsidian border border-silver hover:bg-bone',
-  danger: 'bg-red-500 text-white hover:bg-red-600',
+  danger: 'bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-500',
 };
 
 const sizes = {

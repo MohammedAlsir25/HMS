@@ -33,13 +33,13 @@ const navItems = [
 
 export default function StaggeredMenu({
   position = 'right',
-  colors = ['#f1ccff', '#d4a0f0', '#b879e0'],
+  colors = ['var(--color-sm-layer-1)', 'var(--color-sm-layer-2)', 'var(--color-sm-layer-3)'],
   items = navItems,
   displayItemNumbering = false,
   className,
   logoUrl = '/logo.png',
-  menuButtonColor = '#1a1a2e',
-  openMenuButtonColor = '#1a1a2e',
+  menuButtonColor = 'var(--color-obsidian)',
+  openMenuButtonColor = 'var(--color-obsidian)',
   changeMenuColorOnOpen = false,
   accentColor = '#7c3aed',
   isFixed = false,
@@ -382,7 +382,7 @@ export default function StaggeredMenu({
           aria-hidden="true"
         >
           {(() => {
-            const raw = colors && colors.length ? colors.slice(0, 4) : ['#1e1e22', '#35353c'];
+            const raw = colors && colors.length ? colors.slice(0, 4) : ['var(--color-sm-layer-2)', 'var(--color-sm-layer-3)'];
             let arr = [...raw];
             if (arr.length >= 3) {
               const mid = Math.floor(arr.length / 2);
@@ -463,7 +463,7 @@ export default function StaggeredMenu({
         <aside
           id="staggered-menu-panel"
           ref={panelRef}
-          className="staggered-menu-panel absolute top-0 right-0 h-full bg-white flex flex-col p-[6em_2em_2em_2em] overflow-y-auto z-10 backdrop-blur-[12px] pointer-events-auto"
+          className="staggered-menu-panel absolute top-0 right-0 h-full bg-paper flex flex-col p-[6em_2em_2em_2em] overflow-y-auto z-10 backdrop-blur-[12px] pointer-events-auto"
           style={{ WebkitBackdropFilter: 'blur(12px)' }}
           aria-hidden={!open}
         >

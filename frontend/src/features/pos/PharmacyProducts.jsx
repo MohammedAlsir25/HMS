@@ -21,10 +21,10 @@ function AlertPanel({ alerts, onDismiss }) {
   return (
     <div className="space-y-2">
       {sections.filter(s => s.items.length > 0).map((section) => (
-        <div key={section.key} className={`rounded-lg border ${section.color === "red" ? "border-red-300 bg-red-50" : "border-yellow-300 bg-yellow-50"} overflow-hidden`}>
-          <button className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium touch-target"
+        <div key={section.key} className={`rounded-lg border ${section.color === "red" ? "border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900" : "border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900"} overflow-hidden`}>
+          <button
             onClick={() => setExpanded(expanded === section.key ? null : section.key)}
-            style={{ color: section.color === "red" ? "#991b1b" : "#92400e" }}>
+            className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium touch-target ${section.color === "red" ? "text-red-800 dark:text-red-200" : "text-yellow-800 dark:text-yellow-200"}`}>
             <span>{section.icon} {section.items.length} {section.label}</span>
             <svg className={`w-4 h-4 transition-transform ${expanded === section.key ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
           </button>
@@ -179,7 +179,7 @@ export default function PharmacyProducts() {
       key: "quantity",
       label: t("pharmacyProducts.colQty"),
       render: (row) => (
-        <span className={row.quantity <= row.minStock ? "text-red-500 font-semibold" : ""}>
+        <span className={row.quantity <= row.minStock ? "text-red-500 dark:text-red-400 font-semibold" : ""}>
           {row.quantity}
         </span>
       ),
@@ -235,8 +235,8 @@ export default function PharmacyProducts() {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card><CardContent className="p-4"><p className="text-caption text-slate">{t("pharmacyProducts.totalProducts")}</p><p className="text-heading-sm font-semibold text-obsidian">{items.length}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-caption text-slate">{t("pharmacyProducts.lowStock")}</p><p className="text-heading-sm font-semibold text-red-500">{lowStockCount}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-caption text-slate">{t("pharmacyProducts.expired")}</p><p className="text-heading-sm font-semibold text-red-500">{expiredCount}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-caption text-slate">{t("pharmacyProducts.lowStock")}</p><p className="text-heading-sm font-semibold text-red-500 dark:text-red-400">{lowStockCount}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-caption text-slate">{t("pharmacyProducts.expired")}</p><p className="text-heading-sm font-semibold text-red-500 dark:text-red-400">{expiredCount}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-caption text-slate">{t("pharmacyProducts.totalStock")}</p><p className="text-heading-sm font-semibold text-obsidian">{items.reduce((s, i) => s + i.quantity, 0)}</p></CardContent></Card>
       </div>
 
@@ -288,9 +288,9 @@ export default function PharmacyProducts() {
           <div>
             <label className="text-sm font-medium text-graphite block mb-1">{t("pharmacyProducts.adjustType")}</label>
             <div className="flex gap-2">
-              <button type="button" className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors touch-target ${adjustForm.type === "IN" ? "bg-green-100 text-green-800 border border-green-300" : "bg-bone text-graphite hover:bg-silver"}`}
+              <button type="button" className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors touch-target ${adjustForm.type === "IN" ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border border-green-300" : "bg-bone text-graphite hover:bg-silver"}`}
                 onClick={() => setAdjustForm({ ...adjustForm, type: "IN" })}>{t("pharmacyProducts.stockIn")}</button>
-              <button type="button" className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors touch-target ${adjustForm.type === "OUT" ? "bg-red-100 text-red-800 border border-red-300" : "bg-bone text-graphite hover:bg-silver"}`}
+              <button type="button" className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors touch-target ${adjustForm.type === "OUT" ? "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 border border-red-300" : "bg-bone text-graphite hover:bg-silver"}`}
                 onClick={() => setAdjustForm({ ...adjustForm, type: "OUT" })}>{t("pharmacyProducts.stockOut")}</button>
             </div>
           </div>

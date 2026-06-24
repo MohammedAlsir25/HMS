@@ -9,11 +9,10 @@ const HOURS = Array.from({ length: 14 }, (_, i) => i + 7);
 
 const statusColors = {
   SCHEDULED: { bg: 'bg-lilac-bloom/30', border: 'border-lilac-bloom', label: 'bg-lilac-bloom text-obsidian' },
-  PREP: { bg: 'bg-amber-100', border: 'border-amber-300', label: 'bg-amber-100 text-amber-800' },
-  IN_SURGERY: { bg: 'bg-green-100', border: 'border-green-300', label: 'bg-green-100 text-green-800' },
-  RECOVERY: { bg: 'bg-purple-100', border: 'border-purple-300', label: 'bg-purple-100 text-purple-800' },
-  COMPLETED: { bg: 'bg-silver/30', border: 'border-silver', label: 'bg-bone text-graphite' },
-  CANCELLED: { bg: 'bg-red-100', border: 'border-red-300', label: 'bg-red-100 text-red-800' },
+  PREP: { bg: 'bg-amber-100 dark:bg-amber-900', border: 'border-amber-300 dark:border-amber-700', label: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200' },
+  IN_SURGERY: { bg: 'bg-green-100 dark:bg-green-900', border: 'border-green-300 dark:border-green-700', label: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
+  RECOVERY: { bg: 'bg-purple-100 dark:bg-purple-900', border: 'border-purple-300 dark:border-purple-700', label: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
+  CANCELLED: { bg: 'bg-red-100 dark:bg-red-900', border: 'border-red-300 dark:border-red-700', label: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' },
 };
 
 const statusFlow = {

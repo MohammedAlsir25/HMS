@@ -636,13 +636,13 @@ export default function LabDashboard() {
                       {t(r.status === 'COMPLETED' ? 'lab.viewReport' : 'lab.enterResults')}
                     </button>
                     {r.status === 'PENDING' && (
-                      <button onClick={() => handleClaim(r.id)} className="text-green-600 hover:underline text-caption px-1">
+                      <button onClick={() => handleClaim(r.id)} className="text-green-600 dark:text-green-400 hover:underline text-caption px-1">
                         {t('lab.claim')}
                       </button>
                     )}
                     {r.status === 'IN_PROGRESS' && (
                       <>
-                        <button onClick={() => handleComplete(r.id)} className="text-green-600 hover:underline text-caption px-1">
+                        <button onClick={() => handleComplete(r.id)} className="text-green-600 dark:text-green-400 hover:underline text-caption px-1">
                           {t('lab.markCompleted')}
                         </button>
                         <button onClick={() => handleUnclaim(r.id)} className="text-slate hover:underline text-caption px-1">
@@ -651,7 +651,7 @@ export default function LabDashboard() {
                       </>
                     )}
                     {r.status !== 'COMPLETED' && r.status !== 'CANCELLED' && (
-                      <button onClick={() => handleCancel(r.id)} className="text-red-500 hover:underline text-caption px-1">
+                      <button onClick={() => handleCancel(r.id)} className="text-red-500 dark:text-red-400 hover:underline text-caption px-1">
                         {t('lab.cancelOrder')}
                       </button>
                     )}

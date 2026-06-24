@@ -1,5 +1,5 @@
 @theme {
-  /* Colors */
+  /* Colors — Light mode */
   --color-obsidian: #000000;
   --color-graphite: #333333;
   --color-slate: #7b7b7b;
@@ -9,6 +9,10 @@
   --color-paper: #ffffff;
   --color-lilac-bloom: #f1ccff;
   --color-sky-veil: #91e0ff;
+  --color-sm-layer-1: #f1ccff;
+  --color-sm-layer-2: #d4a0f0;
+  --color-sm-layer-3: #b879e0;
+  --color-panel: rgba(255, 255, 255, 0.97);
 
   /* Typography */
   --font-switzer: 'Switzer', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -60,4 +64,22 @@
   /* Shadows */
   --shadow-md: rgba(0, 0, 0, 0.04) 0px 8px 16px 0px;
   --shadow-subtle: rgba(16, 24, 40, 0.05) 0px 1px 2px 0px;
+}
+
+.dark {
+  --color-obsidian: #f0f0f0;
+  --color-graphite: #c0c0c0;
+  --color-slate: #888888;
+  --color-mist: #555555;
+  --color-silver: #3a3a3e;
+  --color-bone: #2a2a30;
+  --color-paper: #1c1c22;
+  --color-lilac-bloom: #a78bfa;
+  --color-sky-veil: #60a5fa;
+  --color-sm-layer-1: #2a2a35;
+  --color-sm-layer-2: #252530;
+  --color-sm-layer-3: #20202a;
+  --color-panel: rgba(28, 28, 34, 0.97);
+  --shadow-md: rgba(0, 0, 0, 0.4) 0px 8px 16px 0px;
+  --shadow-subtle: rgba(0, 0, 0, 0.3) 0px 1px 2px 0px;
 }

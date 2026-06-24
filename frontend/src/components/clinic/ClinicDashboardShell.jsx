@@ -40,7 +40,7 @@ export function StatCard({ label, value, trend, variant = 'default' }) {
       <span className="text-caption text-slate font-medium">{label}</span>
       <span className="text-subheading font-semibold text-obsidian">{value}</span>
       {trend && (
-        <span className={`text-caption ${trend.startsWith('+') ? 'text-green-600' : 'text-red-500'}`}>
+        <span className={`text-caption ${trend.startsWith('+') ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
           {trend}
         </span>
       )}

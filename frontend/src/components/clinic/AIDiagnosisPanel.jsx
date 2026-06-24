@@ -54,8 +54,8 @@ export default function AIDiagnosisPanel({
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-          <p className="text-caption text-red-700">{error}</p>
+        <div className="bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 rounded-lg px-4 py-3">
+          <p className="text-caption text-red-700 dark:text-red-300">{error}</p>
         </div>
       )}
 
@@ -127,8 +127,8 @@ export default function AIDiagnosisPanel({
       )}
 
       {aiNotes && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-          <p className="text-caption text-amber-800">{aiNotes}</p>
+        <div className="bg-amber-50 dark:bg-amber-900 border border-amber-200 dark:border-amber-700 rounded-lg px-4 py-3">
+          <p className="text-caption text-amber-800 dark:text-amber-200">{aiNotes}</p>
         </div>
       )}
     </div>

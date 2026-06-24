@@ -24,11 +24,16 @@ function hexToRgb(hex) {
   return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
 }
 
+function cssVar(name, fallback) {
+  if (typeof document === 'undefined') return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
 const DotGrid = ({
   dotSize = 6,
   gap = 24,
-  baseColor = '#f1ccff',
-  activeColor = '#91e0ff',
+  baseColor,
+  activeColor,
   proximity = 100,
   speedTrigger = 100,
   shockRadius = 200,
@@ -39,6 +44,8 @@ const DotGrid = ({
   className = '',
   style,
 }) => {
+  const resolvedBase = baseColor || cssVar('--color-lilac-bloom', '#f1ccff');
+  const resolvedActive = activeColor || cssVar('--color-sky-veil', '#91e0ff');
   const wrapperRef = useRef(null);
   const canvasRef = useRef(null);
   const dotsRef = useRef([]);
@@ -46,8 +53,8 @@ const DotGrid = ({
     x: 0, y: 0, vx: 0, vy: 0, speed: 0, lastTime: 0, lastX: 0, lastY: 0,
   });
 
-  const baseRgb = useMemo(() => hexToRgb(baseColor), [baseColor]);
-  const activeRgb = useMemo(() => hexToRgb(activeColor), [activeColor]);
+  const baseRgb = useMemo(() => hexToRgb(resolvedBase), [resolvedBase]);
+  const activeRgb = useMemo(() => hexToRgb(resolvedActive), [resolvedActive]);
 
   const circlePath = useMemo(() => {
     if (typeof window === 'undefined' || !window.Path2D) return null;
@@ -117,7 +124,7 @@ const DotGrid = ({
         const dy = dot.cy - py;
         const dsq = dx * dx + dy * dy;
 
-        let style = baseColor;
+        let style = resolvedBase;
         if (dsq <= proxSq) {
           const dist = Math.sqrt(dsq);
           const t = 1 - dist / proximity;
@@ -139,7 +146,7 @@ const DotGrid = ({
 
     draw();
     return () => cancelAnimationFrame(rafId);
-  }, [proximity, baseColor, activeRgb, baseRgb, circlePath]);
+  }, [proximity, resolvedBase, activeRgb, baseRgb, circlePath]);
 
   useEffect(() => {
     buildGrid();

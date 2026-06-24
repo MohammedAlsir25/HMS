@@ -3,9 +3,9 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 
 const statusConfig = {
-  WAITING: { label: 'Waiting', class: 'bg-amber-100 text-amber-800 border-amber-200' },
-  CALLED: { label: 'Called', class: 'bg-blue-100 text-blue-800 border-blue-200' },
-  IN_PROGRESS: { label: 'In Progress', class: 'bg-green-100 text-green-800 border-green-200' },
+  WAITING: { label: 'Waiting', class: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900 dark:text-amber-200 dark:border-amber-700' },
+  CALLED: { label: 'Called', class: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-700' },
+  IN_PROGRESS: { label: 'In Progress', class: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900 dark:text-green-200 dark:border-green-700' },
 };
 
 function waitTime(createdAt) {
@@ -18,9 +18,9 @@ function waitTime(createdAt) {
 }
 
 function priorityLabel(p) {
-  if (p >= 8) return { label: 'Critical', class: 'text-red-600' };
-  if (p >= 5) return { label: 'High', class: 'text-orange-500' };
-  if (p >= 3) return { label: 'Medium', class: 'text-amber-600' };
+  if (p >= 8) return { label: 'Critical', class: 'text-red-600 dark:text-red-400' };
+  if (p >= 5) return { label: 'High', class: 'text-orange-500 dark:text-orange-400' };
+  if (p >= 3) return { label: 'Medium', class: 'text-amber-600 dark:text-amber-400' };
   return { label: 'Normal', class: 'text-slate' };
 }
 

@@ -306,7 +306,7 @@ export default function DentalDashboard() {
                   <div key={idx} className="bg-bone rounded-lg p-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-caption font-medium text-graphite">Symptom #{idx + 1}</span>
-                      <button onClick={() => removeSymptom(idx)} className="text-red-400 hover:text-red-600 text-caption touch-target">Remove</button>
+                      <button onClick={() => removeSymptom(idx)} className="text-red-400 hover:text-red-600 dark:text-red-300 dark:hover:text-red-400 text-caption touch-target">Remove</button>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
@@ -476,7 +476,7 @@ export default function DentalDashboard() {
               </Button>
             )}
             {saveMessage && (
-              <span className={`text-sm font-medium ${saveMessage.includes('success') ? 'text-green-600' : 'text-red-500'}`}>
+              <span className={`text-sm font-medium ${saveMessage.includes('success') ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
                 {saveMessage}
               </span>
             )}

@@ -158,7 +158,7 @@ export default function NewPatientForm({ clinics, onPatientCreated }) {
               })()}
             </div>
           )}
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {error && <p className="text-sm text-red-500 dark:text-red-400">{error}</p>}
           <Button type="submit" disabled={saving} className="w-full">
             {saving ? t('reception.saving') : t('reception.registerAndCheckIn')}
           </Button>

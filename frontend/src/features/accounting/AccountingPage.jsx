@@ -14,9 +14,9 @@ const TYPE_ICONS = {
   OPTICS: '👓',
 };
 const TYPE_COLORS = {
-  RECEPTION: 'bg-blue-100 text-blue-800',
-  PHARMACY: 'bg-green-100 text-green-800',
-  OPTICS: 'bg-purple-100 text-purple-800',
+  RECEPTION: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+  PHARMACY: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  OPTICS: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
 };
 const EXPENSE_CATEGORIES = ['SALARY', 'SUPPLIES', 'UTILITIES', 'RENT', 'EQUIPMENT', 'MAINTENANCE', 'MARKETING', 'OTHER'];
 const PAYMENT_METHODS = ['CASH', 'CARD', 'BANK_TRANSFER'];
@@ -398,7 +398,7 @@ export default function AccountingPage() {
     { key: 'description', header: 'Description' },
     {
       key: 'amount', header: 'Amount',
-      render: (v) => <span className="font-semibold text-red-600">{formatCurrency(v)}</span>,
+      render: (v) => <span className="font-semibold text-red-600 dark:text-red-400">{formatCurrency(v)}</span>,
     },
     { key: 'paidTo', header: 'Paid To' },
     { key: 'paymentMethod', header: 'Payment', render: (v) => v ? <Badge>{v}</Badge> : '-' },
@@ -411,7 +411,7 @@ export default function AccountingPage() {
       render: (v, r) => (
         <div className="flex gap-1">
           <Button variant="ghost" size="sm" onClick={() => { setEditingExpense(r); setShowExpenseForm(true); }}>Edit</Button>
-          <Button variant="ghost" size="sm" onClick={() => handleExpenseDelete(v)} className="text-red-500">Del</Button>
+          <Button variant="ghost" size="sm" onClick={() => handleExpenseDelete(v)} className="text-red-500 dark:text-red-400">Del</Button>
         </div>
       ),
     },
@@ -458,8 +458,8 @@ export default function AccountingPage() {
                         <p className="text-heading-sm font-semibold text-obsidian">{formatCurrency(d?.total || 0)}</p>
                         <p className="text-caption text-slate">{d?.count || 0} {t('accounting.transactions')}</p>
                         <div className="mt-2 pt-2 border-t border-silver text-xs text-slate space-y-0.5">
-                          <p>{t('accounting.cogsShort')}: <span className="text-orange-600 font-medium">{formatCurrency(d?.cogs || 0)}</span></p>
-                          <p>{t('accounting.grossProfitShort')}: <span className={((d?.total || 0) - (d?.cogs || 0)) >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>{formatCurrency((d?.total || 0) - (d?.cogs || 0))}</span></p>
+                          <p>{t('accounting.cogsShort')}: <span className="text-orange-600 dark:text-orange-400 font-medium">{formatCurrency(d?.cogs || 0)}</span></p>
+                          <p>{t('accounting.grossProfitShort')}: <span className={((d?.total || 0) - (d?.cogs || 0)) >= 0 ? 'text-green-600 dark:text-green-400 font-medium' : 'text-red-600 dark:text-red-400 font-medium'}>{formatCurrency((d?.total || 0) - (d?.cogs || 0))}</span></p>
                         </div>
                       </CardContent>
                     </Card>
@@ -520,7 +520,7 @@ export default function AccountingPage() {
                             </div>
                             <div className="w-full h-3 bg-bone rounded-full overflow-hidden">
                               <div
-                                className={`h-full rounded-full transition-all ${r.type === 'RECEPTION' ? 'bg-blue-400' : r.type === 'PHARMACY' ? 'bg-green-400' : 'bg-purple-400'}`}
+                                className={`h-full rounded-full transition-all ${r.type === 'RECEPTION' ? 'bg-blue-400 dark:bg-blue-500' : r.type === 'PHARMACY' ? 'bg-green-400 dark:bg-green-500' : 'bg-purple-400 dark:bg-purple-500'}`}
                                 style={{ width: `${pct}%` }}
                               />
                             </div>
@@ -537,25 +537,25 @@ export default function AccountingPage() {
                   <CardHeader><CardTitle>{t('accounting.pnl')} (30 days)</CardTitle></CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
-                      <div className="p-4 bg-green-50 rounded-lg">
-                        <p className="text-caption text-green-700">{t('accounting.revenue')}</p>
-                        <p className="text-heading-sm font-bold text-green-800">{formatCurrency(pnlData.totals?.revenue || 0)}</p>
+                      <div className="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
+                        <p className="text-caption text-green-700 dark:text-green-300">{t('accounting.revenue')}</p>
+                        <p className="text-heading-sm font-bold text-green-800 dark:text-green-200">{formatCurrency(pnlData.totals?.revenue || 0)}</p>
                       </div>
-                      <div className="p-4 bg-orange-50 rounded-lg">
-                        <p className="text-caption text-orange-700">{t('accounting.cogsShort')}</p>
-                        <p className="text-heading-sm font-bold text-orange-800">{formatCurrency(pnlData.totals?.cogs || 0)}</p>
+                      <div className="p-4 bg-orange-50 dark:bg-orange-900/30 rounded-lg">
+                        <p className="text-caption text-orange-700 dark:text-orange-300">{t('accounting.cogsShort')}</p>
+                        <p className="text-heading-sm font-bold text-orange-800 dark:text-orange-200">{formatCurrency(pnlData.totals?.cogs || 0)}</p>
                       </div>
-                      <div className="p-4 bg-blue-50 rounded-lg">
-                        <p className="text-caption text-blue-700">{t('accounting.grossProfitShort')}</p>
-                        <p className="text-heading-sm font-bold text-blue-800">{formatCurrency(pnlData.totals?.grossProfit || 0)}</p>
+                      <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                        <p className="text-caption text-blue-700 dark:text-blue-300">{t('accounting.grossProfitShort')}</p>
+                        <p className="text-heading-sm font-bold text-blue-800 dark:text-blue-200">{formatCurrency(pnlData.totals?.grossProfit || 0)}</p>
                       </div>
-                      <div className="p-4 bg-red-50 rounded-lg">
-                        <p className="text-caption text-red-700">{t('accounting.expense')}</p>
-                        <p className="text-heading-sm font-bold text-red-800">{formatCurrency(pnlData.totals?.expense || 0)}</p>
+                      <div className="p-4 bg-red-50 dark:bg-red-900/30 rounded-lg">
+                        <p className="text-caption text-red-700 dark:text-red-300">{t('accounting.expense')}</p>
+                        <p className="text-heading-sm font-bold text-red-800 dark:text-red-200">{formatCurrency(pnlData.totals?.expense || 0)}</p>
                       </div>
-                      <div className={`p-4 rounded-lg ${(pnlData.totals?.net || 0) >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
-                        <p className={`text-caption ${(pnlData.totals?.net || 0) >= 0 ? 'text-green-700' : 'text-red-700'}`}>{t('accounting.netIncomeShort')}</p>
-                        <p className={`text-heading-sm font-bold ${(pnlData.totals?.net || 0) >= 0 ? 'text-green-800' : 'text-red-800'}`}>
+                      <div className={`p-4 rounded-lg ${(pnlData.totals?.net || 0) >= 0 ? 'bg-green-50 dark:bg-green-900/30' : 'bg-red-50 dark:bg-red-900/30'}`}>
+                        <p className={`text-caption ${(pnlData.totals?.net || 0) >= 0 ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>{t('accounting.netIncomeShort')}</p>
+                        <p className={`text-heading-sm font-bold ${(pnlData.totals?.net || 0) >= 0 ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
                           {formatCurrency(pnlData.totals?.net || 0)}
                         </p>
                       </div>
@@ -565,15 +565,15 @@ export default function AccountingPage() {
                         columns={[
                           { key: 'department', header: 'Department', render: (v) => v?.name || 'Uncategorized' },
                           { key: 'revenue', header: t('accounting.revenue'), render: (v) => formatCurrency(v) },
-                          { key: 'cogs', header: t('accounting.cogsShort'), render: (v) => <span className="text-orange-600">{formatCurrency(v)}</span> },
+                          { key: 'cogs', header: t('accounting.cogsShort'), render: (v) => <span className="text-orange-600 dark:text-orange-400">{formatCurrency(v)}</span> },
                           { key: 'grossProfit', header: t('accounting.grossProfitShort'), render: (v, r) => (
-                            <span className={v >= 0 ? 'text-blue-600 font-semibold' : 'text-red-600 font-semibold'}>
+                            <span className={v >= 0 ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-red-600 dark:text-red-400 font-semibold'}>
                               {formatCurrency(v)}
                             </span>
                           )},
-                          { key: 'expense', header: t('accounting.expense'), render: (v) => <span className="text-red-600">{formatCurrency(v)}</span> },
+                          { key: 'expense', header: t('accounting.expense'), render: (v) => <span className="text-red-600 dark:text-red-400">{formatCurrency(v)}</span> },
                           { key: 'net', header: t('accounting.netIncomeShort'), render: (v, r) => (
-                            <span className={v >= 0 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
+                            <span className={v >= 0 ? 'text-green-600 dark:text-green-400 font-semibold' : 'text-red-600 dark:text-red-400 font-semibold'}>
                               {formatCurrency(v)}
                             </span>
                           )},

@@ -24,7 +24,7 @@ export default function PrescriptionWriter({ medications = [], onChange, clinicS
             <span className="text-caption font-medium text-graphite">Medication #{idx + 1}</span>
             <button
               onClick={() => removeMedication(idx)}
-              className="text-red-400 hover:text-red-600 text-caption touch-target"
+              className="text-red-400 hover:text-red-600 dark:hover:text-red-400 text-caption touch-target"
             >
               Remove
             </button>

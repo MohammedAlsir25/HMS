@@ -334,7 +334,7 @@ export default function ReceptionPage() {
                   <div className="space-y-4">
                     {inProgress.length > 0 && (
                       <div>
-                        <p className="text-caption font-medium text-green-600 uppercase tracking-wide mb-2">In Progress</p>
+                        <p className="text-caption font-medium text-green-600 dark:text-green-400 uppercase tracking-wide mb-2">In Progress</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {inProgress.map((a) => (
                             <QueueCard key={a.id} appt={a} onStatusChange={handleStatusChange} onPriority={handlePriority} t={t} />
@@ -344,7 +344,7 @@ export default function ReceptionPage() {
                     )}
                     {called.length > 0 && (
                       <div>
-                        <p className="text-caption font-medium text-sky-600 uppercase tracking-wide mb-2">Called</p>
+                        <p className="text-caption font-medium text-sky-600 dark:text-sky-400 uppercase tracking-wide mb-2">Called</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {called.map((a) => (
                             <QueueCard key={a.id} appt={a} onStatusChange={handleStatusChange} onPriority={handlePriority} t={t} />
@@ -354,7 +354,7 @@ export default function ReceptionPage() {
                     )}
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <p className="text-caption font-medium text-amber-600 uppercase tracking-wide">Waiting ({filteredWaiting.length})</p>
+                        <p className="text-caption font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wide">Waiting ({filteredWaiting.length})</p>
                         {activeStats && <p className="text-caption text-slate">Est. wait: ~{filteredWaiting.length * 10} min total</p>}
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -406,16 +406,16 @@ function QueueCard({ appt, onStatusChange, onPriority, t }) {
 
   return (
     <div className={`rounded-xl border p-4 transition-all ${
-      appt.status === 'IN_PROGRESS' ? 'border-green-300 bg-green-50/50' :
-      appt.status === 'CALLED' ? 'border-sky-300 bg-sky-50/50' :
-      isPriority ? 'border-amber-300 bg-amber-50/50' :
+      appt.status === 'IN_PROGRESS' ? 'border-green-300 bg-green-50/50 dark:border-green-700 dark:bg-green-900/20' :
+      appt.status === 'CALLED' ? 'border-sky-300 bg-sky-50/50 dark:border-sky-700 dark:bg-sky-900/20' :
+      isPriority ? 'border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-900/20' :
       'border-silver bg-paper hover:border-lilac-bloom/30'
     }`}>
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2">
           <span className={`text-xl font-bold ${
-            appt.status === 'IN_PROGRESS' ? 'text-green-600' :
-            appt.status === 'CALLED' ? 'text-sky-600' :
+            appt.status === 'IN_PROGRESS' ? 'text-green-600 dark:text-green-400' :
+            appt.status === 'CALLED' ? 'text-sky-600 dark:text-sky-400' :
             'text-obsidian'
           }`}>
             #{String(appt.token).padStart(3, '0')}
@@ -425,7 +425,7 @@ function QueueCard({ appt, onStatusChange, onPriority, t }) {
           {isPriority && <Badge variant="warning" size="sm">P{appt.priority}</Badge>}
         </div>
         {appt.estimatedWaitMins > 0 && appt.status === 'WAITING' && (
-          <span className="text-xs font-medium text-amber-600 whitespace-nowrap">~{appt.estimatedWaitMins} min</span>
+          <span className="text-xs font-medium text-amber-600 dark:text-amber-400 whitespace-nowrap">~{appt.estimatedWaitMins} min</span>
         )}
       </div>
 
@@ -436,7 +436,7 @@ function QueueCard({ appt, onStatusChange, onPriority, t }) {
           {age !== null && <span>&middot; {age}y</span>}
           {patient.phone && <span>&middot; {patient.phone}</span>}
         </div>
-        {patient.notes && <p className="text-xs text-amber-700 mt-1 italic">{patient.notes}</p>}
+        {patient.notes && <p className="text-xs text-amber-700 dark:text-amber-300 mt-1 italic">{patient.notes}</p>}
       </div>
 
       <div className="flex items-center justify-between gap-2">

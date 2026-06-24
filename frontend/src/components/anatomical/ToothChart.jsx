@@ -59,8 +59,8 @@ export default function ToothChart({ onToothSelect, selectedTooth, findings }) {
             );
           }),
         )}
-        <line x1="12" y1="0" x2="12" y2="16" stroke="#d6d6d6" strokeWidth="0.05" />
-        <line x1="0" y1="7" x2="24" y2="7" stroke="#d6d6d6" strokeWidth="0.05" />
+        <line x1="12" y1="0" x2="12" y2="16" stroke="var(--color-silver)" strokeWidth="0.05" />
+        <line x1="0" y1="7" x2="24" y2="7" stroke="var(--color-silver)" strokeWidth="0.05" />
       </svg>
 
       <div className="flex flex-wrap gap-2">

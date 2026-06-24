@@ -16,7 +16,7 @@ export default function EyeDiagram({ onRegionSelect, selectedRegion, findings, s
     <div className="space-y-3">
       <div className="text-caption font-medium text-slate text-center">{side === 'OD' ? 'Right Eye (OD)' : 'Left Eye (OS)'}</div>
       <svg viewBox="0 0 24 24" className="w-full max-w-xs mx-auto" fill="none" stroke="currentColor" strokeWidth="0.5">
-        <circle cx="12" cy="12" r="10" fill="#f5f2f0" stroke="#d6d6d6" strokeWidth="0.5" />
+        <circle cx="12" cy="12" r="10" fill="var(--color-bone)" stroke="var(--color-silver)" strokeWidth="0.5" />
         {regions.map((r) => {
           const isActive = selectedRegion === r.id || hovered === r.id;
           const hasFinding = findings?.[r.id];
@@ -30,8 +30,8 @@ export default function EyeDiagram({ onRegionSelect, selectedRegion, findings, s
             >
               <path
                 d={r.path}
-                fill={hasFinding ? '#f1ccff' : isActive ? '#91e0ff' : 'transparent'}
-                stroke={isActive ? '#333' : '#bcbcbc'}
+                fill={hasFinding ? 'var(--color-lilac-bloom)' : isActive ? 'var(--color-sky-veil)' : 'transparent'}
+                stroke={isActive ? 'var(--color-graphite)' : 'var(--color-mist)'}
                 strokeWidth={isActive ? 1.2 : 0.6}
                 opacity={isActive ? 1 : 0.7}
               />

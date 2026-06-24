@@ -14,8 +14,8 @@ export default function OrbitDiagram({ onRegionSelect, selectedRegion, findings 
   return (
     <div className="space-y-3">
       <svg viewBox="0 0 24 24" className="w-full max-w-xs mx-auto">
-        <rect x="2" y="2" width="20" height="20" rx="3" fill="#f5f2f0" stroke="#d6d6d6" strokeWidth="0.5" />
-        <circle cx="12" cy="12" r="3" fill="none" stroke="#bcbcbc" strokeWidth="0.3" strokeDasharray="0.5" />
+        <rect x="2" y="2" width="20" height="20" rx="3" fill="var(--color-bone)" stroke="var(--color-silver)" strokeWidth="0.5" />
+        <circle cx="12" cy="12" r="3" fill="none" stroke="var(--color-mist)" strokeWidth="0.3" strokeDasharray="0.5" />
         {regions.map((r) => {
           const isActive = selectedRegion === r.id || hovered === r.id;
           const hasFinding = findings?.[r.id];
@@ -31,8 +31,8 @@ export default function OrbitDiagram({ onRegionSelect, selectedRegion, findings 
                 cx={r.cx}
                 cy={r.cy}
                 r={r.r}
-                fill={hasFinding ? '#f1ccff' : isActive ? '#91e0ff' : 'transparent'}
-                stroke={isActive ? '#333' : '#bcbcbc'}
+                fill={hasFinding ? 'var(--color-lilac-bloom)' : isActive ? 'var(--color-sky-veil)' : 'transparent'}
+                stroke={isActive ? 'var(--color-graphite)' : 'var(--color-mist)'}
                 strokeWidth={isActive ? 1.2 : 0.4}
                 opacity={isActive ? 0.8 : 0.5}
               />

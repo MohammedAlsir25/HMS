@@ -13,7 +13,7 @@ const columns = [
   { key: 'name', header: 'Name' },
   { key: 'category', header: 'Category', render: (v) => <Badge>{v}</Badge> },
   { key: 'quantity', header: 'Qty', render: (v, row) => (
-    <span className={v <= row.minStock ? 'text-red-500 font-semibold' : ''}>{v}</span>
+    <span className={v <= row.minStock ? 'text-red-500 dark:text-red-400 font-semibold' : ''}>{v}</span>
   )},
   { key: 'price', header: 'Price', render: (v) => `$${Number(v).toFixed(2)}` },
   { key: 'costPrice', header: 'Cost', render: (v) => v ? `$${Number(v).toFixed(2)}` : '-' },
@@ -98,7 +98,7 @@ export default function InventoryPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card><CardContent className="p-4"><p className="text-caption text-slate">Total Items</p><p className="text-heading-sm font-semibold text-obsidian">{items.length}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-caption text-slate">Low Stock Items</p><p className="text-heading-sm font-semibold text-red-500">{lowStockCount}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-caption text-slate">Low Stock Items</p>        <p className="text-heading-sm font-semibold text-red-500 dark:text-red-400">{lowStockCount}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-caption text-slate">Categories</p><p className="text-heading-sm font-semibold text-obsidian">{new Set(items.map(i => i.category)).size}</p></CardContent></Card>
       </div>
 

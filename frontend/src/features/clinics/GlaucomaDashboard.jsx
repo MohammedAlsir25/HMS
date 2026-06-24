@@ -316,7 +316,7 @@ export default function GlaucomaDashboard() {
                   <div key={idx} className="bg-bone rounded-lg p-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-caption font-medium text-graphite">Symptom #{idx + 1}</span>
-                      <button onClick={() => removeSymptom(idx)} className="text-red-400 hover:text-red-600 text-caption touch-target">Remove</button>
+                      <button onClick={() => removeSymptom(idx)} className="text-red-400 hover:text-red-600 dark:text-red-300 dark:hover:text-red-400 text-caption touch-target">Remove</button>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
@@ -556,8 +556,7 @@ export default function GlaucomaDashboard() {
       />
 
       {saveMessage && (
-        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg shadow-xl text-sm font-medium transition-all duration-300"
-             style={{ backgroundColor: saveMessage.includes('success') ? '#d1fae5' : '#fee2e2', color: saveMessage.includes('success') ? '#065f46' : '#991b1b' }}>
+        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg shadow-xl text-sm font-medium transition-all duration-300 ${saveMessage.includes('success') ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
           {saveMessage}
         </div>
       )}

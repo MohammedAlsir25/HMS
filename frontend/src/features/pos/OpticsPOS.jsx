@@ -106,9 +106,9 @@ export default function OpticsPOS() {
             <CardTitle>Receipt</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-              <p className="text-lg font-bold text-green-700">Transaction Complete</p>
-              <p className="text-caption text-green-600">ID: {receipt.id.slice(0, 8)}</p>
+            <div className="bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-700 rounded-lg p-4 text-center">
+              <p className="text-lg font-bold text-green-700 dark:text-green-300">Transaction Complete</p>
+              <p className="text-caption text-green-600 dark:text-green-400">ID: {receipt.id.slice(0, 8)}</p>
             </div>
             <div className="space-y-2">
               <div className="flex justify-between text-body">
@@ -235,7 +235,7 @@ export default function OpticsPOS() {
                         <option key={n} value={n}>{n}</option>
                       ))}
                     </select>
-                    <button className="text-slate hover:text-red-500 touch-target p-1" onClick={() => removeFromCart(c.id)}>
+                    <button className="text-slate hover:text-red-500 dark:hover:text-red-400 touch-target p-1" onClick={() => removeFromCart(c.id)}>
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
                     </button>
                   </div>

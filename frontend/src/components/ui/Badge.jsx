@@ -1,9 +1,9 @@
 const variants = {
   default: 'bg-bone text-obsidian',
   primary: 'bg-lilac-bloom text-obsidian',
-  success: 'bg-green-100 text-green-800 border border-green-200',
-  warning: 'bg-amber-100 text-amber-800 border border-amber-200',
-  danger: 'bg-red-100 text-red-800 border border-red-200',
+  success: 'bg-green-100 text-green-800 border border-green-200 dark:bg-green-900 dark:text-green-200 dark:border-green-700',
+  warning: 'bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-900 dark:text-amber-200 dark:border-amber-700',
+  danger: 'bg-red-100 text-red-800 border border-red-200 dark:bg-red-900 dark:text-red-200 dark:border-red-700',
   info: 'bg-sky-veil text-obsidian',
 };
 

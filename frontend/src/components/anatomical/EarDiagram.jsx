@@ -13,7 +13,7 @@ export default function EarDiagram({ onZoneSelect, selectedZone, findings }) {
   return (
     <div className="relative w-full max-w-sm mx-auto">
       <svg viewBox="0 0 24 24" className="w-full h-auto" fill="none" stroke="currentColor" strokeWidth="0.5">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="#f5f2f0" stroke="#d6d6d6" />
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="var(--color-bone)" stroke="var(--color-silver)" />
         {zones.map((zone) => {
           const isActive = selectedZone === zone.id || hovered === zone.id;
           const hasFinding = findings?.[zone.id];
@@ -21,8 +21,8 @@ export default function EarDiagram({ onZoneSelect, selectedZone, findings }) {
             <g key={zone.id}>
               <path
                 d={zone.path}
-                fill={hasFinding ? '#f1ccff' : isActive ? '#91e0ff' : 'transparent'}
-                stroke={isActive ? '#333' : '#bcbcbc'}
+                fill={hasFinding ? 'var(--color-lilac-bloom)' : isActive ? 'var(--color-sky-veil)' : 'transparent'}
+                stroke={isActive ? 'var(--color-graphite)' : 'var(--color-mist)'}
                 strokeWidth={isActive ? 1.2 : 0.6}
                 className="cursor-pointer transition-all duration-200"
                 onMouseEnter={() => setHovered(zone.id)}
@@ -30,7 +30,7 @@ export default function EarDiagram({ onZoneSelect, selectedZone, findings }) {
                 onClick={() => onZoneSelect?.(zone.id)}
               />
               {hasFinding && (
-                <circle cx={zone.x} cy={zone.y} r="0.8" fill="#f1ccff" stroke="#333" strokeWidth="0.3" />
+                <circle cx={zone.x} cy={zone.y} r="0.8" fill="var(--color-lilac-bloom)" stroke="var(--color-graphite)" strokeWidth="0.3" />
               )}
             </g>
           );
