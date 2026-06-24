@@ -442,22 +442,6 @@ export default function StaggeredMenu({
               </button>
             )}
 
-            <Link
-              to="/dashboard"
-              className="sm-logo flex items-center justify-center select-none pointer-events-auto"
-              aria-label="AL Jawahir Hospital — Home"
-            >
-              <img
-                src={logoUrl}
-                alt=""
-                className="sm-logo-img block h-10 w-auto object-contain"
-                draggable={false}
-                width={40}
-                height={40}
-              />
-            </Link>
-
-            <div />
           </header>
 
         <aside

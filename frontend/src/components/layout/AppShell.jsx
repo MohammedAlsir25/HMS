@@ -39,7 +39,13 @@ export default function AppShell({ children }) {
               </svg>
             </button>
           )}
-          <img src="/logo.png" alt="AL Jawahir Hospital" className="h-9 w-auto" />
+          <div className="flex-1 flex justify-center">
+            <img
+              src="/logo.png"
+              alt="AL Jawahir Hospital"
+              className={`h-9 w-auto transition-opacity duration-200 ${isAdmin && menuOpen ? 'invisible' : ''}`}
+            />
+          </div>
           <div className="ml-auto">
             <UserProfileDropdown onSettings={() => setSettingsOpen(true)} />
           </div>
