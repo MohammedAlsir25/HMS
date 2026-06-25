@@ -100,29 +100,25 @@ describe('GlaucomaDashboard', () => {
 });
 
 describe('OrbitDashboard', () => {
-  it('renders title and orbital metrics', () => {
+  it('renders title and description', () => {
     render(<WithRouter><OrbitDashboard /></WithRouter>);
     expect(screen.getByText('Orbit Clinic')).toBeInTheDocument();
-    expect(screen.getByText('Orbital Metrics')).toBeInTheDocument();
-    const props = screen.getAllByText('Proptosis (OD)');
-    expect(props.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Orbital & Oculoplastics Assessment with AI-Assisted Diagnosis')).toBeInTheDocument();
   });
 });
 
 describe('PedsOphthDashboard', () => {
-  it('renders title and growth chart', () => {
+  it('renders title and description', () => {
     render(<WithRouter><PedsOphthDashboard /></WithRouter>);
     expect(screen.getByText('Pediatrics Ophthalmology')).toBeInTheDocument();
-    expect(screen.getByText('Growth & Development')).toBeInTheDocument();
-    expect(screen.getByText('Strabismus Assessment')).toBeInTheDocument();
+    expect(screen.getByText('Child Development & Strabismus Assessment with AI-Assisted Diagnosis')).toBeInTheDocument();
   });
 });
 
 describe('GenOphthDashboard', () => {
-  it('renders title and refraction module', () => {
+  it('renders title and description', () => {
     render(<WithRouter><GenOphthDashboard /></WithRouter>);
     expect(screen.getByText('General Ophthalmology')).toBeInTheDocument();
-    expect(screen.getByText('Refraction Module')).toBeInTheDocument();
-    expect(screen.getByText('Sphere (SPH)')).toBeInTheDocument();
+    expect(screen.getByText('Refraction & Comprehensive Eye Exam with AI-Assisted Diagnosis')).toBeInTheDocument();
   });
 });

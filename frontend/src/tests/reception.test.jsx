@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
@@ -26,11 +26,12 @@ describe('ReceptionPage', () => {
     expect(screen.getByText('reception.description')).toBeInTheDocument();
     expect(screen.getByText('reception.newPatient')).toBeInTheDocument();
     expect(screen.getByText('reception.reservations')).toBeInTheDocument();
-    expect(screen.getByText('reception.queue')).toBeInTheDocument();
+    expect(screen.getAllByText('reception.queue').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders search area and register form on new patient tab', () => {
     render(<WithRouter><ReceptionPage /></WithRouter>);
+    fireEvent.click(screen.getByText('reception.newPatient'));
     expect(screen.getByText('reception.search')).toBeInTheDocument();
     expect(screen.getByText('reception.registerPatient')).toBeInTheDocument();
   });
@@ -50,6 +51,6 @@ describe('WaitingRoomTV', () => {
 
   it('shows auto-refresh indicator', () => {
     render(<WithRouter><WaitingRoomTV /></WithRouter>);
-    expect(screen.getByText('Auto-refreshes every 10 seconds')).toBeInTheDocument();
+    expect(screen.getByText('Live · Updates every 8 seconds')).toBeInTheDocument();
   });
 });

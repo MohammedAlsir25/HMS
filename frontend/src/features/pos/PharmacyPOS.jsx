@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { usePOSItems } from '../../hooks/queries/usePOS';
 import { useReferrals } from '../../hooks/queries/useReferrals';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';

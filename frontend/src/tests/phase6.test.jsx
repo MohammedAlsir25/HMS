@@ -1,7 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key) => key,
+    i18n: { changeLanguage: vi.fn() },
+  }),
+}));
 
 const testQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 import InventoryPage from '../features/inventory/InventoryPage';
@@ -32,15 +39,10 @@ describe('InventoryPage', () => {
 });
 
 describe('AccountingPage', () => {
-  it('renders title and description', () => {
+  it('renders title and loading state initially', () => {
     render(<WithRouter><AccountingPage /></WithRouter>);
-    expect(screen.getByText('Accounting')).toBeInTheDocument();
-    expect(screen.getByText(/Revenue tracking/)).toBeInTheDocument();
-  });
-
-  it('shows loading state initially', () => {
-    render(<WithRouter><AccountingPage /></WithRouter>);
-    expect(screen.getByText('Loading accounting data...')).toBeInTheDocument();
+    expect(screen.getByText('accounting.title')).toBeInTheDocument();
+    expect(screen.getByText('accounting.loading')).toBeInTheDocument();
   });
 });
 
