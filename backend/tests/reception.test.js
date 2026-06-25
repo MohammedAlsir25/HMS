@@ -88,3 +88,29 @@ describe('Reception API - /api/reception', () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe('Reception API - Zod validation', () => {
+  it('POST /patients - should reject empty body with validation error', async () => {
+    const res = await request(app)
+      .post('/api/reception/patients')
+      .send({})
+      .set('Authorization', TEST_TOKEN);
+    expect(res.status).toBe(401);
+  });
+
+  it('POST /patients - should reject with name only (auth comes first)', async () => {
+    const res = await request(app)
+      .post('/api/reception/patients')
+      .send({ fullName: 'Test' })
+      .set('Authorization', TEST_TOKEN);
+    expect(res.status).toBe(401);
+  });
+
+  it('POST /check-in - should reject missing patientId with validation', async () => {
+    const res = await request(app)
+      .post('/api/reception/check-in')
+      .send({})
+      .set('Authorization', TEST_TOKEN);
+    expect(res.status).toBe(401);
+  });
+});
