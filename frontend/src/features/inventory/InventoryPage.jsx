@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useInventoryItems, useCreateInventoryItem } from '../../hooks/queries/useInventory';
 import { api } from '../../lib/api';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -20,40 +21,22 @@ const columns = [
 ];
 
 export default function InventoryPage() {
-  const [items, setItems] = useState([]);
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [form, setForm] = useState({ name: '', sku: '', category: '', quantity: 0, price: 0, costPrice: 0, minStock: 0 });
   const [txForm, setTxForm] = useState({ type: 'IN', quantity: 1, notes: '' });
 
-  const loadItems = async () => {
-    try {
-      const params = search ? `?search=${encodeURIComponent(search)}` : '';
-      const data = await api.get(`/inventory/items${params}`);
-      setItems(data);
-    } catch (err) {
-      console.error('Failed to load items:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { loadItems(); }, []);
-
-  const handleSearch = (e) => {
-    e.preventDefault();
-    loadItems();
-  };
+  const { data: items = [], isLoading } = useInventoryItems(search);
+  const createItem = useCreateInventoryItem();
 
   const handleSelectItem = async (item) => {
     setSelectedItem(item);
     try {
       const data = await api.get(`/inventory/items/${item.id}`);
       setTransactions(data.transactions || []);
-    } catch (err) {
+    } catch {
       setTransactions([]);
     }
   };
@@ -61,10 +44,9 @@ export default function InventoryPage() {
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/inventory/items', form);
+      await createItem.mutateAsync(form);
       setShowModal(false);
       setForm({ name: '', sku: '', category: '', quantity: 0, price: 0, costPrice: 0, minStock: 0 });
-      loadItems();
     } catch (err) {
       alert(err.message || 'Failed to create item');
     }
@@ -77,7 +59,6 @@ export default function InventoryPage() {
       await api.post('/inventory/transactions', { itemId: selectedItem.id, ...txForm });
       setTxForm({ type: 'IN', quantity: 1, notes: '' });
       handleSelectItem(selectedItem);
-      loadItems();
     } catch (err) {
       alert(err.message || 'Transaction failed');
     }
@@ -108,15 +89,14 @@ export default function InventoryPage() {
               <CardTitle>Inventory Items</CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSearch} className="mb-4">
+              <form onSubmit={(e) => e.preventDefault()} className="mb-4">
                 <div className="flex gap-2">
                   <div className="flex-1">
                     <Input placeholder="Search by name or SKU..." value={search} onChange={(e) => setSearch(e.target.value)} />
                   </div>
-                  <Button type="submit" variant="secondary">Search</Button>
                 </div>
               </form>
-              {loading ? (
+              {isLoading ? (
                 <p className="text-body text-slate">Loading inventory...</p>
               ) : items.length === 0 ? (
                 <p className="text-body text-slate text-center py-4">No items found</p>
@@ -213,7 +193,7 @@ export default function InventoryPage() {
           <Input label="Min Stock Level" type="number" min="0" value={form.minStock} onChange={(e) => setForm({ ...form, minStock: parseInt(e.target.value) || 0 })} />
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="secondary" onClick={() => setShowModal(false)} className="flex-1">Cancel</Button>
-            <Button type="submit" className="flex-1">Create Item</Button>
+            <Button type="submit" className="flex-1">{createItem.isPending ? 'Creating...' : 'Create Item'}</Button>
           </div>
         </form>
       </Modal>

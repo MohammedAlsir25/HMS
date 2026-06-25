@@ -1,6 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../lib/api';
+import { useAccountingSummary, useRevenueByDay, useRevenueByType, useAccountingTransactions, useExpenses, usePnL, accountingKeys } from '../../hooks/queries/useAccounting';
+import { useDepartments } from '../../hooks/queries/useAdmin';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -138,97 +141,43 @@ function ExpenseForm({ expense, departments, onSave, onCancel, saving }) {
   );
 }
 
+function buildParams(filters) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+  });
+  return params;
+}
+
 export default function AccountingPage() {
+  const queryClient = useQueryClient();
   const { t } = useTranslation();
   const [tab, setTab] = useState('overview');
-  const [summary, setSummary] = useState(null);
-  const [txResponse, setTxResponse] = useState({ transactions: [], totalCount: 0 });
-  const [revenueByDay, setRevenueByDay] = useState([]);
-  const [revenueByType, setRevenueByType] = useState([]);
-  const [pnlData, setPnlData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [txLoading, setTxLoading] = useState(false);
-  const [departments, setDepartments] = useState([]);
-
   const [txFilters, setTxFilters] = useState({ type: '', paymentMethod: '', startDate: get30DaysAgo(), endDate: getTodayStr(), limit: '25', offset: 0 });
   const [showTxModal, setShowTxModal] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTx, setNewTx] = useState({ type: 'RECEPTION', amount: '', paymentMethod: 'CASH', description: '', departmentId: '' });
   const [addSaving, setAddSaving] = useState(false);
 
-  const [expenses, setExpenses] = useState([]);
-  const [expensesTotal, setExpensesTotal] = useState(0);
   const [expenseFilters, setExpenseFilters] = useState({ category: '', departmentId: '', startDate: '', endDate: '' });
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
   const [expenseSaving, setExpenseSaving] = useState(false);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [summaryData, dayData, typeData, deptData, pnl] = await Promise.all([
-          api.get('/accounting/summary'),
-          api.get('/accounting/revenue-by-day?days=30'),
-          api.get('/accounting/revenue-by-type'),
-          api.get('/departments'),
-          api.get('/accounting/pnl?startDate=' + get30DaysAgo() + '&endDate=' + getTodayStr()).catch(() => null),
-        ]);
-        setSummary(summaryData);
-        setRevenueByDay(dayData);
-        setRevenueByType(typeData);
-        setDepartments(deptData);
-        setPnlData(pnl);
-      } catch (err) {
-        console.error('Failed to load accounting data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, []);
+  const { data: summary, isLoading: loading } = useAccountingSummary();
+  const { data: departments } = useDepartments();
+  const { data: revenueByDay = [] } = useRevenueByDay(`days=30`);
+  const { data: revenueByType = [] } = useRevenueByType(`from=${get30DaysAgo()}&to=${getTodayStr()}`);
+  const { data: pnlData } = usePnL(`startDate=${get30DaysAgo()}&endDate=${getTodayStr()}`);
 
-  const loadExpenses = useCallback(async (filters) => {
-    try {
-      const params = new URLSearchParams();
-      if (filters.category) params.set('category', filters.category);
-      if (filters.departmentId) params.set('departmentId', filters.departmentId);
-      if (filters.startDate) params.set('startDate', filters.startDate);
-      if (filters.endDate) params.set('endDate', filters.endDate);
-      params.set('limit', '200');
-      const data = await api.get(`/accounting/expenses?${params.toString()}`);
-      setExpenses(data.expenses || []);
-      setExpensesTotal(data.totalCount || 0);
-    } catch (err) {
-      console.error('Failed to load expenses:', err);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadExpenses(expenseFilters);
-  }, [expenseFilters, loadExpenses]);
-
-  const loadTransactions = useCallback(async (filters) => {
-    setTxLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (filters.type) params.set('type', filters.type);
-      if (filters.paymentMethod) params.set('paymentMethod', filters.paymentMethod);
-      if (filters.startDate) params.set('startDate', filters.startDate);
-      if (filters.endDate) params.set('endDate', filters.endDate);
-      if (filters.limit) params.set('limit', filters.limit);
-      if (filters.offset) params.set('offset', filters.offset);
-      const data = await api.get(`/accounting/transactions?${params.toString()}`);
-      setTxResponse(data);
-    } catch (err) {
-      console.error('Failed to load transactions:', err);
-    } finally {
-      setTxLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (tab === 'transactions') loadTransactions(txFilters);
-  }, [txFilters, loadTransactions, tab]);
+  const expenseParams = buildParams({ ...expenseFilters, limit: '200' });
+  const txParams = buildParams(txFilters);
+  const { data: expensesData = { expenses: [], totalCount: 0 } } = useExpenses(expenseFilters.category || expenseFilters.departmentId || expenseFilters.startDate ? expenseParams : `limit=200`);
+  const expenses = expensesData.expenses ?? [];
+  const expensesTotal = expensesData.totalCount ?? 0;
+  const { data: txResponse = { transactions: [], totalCount: 0 }, isLoading: txLoading } = useAccountingTransactions(
+    tab === 'transactions' && txFilters.startDate && txFilters.endDate ? txParams : null
+  );
 
   const handleFilterChange = (field, value) => {
     setTxFilters((prev) => ({ ...prev, [field]: value, offset: field === 'limit' ? 0 : prev.offset }));
@@ -270,8 +219,8 @@ export default function AccountingPage() {
 
   const handleOpenShift = async () => {
     try {
-      const data = await api.post('/accounting/shifts/open', {});
-      setSummary((prev) => ({ ...prev, openShift: data }));
+      await api.post('/accounting/shifts/open', {});
+      queryClient.invalidateQueries({ queryKey: ['accounting'] });
     } catch (err) {
       alert(err.message || 'Failed to open shift');
     }
@@ -281,11 +230,11 @@ export default function AccountingPage() {
     const expected = prompt('Expected total:');
     if (expected === null) return;
     try {
-      const data = await api.post('/accounting/shifts/close', {
+      await api.post('/accounting/shifts/close', {
         expectedTotal: parseFloat(expected) || 0,
         actualTotal: parseFloat(expected) || 0,
       });
-      setSummary((prev) => ({ ...prev, openShift: null }));
+      queryClient.invalidateQueries({ queryKey: ['accounting'] });
     } catch (err) {
       alert(err.message || 'Failed to close shift');
     }
@@ -304,14 +253,7 @@ export default function AccountingPage() {
       });
       setShowAddModal(false);
       setNewTx({ type: 'RECEPTION', amount: '', paymentMethod: 'CASH', description: '', departmentId: '' });
-      const [summaryData, dayData, typeData] = await Promise.all([
-        api.get('/accounting/summary'),
-        api.get('/accounting/revenue-by-day?days=30'),
-        api.get('/accounting/revenue-by-type'),
-      ]);
-      setSummary(summaryData);
-      setRevenueByDay(dayData);
-      setRevenueByType(typeData);
+      queryClient.invalidateQueries({ queryKey: ['accounting'] });
       setTxFilters((prev) => ({ ...prev, offset: 0 }));
     } catch (err) {
       alert(err.message || 'Failed to create transaction');
@@ -319,6 +261,8 @@ export default function AccountingPage() {
       setAddSaving(false);
     }
   };
+
+  const invalidateExpenses = () => queryClient.invalidateQueries({ queryKey: accountingKeys.expenses(expenseFilters.category || expenseFilters.departmentId || expenseFilters.startDate ? expenseParams : `limit=200`) });
 
   const handleExpenseSave = async (formData) => {
     setExpenseSaving(true);
@@ -330,7 +274,7 @@ export default function AccountingPage() {
       }
       setShowExpenseForm(false);
       setEditingExpense(null);
-      loadExpenses(expenseFilters);
+      invalidateExpenses();
     } catch (err) {
       alert(err.message || 'Failed to save expense');
     } finally {
@@ -342,7 +286,7 @@ export default function AccountingPage() {
     if (!confirm('Delete this expense?')) return;
     try {
       await api.delete(`/accounting/expenses/${id}`);
-      loadExpenses(expenseFilters);
+      invalidateExpenses();
     } catch (err) {
       alert(err.message || 'Failed to delete expense');
     }

@@ -1,5 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { useAdminUsers, useAdminRoles, useCreateUser, useUpdateUser, useDepartments, adminKeys } from '../../hooks/queries/useAdmin';
+import { useClinics } from '../../hooks/queries/useClinics';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -28,11 +31,8 @@ const roleColumns = [
 ];
 
 export default function AdminPage() {
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState('users');
-  const [users, setUsers] = useState([]);
-  const [roles, setRoles] = useState([]);
-  const [rolesList, setRolesList] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [showUserModal, setShowUserModal] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [showDeptModal, setShowDeptModal] = useState(false);
@@ -40,42 +40,29 @@ export default function AdminPage() {
   const [editingDept, setEditingDept] = useState(null);
   const [userForm, setUserForm] = useState({ email: '', password: '', fullName: '', phone: '', roleId: '', clinicId: '' });
   const [roleForm, setRoleForm] = useState({ name: '', description: '', permissions: [] });
-  const [departments, setDepartments] = useState([]);
   const [deptForm, setDeptForm] = useState({ name: '', nameAr: '', slug: '', type: 'OTHER' });
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [u, r, rl, d] = await Promise.all([
-        api.get('/admin/users'),
-        api.get('/admin/roles'),
-        api.get('/clinics'),
-        api.get('/departments'),
-      ]);
-      setUsers(u);
-      setRoles(r);
-      setRolesList(rl);
-      setDepartments(d);
-    } catch (err) {
-      console.error('Failed to load admin data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: users = [], isLoading: loadingUsers } = useAdminUsers();
+  const { data: roles = [] } = useAdminRoles();
+  const { data: departments = [], isLoading: loadingDepts } = useDepartments();
+  const { data: rolesList = [] } = useClinics();
+  const createUser = useCreateUser();
+  const updateUser = useUpdateUser();
 
-  useEffect(() => { loadData(); }, []);
+  const loading = loadingUsers || loadingDepts;
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/admin/users', userForm);
+      await createUser.mutateAsync(userForm);
       setShowUserModal(false);
       setUserForm({ email: '', password: '', fullName: '', phone: '', roleId: '', clinicId: '' });
-      loadData();
     } catch (err) {
       alert(err.message || 'Failed to create user');
     }
   };
+
+  const invalidateAll = () => queryClient.invalidateQueries({ queryKey: adminKeys.roles });
 
   const handleCreateRole = async (e) => {
     e.preventDefault();
@@ -88,7 +75,7 @@ export default function AdminPage() {
       setShowRoleModal(false);
       setEditingRole(null);
       setRoleForm({ name: '', description: '', permissions: [] });
-      loadData();
+      invalidateAll();
     } catch (err) {
       alert(err.message || 'Failed to save role');
     }
@@ -104,7 +91,7 @@ export default function AdminPage() {
     if (!confirm('Delete this role?')) return;
     try {
       await api.delete(`/admin/roles/${roleId}`);
-      loadData();
+      invalidateAll();
     } catch (err) {
       alert(err.message || 'Failed to delete role');
     }
@@ -121,7 +108,7 @@ export default function AdminPage() {
       setShowDeptModal(false);
       setEditingDept(null);
       setDeptForm({ name: '', nameAr: '', slug: '', type: 'OTHER' });
-      loadData();
+      queryClient.invalidateQueries({ queryKey: adminKeys.departments });
     } catch (err) {
       alert(err.message || 'Failed to save department');
     }

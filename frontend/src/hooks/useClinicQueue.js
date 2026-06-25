@@ -1,34 +1,17 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
-
-const POLL_INTERVAL = 15000;
+import { clinicKeys } from './queries/useClinics';
 
 export function useClinicQueue(clinicSlug, onSelectPatient) {
-  const [queue, setQueue] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState(null);
-  const timer = useRef(null);
+  const queryClient = useQueryClient();
 
-  const fetchQueue = useCallback(async () => {
-    if (!clinicSlug) return;
-    try {
-      const data = await api.get(`/clinics/${clinicSlug}/queue`);
-      setQueue(data || []);
-      setLastUpdated(new Date());
-    } catch {
-      setQueue([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [clinicSlug]);
-
-  useEffect(() => {
-    // Polling pattern: fetch immediately then poll — setState in effect is intentional
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchQueue();
-    timer.current = setInterval(fetchQueue, POLL_INTERVAL);
-    return () => { if (timer.current) clearInterval(timer.current); };
-  }, [fetchQueue]);
+  const { data: queue = [], isLoading: loading, dataUpdatedAt } = useQuery({
+    queryKey: clinicKeys.queue(clinicSlug),
+    queryFn: () => api.get(`/clinics/${clinicSlug}/queue`),
+    enabled: !!clinicSlug,
+    refetchInterval: 15000,
+  });
 
   const startConsultation = useCallback(async (appointment) => {
     try {
@@ -37,8 +20,14 @@ export function useClinicQueue(clinicSlug, onSelectPatient) {
       // if status update fails, still proceed with consultation
     }
     onSelectPatient?.(appointment.patient);
-    setQueue((prev) => prev.filter((a) => a.id !== appointment.id));
-  }, [onSelectPatient]);
+    queryClient.setQueryData(clinicKeys.queue(clinicSlug), (prev) =>
+      (prev || []).filter((a) => a.id !== appointment.id)
+    );
+  }, [onSelectPatient, queryClient, clinicSlug]);
 
-  return { queue, loading, lastUpdated, startConsultation, refresh: fetchQueue };
+  const refresh = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: clinicKeys.queue(clinicSlug) });
+  }, [queryClient, clinicSlug]);
+
+  return { queue, loading, lastUpdated: dataUpdatedAt ? new Date(dataUpdatedAt) : null, startConsultation, refresh };
 }
