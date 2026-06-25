@@ -16,13 +16,15 @@ export function useClinicQueue(clinicSlug, onSelectPatient) {
       setQueue(data || []);
       setLastUpdated(new Date());
     } catch {
-      if (queue.length === 0) setQueue([]);
+      setQueue([]);
     } finally {
       setLoading(false);
     }
   }, [clinicSlug]);
 
   useEffect(() => {
+    // Polling pattern: fetch immediately then poll — setState in effect is intentional
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchQueue();
     timer.current = setInterval(fetchQueue, POLL_INTERVAL);
     return () => { if (timer.current) clearInterval(timer.current); };

@@ -3,6 +3,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { api } from '../../lib/api';
+import { useDebounce } from '../../hooks/useDebounce';
 
 const EMPTY_MEDICATION = { drugName: '', dosage: '', frequency: '', duration: '', route: 'oral', notes: '' };
 
@@ -40,17 +41,16 @@ export default function CrossReferralModal({ open, onClose, fromClinicId, onCrea
     }
   }, [open]);
 
+  const debouncedQuery = useDebounce(searchQuery, 300);
+
   useEffect(() => {
-    if (searchQuery.length < 2 || step !== 'patient') { return; }
-    const timer = setTimeout(() => {
-      setSearching(true);
-      api.get(`/reception/search?q=${encodeURIComponent(searchQuery)}`)
-        .then(setSearchResults)
-        .catch(() => setSearchResults([]))
-        .finally(() => setSearching(false));
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery, step]);
+    if (debouncedQuery.length < 2 || step !== 'patient') { return; }
+    setSearching(true);
+    api.get(`/reception/search?q=${encodeURIComponent(debouncedQuery)}`)
+      .then(setSearchResults)
+      .catch(() => setSearchResults([]))
+      .finally(() => setSearching(false));
+  }, [debouncedQuery, step]);
 
   useEffect(() => {
     if (referralType === 'LAB_DISPATCH' && step === 'type') {

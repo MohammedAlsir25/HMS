@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import multer from 'multer';
 import { getSupabase, getBucket } from '../../lib/supabase.js';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
+import { auditMiddleware } from '../../middleware/auditLog.js';
 import { PERMISSIONS } from '../../middleware/rbac.js';
 
 const router = Router();

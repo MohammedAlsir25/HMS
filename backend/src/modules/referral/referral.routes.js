@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
+import { auditMiddleware } from '../../middleware/auditLog.js';
 import { PERMISSIONS } from '../../middleware/rbac.js';
 
 const router = Router();

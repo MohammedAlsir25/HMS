@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
+import { auditMiddleware } from '../../middleware/auditLog.js';
 import { PERMISSIONS, DEFAULT_ROLES } from '../../middleware/rbac.js';
 
 const router = Router();

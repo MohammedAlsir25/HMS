@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
+import { auditMiddleware } from '../../middleware/auditLog.js';
 import { PERMISSIONS } from '../../middleware/rbac.js';
 
 const router = Router();
@@ -270,7 +271,7 @@ router.get('/shift/current', authenticate, async (req, res) => {
   }
 });
 
-router.post('/shift/close', authenticate, async (req, res) => {
+router.post('/shift/close', authenticate, auditMiddleware('UPDATE', 'Shift'), async (req, res) => {
   try {
     const { expectedTotal, actualTotal, notes } = req.body;
     const shift = await prisma.shift.findFirst({
@@ -294,7 +295,7 @@ router.post('/shift/close', authenticate, async (req, res) => {
 
 const TYPE_DEPT_SLUG = { PHARMACY: 'pharmacy', OPTICS: 'optics' };
 
-router.post('/transact', authenticate, requirePermission(PERMISSIONS.PHARMACY_WRITE), async (req, res) => {
+router.post('/transact', authenticate, requirePermission(PERMISSIONS.PHARMACY_WRITE), auditMiddleware('CREATE', 'Transaction'), async (req, res) => {
   try {
     const { type, items, paymentMethod, amount, description, patientName, departmentId, referralId } = req.body;
     if (!type || !['PHARMACY', 'OPTICS'].includes(type)) {

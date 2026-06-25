@@ -5,6 +5,7 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { api } from '../../lib/api';
+import { useDebounce } from '../../hooks/useDebounce';
 import NewPatientForm from './NewPatientForm';
 import ReservationsPanel from './ReservationsPanel';
 import FileUploader from './FileUploader';
@@ -80,17 +81,16 @@ export default function ReceptionPage() {
     return () => clearInterval(interval);
   }, [queueClinicFilter, selectedClinic, loadQueue, loadStats]);
 
+  const debouncedQuery = useDebounce(searchQuery, 300);
+
   useEffect(() => {
-    if (searchQuery.length < 2) { setSearchResults([]); return; }
-    const timer = setTimeout(() => {
-      setSearching(true);
-      api.get(`/reception/search?q=${encodeURIComponent(searchQuery)}`)
-        .then(setSearchResults)
-        .catch(() => setSearchResults([]))
-        .finally(() => setSearching(false));
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+    if (debouncedQuery.length < 2) { setSearchResults([]); return; }
+    setSearching(true);
+    api.get(`/reception/search?q=${encodeURIComponent(debouncedQuery)}`)
+      .then(setSearchResults)
+      .catch(() => setSearchResults([]))
+      .finally(() => setSearching(false));
+  }, [debouncedQuery]);
 
   const handleCheckIn = useCallback(async () => {
     if (!selectedPatient || !selectedClinic) return;

@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { Table } from '../../components/ui/Table';
 import { Modal } from '../../components/ui/Modal';
 import { api } from '../../lib/api';
+import { useDebounce } from '../../hooks/useDebounce';
 
 const statusBadge = {
   PENDING: 'warning',
@@ -133,17 +134,16 @@ function NewRequestModal({ open, onClose, onCreated }) {
     }
   }, [open]);
 
+  const debouncedQuery = useDebounce(searchQuery, 300);
+
   useEffect(() => {
-    if (searchQuery.length < 2 || step !== 'patient') return;
-    const timer = setTimeout(() => {
-      setSearching(true);
-      api.get(`/reception/search?q=${encodeURIComponent(searchQuery)}`)
-        .then(setSearchResults)
-        .catch(() => setSearchResults([]))
-        .finally(() => setSearching(false));
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery, step]);
+    if (debouncedQuery.length < 2 || step !== 'patient') return;
+    setSearching(true);
+    api.get(`/reception/search?q=${encodeURIComponent(debouncedQuery)}`)
+      .then(setSearchResults)
+      .catch(() => setSearchResults([]))
+      .finally(() => setSearching(false));
+  }, [debouncedQuery, step]);
 
   const loadCatalog = useCallback(async () => {
     try {
