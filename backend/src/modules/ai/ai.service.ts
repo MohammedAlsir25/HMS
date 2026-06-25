@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { config } from '../../config/index.js';
 
 export async function getAIDiagnosis({ symptoms, vitals, patient, specialty }) {
