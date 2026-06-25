@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
@@ -93,8 +92,8 @@ router.get('/:slug/records', authenticate, requirePermission(PERMISSIONS.CLINICA
   const clinic = await prisma.clinic.findUnique({ where: { slug: req.params.slug } });
   if (!clinic) throw new NotFoundError('Clinic not found');
 
-  const { patientId } = req.query;
-  const where = { clinicId: clinic.id };
+  const { patientId } = req.query as { patientId?: string };
+  const where: Record<string, unknown> = { clinicId: clinic.id };
   if (patientId) where.patientId = patientId;
 
   const records = await prisma.clinicalRecord.findMany({
@@ -162,15 +161,15 @@ router.get('/:slug/stats', authenticate, requirePermission(PERMISSIONS.CLINICAL_
 }));
 
 router.get('/:slug/medications', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), asyncHandler(async (req, res) => {
-  const { search } = req.query;
-  const where = { isActive: true, category: { contains: 'medication', mode: 'insensitive' } };
+  const { search } = req.query as Record<string, string>;
+  const where: Record<string, unknown> = { isActive: true, category: { contains: 'medication', mode: 'insensitive' as const } };
   if (search && search.length >= 2) {
     where.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { sku: { contains: search, mode: 'insensitive' } },
+      { name: { contains: search, mode: 'insensitive' as const } },
+      { sku: { contains: search, mode: 'insensitive' as const } },
     ];
   }
-  const items = await prisma.inventoryItem.findMany({ where, orderBy: { name: 'asc' }, take: 20 });
+  const items = await prisma.inventoryItem.findMany({ where: where as any, orderBy: { name: 'asc' }, take: 20 });
   res.json(items);
 }));
 

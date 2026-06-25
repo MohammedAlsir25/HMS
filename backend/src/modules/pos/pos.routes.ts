@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
@@ -42,28 +41,28 @@ router.post("/optics/items", authenticate, requirePermission(PERMISSIONS.OPTICS_
 }));
 
 router.get("/pharmacy/items", authenticate, requirePermission(PERMISSIONS.PHARMACY_READ), asyncHandler(async (req, res) => {
-  const { search } = req.query;
-  const where = { category: { equals: "pharmacy", mode: "insensitive" }, isActive: true };
+  const { search } = req.query as Record<string, string>;
+  const where: Record<string, unknown> = { category: { equals: 'pharmacy', mode: 'insensitive' as const }, isActive: true };
   if (search) {
     where.OR = [
-      { name: { contains: search, mode: "insensitive" } },
-      { sku: { contains: search, mode: "insensitive" } },
+      { name: { contains: search, mode: 'insensitive' as const } },
+      { sku: { contains: search, mode: 'insensitive' as const } },
     ];
   }
-  const items = await prisma.inventoryItem.findMany({ where, orderBy: { name: "asc" } });
+  const items = await prisma.inventoryItem.findMany({ where: where as any, orderBy: { name: 'asc' } });
   res.json(items);
 }));
 
 router.get("/optics/items", authenticate, requirePermission(PERMISSIONS.OPTICS_READ), asyncHandler(async (req, res) => {
-  const { search } = req.query;
-  const where = { category: { equals: "optics", mode: "insensitive" }, isActive: true };
+  const { search } = req.query as Record<string, string>;
+  const where: Record<string, unknown> = { category: { equals: 'optics', mode: 'insensitive' as const }, isActive: true };
   if (search) {
     where.OR = [
-      { name: { contains: search, mode: "insensitive" } },
-      { sku: { contains: search, mode: "insensitive" } },
+      { name: { contains: search, mode: 'insensitive' as const } },
+      { sku: { contains: search, mode: 'insensitive' as const } },
     ];
   }
-  const items = await prisma.inventoryItem.findMany({ where, orderBy: { name: "asc" } });
+  const items = await prisma.inventoryItem.findMany({ where: where as any, orderBy: { name: 'asc' } });
   res.json(items);
 }));
 
@@ -161,10 +160,10 @@ router.delete("/optics/items/:id", authenticate, requirePermission(PERMISSIONS.O
 }));
 
 router.get("/alerts", authenticate, asyncHandler(async (req, res) => {
-  const { category } = req.query;
-  const where = { isActive: true };
-  if (category) where.category = { equals: category, mode: "insensitive" };
-  const items = await prisma.inventoryItem.findMany({ where, orderBy: { name: "asc" } });
+  const { category } = req.query as Record<string, string>;
+  const where: Record<string, unknown> = { isActive: true };
+  if (category) where.category = { equals: category, mode: 'insensitive' as const };
+  const items = await prisma.inventoryItem.findMany({ where: where as any, orderBy: { name: 'asc' } });
   const now = new Date();
   const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   const alerts = { lowStock: [], expired: [], expiringSoon: [] };
@@ -181,16 +180,16 @@ router.get("/alerts", authenticate, asyncHandler(async (req, res) => {
 const VALID_TYPES = { PHARMACY: 'PHARMACY', OPTICS: 'OPTICS' };
 
 router.get('/items', authenticate, asyncHandler(async (req, res) => {
-  const { category, search } = req.query;
-  const where = { isActive: true };
-  if (category) where.category = { contains: category, mode: 'insensitive' };
+  const { category, search } = req.query as Record<string, string>;
+  const where: Record<string, unknown> = { isActive: true };
+  if (category) where.category = { contains: category, mode: 'insensitive' as const };
   if (search) {
     where.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { sku: { contains: search, mode: 'insensitive' } },
+      { name: { contains: search, mode: 'insensitive' as const } },
+      { sku: { contains: search, mode: 'insensitive' as const } },
     ];
   }
-  const items = await prisma.inventoryItem.findMany({ where, orderBy: { name: 'asc' } });
+  const items = await prisma.inventoryItem.findMany({ where: where as any, orderBy: { name: 'asc' } });
   res.json(items);
 }));
 

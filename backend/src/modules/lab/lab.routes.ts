@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
@@ -23,17 +22,17 @@ const ORDER_INCLUDE = {
       test: true,
       resultEnteredBy: { select: { id: true, fullName: true } },
     },
-    orderBy: { test: { sortOrder: 'asc' } },
+    orderBy: { test: { sortOrder: 'asc' as const } },
   },
 };
 
 router.get('/tests', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_READ), asyncHandler(async (req, res) => {
-  const { search, category, isActive } = req.query;
-  const where = { orderType: 'LAB' };
-  if (search) where.name = { contains: search, mode: 'insensitive' };
+  const { search, category, isActive } = req.query as Record<string, string>;
+  const where: Record<string, unknown> = { orderType: 'LAB' as const };
+  if (search) where.name = { contains: search, mode: 'insensitive' as const };
   if (category) where.category = category;
   if (isActive !== undefined) where.isActive = isActive === 'true';
-  const tests = await prisma.diagnosticTest.findMany({ where, orderBy: { sortOrder: 'asc' } });
+  const tests = await prisma.diagnosticTest.findMany({ where: where as any, orderBy: { sortOrder: 'asc' as const } });
   res.json(tests);
 }));
 
@@ -63,8 +62,8 @@ router.post('/tests', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_CA
 }));
 
 router.put('/tests/:id', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_CATALOG), asyncHandler(async (req, res) => {
-  const { code, name, nameAr, category, specimen, unit, refRangeText, refRangeLow, refRangeHigh, lowCritical, highCritical, price, sortOrder, isActive } = req.body;
-  const data = {};
+  const { code, name, nameAr, category, specimen, unit, refRangeText, refRangeLow, refRangeHigh, lowCritical, highCritical, price, sortOrder, isActive } = req.body as Record<string, unknown>;
+  const data: Record<string, unknown> = {};
   if (code !== undefined) data.code = code;
   if (name !== undefined) data.name = name;
   if (nameAr !== undefined) data.nameAr = nameAr;
@@ -72,11 +71,11 @@ router.put('/tests/:id', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS
   if (specimen !== undefined) data.specimen = specimen;
   if (unit !== undefined) data.unit = unit;
   if (refRangeText !== undefined) data.refRangeText = refRangeText;
-  if (refRangeLow !== undefined) data.refRangeLow = parseFloat(refRangeLow);
-  if (refRangeHigh !== undefined) data.refRangeHigh = parseFloat(refRangeHigh);
-  if (lowCritical !== undefined) data.lowCritical = lowCritical ? parseFloat(lowCritical) : null;
-  if (highCritical !== undefined) data.highCritical = highCritical ? parseFloat(highCritical) : null;
-  if (price !== undefined) data.price = price ? parseFloat(price) : null;
+  if (refRangeLow !== undefined) data.refRangeLow = parseFloat(refRangeLow as string);
+  if (refRangeHigh !== undefined) data.refRangeHigh = parseFloat(refRangeHigh as string);
+  if (lowCritical !== undefined) data.lowCritical = lowCritical ? parseFloat(lowCritical as string) : null;
+  if (highCritical !== undefined) data.highCritical = highCritical ? parseFloat(highCritical as string) : null;
+  if (price !== undefined) data.price = price ? parseFloat(price as string) : null;
   if (sortOrder !== undefined) data.sortOrder = sortOrder;
   if (isActive !== undefined) data.isActive = isActive;
   const test = await prisma.diagnosticTest.update({ where: { id: req.params.id }, data });
@@ -91,7 +90,7 @@ router.delete('/tests/:id', authenticate, requirePermission(PERMISSIONS.DIAGNOST
 router.get('/panels', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_READ), asyncHandler(async (req, res) => {
   const panels = await prisma.diagnosticPanel.findMany({
     where: { orderType: 'LAB', isActive: true },
-    include: { panelTests: { include: { test: true }, orderBy: { test: { sortOrder: 'asc' } } } },
+    include: { panelTests: { include: { test: true }, orderBy: { test: { sortOrder: 'asc' as const } } } },
   });
   res.json(panels);
 }));
@@ -115,14 +114,14 @@ router.delete('/panels/:id', authenticate, requirePermission(PERMISSIONS.DIAGNOS
 }));
 
 router.get('/orders', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_READ), asyncHandler(async (req, res) => {
-  const { status, patientId, fromClinicId, search } = req.query;
-  const where = { orderType: 'LAB' };
+  const { status, patientId, fromClinicId, search } = req.query as Record<string, string>;
+  const where: Record<string, unknown> = { orderType: 'LAB' as const };
   if (status) where.status = status;
   if (patientId) where.patientId = patientId;
   if (fromClinicId) where.fromClinicId = fromClinicId;
-  if (search) where.patient = { fullName: { contains: search, mode: 'insensitive' } };
+  if (search) where.patient = { fullName: { contains: search, mode: 'insensitive' as const } };
   const orders = await prisma.diagnosticOrder.findMany({
-    where,
+    where: where as any,
     include: ORDER_INCLUDE,
     orderBy: { createdAt: 'desc' },
     take: 50,
@@ -186,10 +185,10 @@ router.patch('/orders/:id/unclaim', authenticate, requirePermission(PERMISSIONS.
 }));
 
 router.patch('/orders/:id/status', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_WRITE), asyncHandler(async (req, res) => {
-  const { status } = req.body;
+  const { status } = req.body as { status?: string };
   const valid = ['SUBMITTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
-  if (!valid.includes(status)) throw new ValidationError('Invalid status');
-  const data = { status };
+  if (!status || !valid.includes(status)) throw new ValidationError('Invalid status');
+  const data: Record<string, unknown> = { status };
   if (status === 'IN_PROGRESS') data.assignedToId = req.user.id;
   if (status === 'COMPLETED') data.completedAt = new Date();
   const order = await prisma.diagnosticOrder.update({
@@ -252,7 +251,7 @@ router.get('/results', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_R
     include: {
       tests: {
         include: { test: true, resultEnteredBy: { select: { fullName: true } } },
-        orderBy: { test: { sortOrder: 'asc' } },
+    orderBy: { test: { sortOrder: 'asc' as const } },
       },
       fromClinic: { select: { name: true, slug: true } },
     },
