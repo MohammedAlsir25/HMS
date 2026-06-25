@@ -1,5 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { useHREmployees, useHRPayroll, useHRLeaves, useUpdatePayrollStatus, useUpdateLeaveStatus, hrKeys } from '../../hooks/queries/useHR';
+import { useDepartments } from '../../hooks/queries/useAdmin';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -20,55 +23,23 @@ const employeeColumns = [
 ];
 
 export default function HRPage() {
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState('employees');
-  const [employees, setEmployees] = useState([]);
-  const [payroll, setPayroll] = useState([]);
-  const [leaves, setLeaves] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [showEmpModal, setShowEmpModal] = useState(false);
   const [showPayrollModal, setShowPayrollModal] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
-  const [departments, setDepartments] = useState([]);
   const [empForm, setEmpForm] = useState({ employeeCode: '', fullName: '', phone: '', email: '', gender: '', position: '', department: '', departmentId: '', baseSalary: 0, hireDate: '' });
   const [payForm, setPayForm] = useState({ employeeId: '', period: '', grossPay: 0, deductions: 0, notes: '' });
   const [leaveForm, setLeaveForm] = useState({ employeeId: '', type: 'ANNUAL', startDate: '', endDate: '', reason: '' });
 
-  const loadEmployees = async () => {
-    try {
-      const data = await api.get('/hr/employees');
-      setEmployees(data);
-    } catch (err) {
-      console.error('Failed to load employees:', err);
-    }
-  };
+  const { data: employees = [], isLoading: loadingEmp } = useHREmployees();
+  const { data: payroll = [], isLoading: loadingPay } = useHRPayroll();
+  const { data: leaves = [], isLoading: loadingLeave } = useHRLeaves();
+  const { data: departments = [] } = useDepartments();
+  const updatePayrollStatus = useUpdatePayrollStatus();
+  const updateLeaveStatus = useUpdateLeaveStatus();
 
-  const loadPayroll = async () => {
-    try {
-      const data = await api.get('/hr/payroll');
-      setPayroll(data);
-    } catch (err) {
-      console.error('Failed to load payroll:', err);
-    }
-  };
-
-  const loadLeaves = async () => {
-    try {
-      const data = await api.get('/hr/leaves');
-      setLeaves(data);
-    } catch (err) {
-      console.error('Failed to load leaves:', err);
-    }
-  };
-
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      const [d] = await Promise.all([api.get('/departments'), loadEmployees(), loadPayroll(), loadLeaves()]);
-      setDepartments(d);
-      setLoading(false);
-    };
-    load();
-  }, []);
+  const loading = loadingEmp || loadingPay || loadingLeave;
 
   const handleCreateEmployee = async (e) => {
     e.preventDefault();
@@ -76,7 +47,7 @@ export default function HRPage() {
       await api.post('/hr/employees', empForm);
       setShowEmpModal(false);
       setEmpForm({ employeeCode: '', fullName: '', phone: '', email: '', gender: '', position: '', department: '', departmentId: '', baseSalary: 0, hireDate: '' });
-      loadEmployees();
+      queryClient.invalidateQueries({ queryKey: hrKeys.employees });
     } catch (err) {
       alert(err.message || 'Failed to create employee');
     }
@@ -88,7 +59,7 @@ export default function HRPage() {
       await api.post('/hr/payroll', payForm);
       setShowPayrollModal(false);
       setPayForm({ employeeId: '', period: '', grossPay: 0, deductions: 0, notes: '' });
-      loadPayroll();
+      queryClient.invalidateQueries({ queryKey: hrKeys.payroll });
     } catch (err) {
       alert(err.message || 'Failed to create payroll record');
     }
@@ -96,8 +67,7 @@ export default function HRPage() {
 
   const handlePayrollStatus = async (id, status) => {
     try {
-      await api.patch(`/hr/payroll/${id}/status`, { status });
-      loadPayroll();
+      await updatePayrollStatus.mutateAsync({ id, status });
     } catch (err) {
       alert(err.message || 'Failed to update payroll status');
     }
@@ -109,7 +79,7 @@ export default function HRPage() {
       await api.post('/hr/leaves', leaveForm);
       setShowLeaveModal(false);
       setLeaveForm({ employeeId: '', type: 'ANNUAL', startDate: '', endDate: '', reason: '' });
-      loadLeaves();
+      queryClient.invalidateQueries({ queryKey: hrKeys.leaves });
     } catch (err) {
       alert(err.message || 'Failed to create leave request');
     }
@@ -117,8 +87,7 @@ export default function HRPage() {
 
   const handleLeaveStatus = async (id, status) => {
     try {
-      await api.patch(`/hr/leaves/${id}/status`, { status });
-      loadLeaves();
+      await updateLeaveStatus.mutateAsync({ id, status });
     } catch (err) {
       alert(err.message || 'Failed to update leave status');
     }

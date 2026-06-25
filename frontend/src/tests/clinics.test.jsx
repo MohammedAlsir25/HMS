@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
+
+const testQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 import MedicineDashboard from '../features/clinics/MedicineDashboard';
 import ENTDashboard from '../features/clinics/ENTDashboard';
 import DentalDashboard from '../features/clinics/DentalDashboard';
@@ -12,7 +15,7 @@ import PedsOphthDashboard from '../features/clinics/PedsOphthDashboard';
 import GenOphthDashboard from '../features/clinics/GenOphthDashboard';
 
 function WithRouter({ children }) {
-  return <BrowserRouter>{children}</BrowserRouter>;
+  return <QueryClientProvider client={testQueryClient}><BrowserRouter>{children}</BrowserRouter></QueryClientProvider>;
 }
 
 describe('MedicineDashboard', () => {

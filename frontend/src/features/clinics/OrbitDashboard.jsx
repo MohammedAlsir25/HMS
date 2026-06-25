@@ -15,9 +15,8 @@ import EncounterSummary from '../../components/clinic/EncounterSummary';
 import OrbitDiagram from '../../components/anatomical/OrbitDiagram';
 import { usePatients } from '../../hooks/usePatients';
 import { useClinicalRecords } from '../../hooks/useClinicalRecords';
-import { useAIDiagnosis } from '../../hooks/useAIDiagnosis';
+import { useAIDiagnosis, useIcd10Search } from '../../hooks/useAIDiagnosis';
 import { useClinicQueue } from '../../hooks/useClinicQueue';
-import { api } from '../../lib/api';
 
 const bodyAreas = ['Optic Nerve', 'Macula', 'Retina', 'Cornea', 'Lens', 'Anterior Chamber', 'Eyelid', 'Orbit', 'Generalized'];
 const onsetOptions = ['Sudden', 'Acute (<1 week)', 'Subacute (1-4 weeks)', 'Chronic (>4 weeks)'];
@@ -45,12 +44,13 @@ export default function OrbitDashboard() {
   const [symptoms, setSymptoms] = useState([]);
   const [diagnosis, setDiagnosis] = useState('');
   const [diagnosisIcd10, setDiagnosisIcd10] = useState('');
-  const [icd10Results, setIcd10Results] = useState([]);
   const [medications, setMedications] = useState([]);
   const [soapNotes, setSoapNotes] = useState({ subjective: '', objective: '', assessment: '', plan: '' });
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [showIcd10Dropdown, setShowIcd10Dropdown] = useState(false);
+
+  const { data: icd10Results = [] } = useIcd10Search(diagnosis);
 
   const [selectedRegion, setSelectedRegion] = useState(null);
   const [findings, setFindings] = useState({});
@@ -64,10 +64,6 @@ export default function OrbitDashboard() {
   };
 
   useEffect(() => {
-    records.fetchStats();
-  }, []);
-
-  useEffect(() => {
     if (patients.selectedPatient) {
       records.fetchRecords(patients.selectedPatient.id);
       setShowReferralBtn(true);
@@ -77,24 +73,16 @@ export default function OrbitDashboard() {
     }
   }, [patients.selectedPatient]);
 
-  const handleIcd10Search = useCallback(async (q) => {
+  const handleIcd10Search = useCallback((q) => {
     setDiagnosis(q);
     setDiagnosisIcd10('');
-    if (q.length < 2) { setIcd10Results([]); setShowIcd10Dropdown(false); return; }
-    try {
-      const data = await api.get(`/ai/icd10?q=${encodeURIComponent(q)}`);
-      setIcd10Results(data || []);
-      setShowIcd10Dropdown(true);
-    } catch {
-      setIcd10Results([]);
-    }
+    if (q.length >= 2) setShowIcd10Dropdown(true);
   }, []);
 
   const selectIcd10 = useCallback((code) => {
     setDiagnosis(code.name);
     setDiagnosisIcd10(code.code);
     setShowIcd10Dropdown(false);
-    setIcd10Results([]);
   }, []);
 
   const addSymptom = useCallback(() => {

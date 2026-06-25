@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useReferrals, useUpdateReferralStatus } from '../../hooks/queries/useReferrals';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { api } from '../../lib/api';
 
 const statusColors = {
   PENDING: 'warning',
@@ -18,21 +17,11 @@ const typeLabels = {
 };
 
 export default function ReferralsPage() {
-  const [referrals, setReferrals] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { data: referrals = [], isLoading } = useReferrals();
+  const updateStatus = useUpdateReferralStatus();
 
-  useEffect(() => {
-    api.get('/referrals')
-      .then(setReferrals)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  const handleStatusChange = async (id, status) => {
-    try {
-      const updated = await api.patch(`/referrals/${id}/status`, { status });
-      setReferrals((prev) => prev.map((r) => (r.id === id ? updated : r)));
-    } catch { /* ignore */ }
+  const handleStatusChange = (id, status) => {
+    updateStatus.mutate({ id, status });
   };
 
   return (
@@ -46,8 +35,8 @@ export default function ReferralsPage() {
 
       <Card>
         <CardContent>
-          {loading && <p className="text-body text-slate">Loading referrals...</p>}
-          {!loading && referrals.length === 0 && (
+          {isLoading && <p className="text-body text-slate">Loading referrals...</p>}
+          {!isLoading && referrals.length === 0 && (
             <p className="text-body text-slate text-center py-8">No referrals yet</p>
           )}
           {referrals.length > 0 && (

@@ -1,11 +1,15 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { useClinics } from '../../hooks/queries/useClinics';
+import { useReceptionQueue, useReceptionQueueStats, useCheckIn, useUpdateAppointmentStatus, useUpdateAppointmentPriority, useCallNext } from '../../hooks/queries/useReception';
+import { patientKeys } from '../../hooks/usePatients';
+import { useDebounce } from '../../hooks/useDebounce';
+import { api } from '../../lib/api';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { api } from '../../lib/api';
-import { useDebounce } from '../../hooks/useDebounce';
 import NewPatientForm from './NewPatientForm';
 import ReservationsPanel from './ReservationsPanel';
 import FileUploader from './FileUploader';
@@ -30,118 +34,64 @@ function calcAge(dob) {
 export default function ReceptionPage() {
   const { t } = useTranslation();
   const [tab, setTab] = useState('queue');
-  const [clinics, setClinics] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [selectedClinic, setSelectedClinic] = useState('');
   const [appointmentType, setAppointmentType] = useState('WALKIN');
   const [collectPayment, setCollectPayment] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('CASH');
-  const [queue, setQueue] = useState([]);
-  const [queueStats, setQueueStats] = useState([]);
-  const [queueLoading, setQueueLoading] = useState(false);
-  const [searching, setSearching] = useState(false);
   const [queueClinicFilter, setQueueClinicFilter] = useState('');
   const [queueSearch, setQueueSearch] = useState('');
-  const [callingNext, setCallingNext] = useState(false);
-  const queueRef = useRef(null);
-  queueRef.current = queue;
 
-  useEffect(() => {
-    api.get('/clinics').then(setClinics).catch(() => {});
-  }, []);
-
-  const loadQueue = useCallback(async (clinicId) => {
-    if (!clinicId) return;
-    setQueueLoading(true);
-    try {
-      const data = await api.get(`/reception/queue/${clinicId}`);
-      setQueue(data);
-    } catch { /* ignore */ }
-    finally { setQueueLoading(false); }
-  }, []);
-
-  const loadStats = useCallback(async () => {
-    try {
-      const data = await api.get('/reception/queue/stats');
-      setQueueStats(data);
-    } catch { /* ignore */ }
-  }, []);
-
-  useEffect(() => {
-    const targetClinic = queueClinicFilter || selectedClinic;
-    loadStats();
-    if (targetClinic) loadQueue(targetClinic);
-    const interval = setInterval(() => {
-      const clinic = queueRef.current?.[0]?.clinicId || queueClinicFilter || selectedClinic;
-      if (clinic) loadQueue(clinic);
-      loadStats();
-    }, 8000);
-    return () => clearInterval(interval);
-  }, [queueClinicFilter, selectedClinic, loadQueue, loadStats]);
+  const { data: clinics = [] } = useClinics();
+  const activeClinic = queueClinicFilter || selectedClinic;
+  const { data: queue = [], isLoading: queueLoading } = useReceptionQueue(activeClinic);
+  const { data: queueStats = [] } = useReceptionQueueStats();
+  const checkIn = useCheckIn();
+  const updateStatus = useUpdateAppointmentStatus();
+  const updatePriority = useUpdateAppointmentPriority();
+  const callNext = useCallNext();
 
   const debouncedQuery = useDebounce(searchQuery, 300);
+  const { data: searchResults = [], isLoading: searching } = useQuery({
+    queryKey: patientKeys.search(debouncedQuery),
+    queryFn: () => api.get(`/reception/search?q=${encodeURIComponent(debouncedQuery)}`),
+    enabled: debouncedQuery.length >= 2,
+  });
 
-  useEffect(() => {
-    if (debouncedQuery.length < 2) { setSearchResults([]); return; }
-    setSearching(true);
-    api.get(`/reception/search?q=${encodeURIComponent(debouncedQuery)}`)
-      .then(setSearchResults)
-      .catch(() => setSearchResults([]))
-      .finally(() => setSearching(false));
-  }, [debouncedQuery]);
-
-  const handleCheckIn = useCallback(async () => {
+  const handleCheckIn = async () => {
     if (!selectedPatient || !selectedClinic) return;
     try {
-      const result = await api.post('/reception/check-in', {
+      await checkIn.mutateAsync({
         patientId: selectedPatient.id,
         clinicId: selectedClinic,
         type: appointmentType,
         collectPayment: collectPayment || undefined,
         paymentMethod: collectPayment ? paymentMethod : undefined,
       });
-      const appt = result.appointment || result;
-      setQueue((prev) => [...prev, appt]);
       setSelectedPatient(null);
       setCollectPayment(false);
       setPaymentMethod('CASH');
       setSearchQuery('');
-      setSearchResults([]);
     } catch { /* ignore */ }
-  }, [selectedPatient, selectedClinic, appointmentType, collectPayment, paymentMethod]);
+  };
 
-  const handleStatusChange = useCallback(async (id, status) => {
-    try {
-      const updated = await api.patch(`/reception/appointments/${id}/status`, { status });
-      setQueue((prev) => prev.map((a) => (a.id === id ? { ...updated, estimatedWaitMins: a.estimatedWaitMins, position: a.position } : a)));
-    } catch { /* ignore */ }
-  }, []);
+  const handleStatusChange = (id, status) => {
+    updateStatus.mutate({ id, status });
+  };
 
-  const handlePriority = useCallback(async (id, priority) => {
-    try {
-      const updated = await api.patch(`/reception/appointments/${id}/priority`, { priority });
-      setQueue((prev) => prev.map((a) => (a.id === id ? { ...updated, estimatedWaitMins: a.estimatedWaitMins, position: a.position } : a)));
-    } catch { /* ignore */ }
-  }, []);
+  const handlePriority = (id, priority) => {
+    updatePriority.mutate({ id, priority });
+  };
 
-  const handleCallNext = useCallback(async () => {
-    const clinicId = queueClinicFilter || queue[0]?.clinicId;
-    if (!clinicId) return;
-    setCallingNext(true);
-    try {
-      const updated = await api.post(`/reception/queue/${clinicId}/call-next`);
-      setQueue((prev) => prev.map((a) => (a.id === updated.id ? { ...updated, estimatedWaitMins: a.estimatedWaitMins, position: a.position } : a)));
-    } catch { /* ignore */ }
-    finally { setCallingNext(false); }
-  }, [queueClinicFilter, queue]);
+  const handleCallNext = () => {
+    callNext.mutate(activeClinic);
+  };
 
-  const handlePatientCreated = useCallback((patient) => {
+  const handlePatientCreated = (patient) => {
     setSelectedPatient(patient);
     setSearchQuery('');
-    setSearchResults([]);
-  }, []);
+  };
 
   const waiting = queue.filter((a) => a.status === 'WAITING');
   const called = queue.filter((a) => a.status === 'CALLED');
@@ -151,7 +101,6 @@ export default function ReceptionPage() {
     ? waiting.filter((a) => a.patient.fullName.toLowerCase().includes(queueSearch.toLowerCase()) || a.patient.mrn.toLowerCase().includes(queueSearch.toLowerCase()))
     : waiting;
 
-  const activeClinic = queueClinicFilter || selectedClinic;
   const activeStats = queueStats.find((s) => s.id === activeClinic);
 
   return (
@@ -189,7 +138,7 @@ export default function ReceptionPage() {
                       key={p.id}
                       className={`w-full text-left px-3 py-2 text-body rounded-lg transition-colors touch-target
                         ${selectedPatient?.id === p.id ? 'bg-lilac-bloom text-obsidian' : 'hover:bg-bone text-graphite'}`}
-                      onClick={() => { setSelectedPatient(p); setSearchQuery(''); setSearchResults([]); }}
+                      onClick={() => { setSelectedPatient(p); setSearchQuery(''); }}
                     >
                       <span className="font-medium">{p.fullName}</span>
                       <span className="text-caption text-slate ml-2">{p.mrn}</span>
@@ -317,8 +266,8 @@ export default function ReceptionPage() {
                     onChange={(e) => setQueueSearch(e.target.value)}
                     className="w-48"
                   />
-                  <Button variant="primary" size="sm" onClick={handleCallNext} disabled={callingNext || waiting.length === 0}>
-                    {callingNext ? '...' : 'Call Next'}
+                  <Button variant="primary" size="sm" onClick={handleCallNext} disabled={callNext.isPending || waiting.length === 0}>
+                    {callNext.isPending ? '...' : 'Call Next'}
                   </Button>
                 </div>
               </div>

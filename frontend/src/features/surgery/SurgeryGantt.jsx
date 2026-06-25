@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useSurgeries, useUpdateSurgeryStatus } from '../../hooks/queries/useSurgery';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { api } from '../../lib/api';
 
 const OR_ROOMS = [1, 2, 3, 4, 5];
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7);
@@ -29,24 +29,13 @@ function toMins(d) {
 export default function SurgeryGantt() {
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(today);
-  const [surgeries, setSurgeries] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [selectedSurgery, setSelectedSurgery] = useState(null);
 
-  useEffect(() => {
-    setLoading(true);
-    api.get(`/surgeries?date=${date}`)
-      .then(setSurgeries)
-      .catch(() => setSurgeries([]))
-      .finally(() => setLoading(false));
-  }, [date]);
+  const { data: surgeries = [], isLoading } = useSurgeries(date);
+  const updateStatus = useUpdateSurgeryStatus();
 
-  const handleStatusChange = async (id, status) => {
-    try {
-      const updated = await api.patch(`/surgeries/${id}/status`, { status });
-      setSurgeries((prev) => prev.map((s) => (s.id === id ? updated : s)));
-      if (selectedSurgery?.id === id) setSelectedSurgery(updated);
-    } catch { /* ignore */ }
+  const handleStatusChange = (id, status) => {
+    updateStatus.mutate({ id, status });
   };
 
   const ganttStart = 7 * 60;
