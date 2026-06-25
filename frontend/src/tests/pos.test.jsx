@@ -1,12 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
+
+const testQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 import PharmacyPOS from '../features/pos/PharmacyPOS';
 import OpticsPOS from '../features/pos/OpticsPOS';
 
 function WithRouter({ children }) {
-  return <BrowserRouter>{children}</BrowserRouter>;
+  return <QueryClientProvider client={testQueryClient}><BrowserRouter>{children}</BrowserRouter></QueryClientProvider>;
 }
 
 describe('PharmacyPOS', () => {

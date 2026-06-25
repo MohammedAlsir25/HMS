@@ -1,13 +1,16 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, it, expect } from 'vitest';
+
+const testQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 import InventoryPage from '../features/inventory/InventoryPage';
 import AccountingPage from '../features/accounting/AccountingPage';
 import AdminPage from '../features/admin/AdminPage';
 import HRPage from '../features/hr/HRPage';
 
 function WithRouter({ children }) {
-  return <MemoryRouter>{children}</MemoryRouter>;
+  return <QueryClientProvider client={testQueryClient}><MemoryRouter>{children}</MemoryRouter></QueryClientProvider>;
 }
 
 describe('InventoryPage', () => {

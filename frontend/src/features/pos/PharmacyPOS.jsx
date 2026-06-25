@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
+import { usePOSItems } from '../../hooks/queries/usePOS';
+import { useReferrals } from '../../hooks/queries/useReferrals';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
@@ -14,25 +16,17 @@ const paymentMethods = [
 ];
 
 export default function PharmacyPOS() {
-  const [items, setItems] = useState([]);
   const [cart, setCart] = useState([]);
   const [search, setSearch] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [patientName, setPatientName] = useState('');
-  const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
   const [receipt, setReceipt] = useState(null);
   const [activeTab, setActiveTab] = useState('sale');
-  const [referrals, setReferrals] = useState([]);
-  const [referralsLoading, setReferralsLoading] = useState(false);
   const [activeReferralId, setActiveReferralId] = useState(null);
 
-  useEffect(() => {
-    api.get('/pos/items?category=pharmacy')
-      .then(setItems)
-      .catch(() => setItems([]))
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: items = [], isLoading } = usePOSItems('pharmacy');
+  const { data: referrals = [], isLoading: referralsLoading } = useReferrals(activeTab === 'referrals' ? 'type=PHARMACY_DISPATCH&status=PENDING' : null);
 
   const addToCart = (item) => {
     setCart((prev) => {
@@ -47,21 +41,6 @@ export default function PharmacyPOS() {
   const removeFromCart = (id) => setCart((prev) => prev.filter((c) => c.id !== id));
   const updateQty = (id, qty) => setCart((prev) => prev.map((c) => c.id === id ? { ...c, quantity: Math.max(1, qty) } : c));
   const total = cart.reduce((sum, c) => sum + c.price * c.quantity, 0);
-
-  const loadReferrals = useCallback(async () => {
-    setReferralsLoading(true);
-    try {
-      const data = await api.get('/referrals?type=PHARMACY_DISPATCH&status=PENDING');
-      setReferrals(data || []);
-    } catch {
-      setReferrals([]);
-    }
-    setReferralsLoading(false);
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === 'referrals') loadReferrals();
-  }, [activeTab, loadReferrals]);
 
   const handleDispenseReferral = useCallback((referral) => {
     setPatientName(referral.patient?.fullName || '');
@@ -203,8 +182,8 @@ export default function PharmacyPOS() {
                 onChange={(e) => setSearch(e.target.value)}
                 className="mb-3"
               />
-              {loading && <p className="text-body text-slate">Loading inventory...</p>}
-              {!loading && (
+              {isLoading && <p className="text-body text-slate">Loading inventory...</p>}
+              {!isLoading && (
                 <div className="max-h-80 overflow-y-auto space-y-1">
                   {filteredItems.map((item) => (
                     <div key={item.id} className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-bone transition-colors">

@@ -2,14 +2,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 
 export const referralKeys = {
-  all: ['referrals'],
+  all: (params) => ['referrals', params],
   byId: (id) => ['referrals', id],
 };
 
-export function useReferrals() {
+export function useReferrals(params) {
   return useQuery({
-    queryKey: referralKeys.all,
-    queryFn: () => api.get('/referrals'),
+    queryKey: referralKeys.all(params),
+    queryFn: () => api.get(`/referrals${params ? `?${params}` : ''}`),
   });
 }
 

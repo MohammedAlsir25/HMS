@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { useLabOrders, useLabStats, useUpdateOrderStatus, useClaimOrder, useUnclaimOrder, useLabCheckout, labKeys } from '../../hooks/queries/useLab';
+import { useDebounce } from '../../hooks/useDebounce';
+import { api } from '../../lib/api';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Table } from '../../components/ui/Table';
 import { Modal } from '../../components/ui/Modal';
-import { api } from '../../lib/api';
-import { useDebounce } from '../../hooks/useDebounce';
 
 const statusBadge = {
   PENDING: 'warning',
@@ -422,86 +424,35 @@ function CatalogEditModal({ test, onSave, onClose }) {
 }
 
 export default function LabDashboard() {
+  const queryClient = useQueryClient();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('queue');
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showDetail, setShowDetail] = useState(false);
   const [showNewRequest, setShowNewRequest] = useState(false);
-  const [stats, setStats] = useState(null);
-  const [billingOrders, setBillingOrders] = useState([]);
   const [selectedForBilling, setSelectedForBilling] = useState([]);
   const [billingPaymentMethod, setBillingPaymentMethod] = useState('CASH');
   const [billingSubmitting, setBillingSubmitting] = useState(false);
 
-  const loadOrders = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = statusFilter !== 'ALL' ? `?status=${statusFilter}` : '';
-      const data = await api.get(`/lab/orders${params}`);
-      setOrders(data || []);
-    } catch {
-      setOrders([]);
-    }
-    setLoading(false);
-  }, [statusFilter]);
+  const orderParams = statusFilter !== 'ALL' ? `status=${statusFilter}` : '';
+  const { data: orders = [], isLoading } = useLabOrders(orderParams);
+  const { data: stats } = useLabStats();
+  const { data: billingOrders = [] } = useLabOrders(activeTab === 'billing' ? 'status=COMPLETED' : null);
+  const claimOrder = useClaimOrder();
+  const unclaimOrder = useUnclaimOrder();
+  const updateOrderStatus = useUpdateOrderStatus();
+  const labCheckout = useLabCheckout();
 
-  const loadStats = useCallback(async () => {
-    try {
-      const data = await api.get('/lab/stats');
-      setStats(data);
-    } catch { /* ignore */ }
-  }, []);
+  const handleClaim = (orderId) => claimOrder.mutate(orderId);
+  const handleUnclaim = (orderId) => unclaimOrder.mutate(orderId);
+  const handleComplete = (orderId) => updateOrderStatus.mutate({ id: orderId, status: 'COMPLETED' });
+  const handleCancel = (orderId) => updateOrderStatus.mutate({ id: orderId, status: 'CANCELLED' });
 
-  useEffect(() => { loadOrders(); }, [loadOrders]);
-  useEffect(() => { loadStats(); }, [loadStats]);
-
-  const handleClaim = useCallback(async (orderId) => {
-    try {
-      await api.patch(`/lab/orders/${orderId}/claim`);
-      loadOrders();
-    } catch { /* ignore */ }
-  }, [loadOrders]);
-
-  const handleUnclaim = useCallback(async (orderId) => {
-    try {
-      await api.patch(`/lab/orders/${orderId}/unclaim`);
-      loadOrders();
-    } catch { /* ignore */ }
-  }, [loadOrders]);
-
-  const handleComplete = useCallback(async (orderId) => {
-    try {
-      await api.patch(`/lab/orders/${orderId}/status`, { status: 'COMPLETED' });
-      loadOrders();
-      loadStats();
-    } catch { /* ignore */ }
-  }, [loadOrders, loadStats]);
-
-  const handleCancel = useCallback(async (orderId) => {
-    try {
-      await api.patch(`/lab/orders/${orderId}/status`, { status: 'CANCELLED' });
-      loadOrders();
-    } catch { /* ignore */ }
-  }, [loadOrders]);
-
-  const handleViewDetail = useCallback((order) => {
+  const handleViewDetail = (order) => {
     setSelectedOrder(order);
     setShowDetail(true);
-  }, []);
-
-  const loadBillingOrders = useCallback(async () => {
-    try {
-      const data = await api.get('/lab/orders?status=COMPLETED');
-      setBillingOrders(data || []);
-    } catch { /* ignore */ }
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === 'billing') loadBillingOrders();
-  }, [activeTab, loadBillingOrders]);
+  };
 
   const toggleBillingOrder = (orderId) => {
     setSelectedForBilling((prev) =>
@@ -513,13 +464,12 @@ export default function LabDashboard() {
     if (selectedForBilling.length === 0) { alert('Select at least one order'); return; }
     setBillingSubmitting(true);
     try {
-      const result = await api.post('/lab/checkout', {
+      const result = await labCheckout.mutateAsync({
         orderIds: selectedForBilling,
         paymentMethod: billingPaymentMethod,
       });
       alert(`Invoice created: AED ${Number(result.totalAmount).toFixed(2)} for ${result.orderCount} orders`);
       setSelectedForBilling([]);
-      loadBillingOrders();
     } catch (err) {
       alert(err.message || 'Checkout failed');
     } finally {
@@ -531,10 +481,10 @@ export default function LabDashboard() {
     .filter((o) => selectedForBilling.includes(o.id))
     .reduce((sum, o) => sum + (o.tests || []).reduce((s, t) => s + Number(t.test?.price || 0), 0), 0);
 
-  const handleSaveResults = useCallback((updated) => {
-    loadOrders();
-    loadStats();
-  }, [loadOrders, loadStats]);
+  const handleSaveResults = () => {
+    queryClient.invalidateQueries({ queryKey: labKeys.orders(statusFilter === 'ALL' ? '' : `status=${statusFilter}`) });
+    queryClient.invalidateQueries({ queryKey: labKeys.stats });
+  };
 
   const tabs = [
     { key: 'queue', label: t('lab.tab.queue') },
@@ -615,7 +565,7 @@ export default function LabDashboard() {
             ))}
           </div>
 
-          {loading ? (
+          {isLoading ? (
             <p className="text-caption text-slate">{t('common.loading')}</p>
           ) : (
             <Table
@@ -666,7 +616,7 @@ export default function LabDashboard() {
       )}
 
       {activeTab === 'catalog' && (
-        <CatalogManager onRefresh={loadStats} />
+        <CatalogManager onRefresh={handleSaveResults} />
       )}
 
       {activeTab === 'panels' && (
@@ -748,7 +698,7 @@ export default function LabDashboard() {
       <NewRequestModal
         open={showNewRequest}
         onClose={() => setShowNewRequest(false)}
-        onCreated={() => { loadOrders(); loadStats(); }}
+        onCreated={handleSaveResults}
       />
     </div>
   );

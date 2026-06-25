@@ -4,7 +4,7 @@ import { api } from '../../lib/api';
 export const labKeys = {
   all: ['lab'],
   tests: ['lab', 'tests'],
-  orders: ['lab', 'orders'],
+  orders: (params) => ['lab', 'orders', params],
   order: (id) => ['lab', 'order', id],
   stats: ['lab', 'stats'],
 };
@@ -16,10 +16,10 @@ export function useLabTests() {
   });
 }
 
-export function useLabOrders() {
+export function useLabOrders(params) {
   return useQuery({
-    queryKey: labKeys.orders,
-    queryFn: () => api.get('/lab/orders'),
+    queryKey: labKeys.orders(params),
+    queryFn: () => api.get(`/lab/orders${params ? `?${params}` : ''}`),
   });
 }
 

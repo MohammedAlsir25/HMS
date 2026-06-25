@@ -1,14 +1,17 @@
 import { useState, useCallback } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { clinicKeys } from './queries/useClinics';
-import { useQueryClient } from '@tanstack/react-query';
 
 export function useClinicalRecords(clinicSlug) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState(null);
   const queryClient = useQueryClient();
+
+  const { data: stats } = useQuery({
+    queryKey: [...clinicKeys.all, 'records', clinicSlug, 'stats'],
+    queryFn: () => api.get(`/clinics/${clinicSlug}/stats`),
+  });
 
   const saveMutation = useMutation({
     mutationFn: (data) => api.post(`/clinics/${clinicSlug}/record`, data),
@@ -30,14 +33,5 @@ export function useClinicalRecords(clinicSlug) {
 
   const saveRecord = saveMutation.mutateAsync;
 
-  const fetchStats = useCallback(async () => {
-    try {
-      const data = await api.get(`/clinics/${clinicSlug}/stats`);
-      setStats(data);
-    } catch {
-      setStats(null);
-    }
-  }, [clinicSlug]);
-
-  return { records, loading, saving: saveMutation.isPending, stats, fetchRecords, saveRecord, fetchStats };
+  return { records, loading, saving: saveMutation.isPending, stats, fetchRecords: fetchRecords, saveRecord, fetchStats: () => {} };
 }
