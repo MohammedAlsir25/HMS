@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
@@ -10,8 +9,8 @@ const router = Router();
 const prisma = new PrismaClient();
 
 router.get('/', authenticate, asyncHandler(async (req, res) => {
-  const { type } = req.query;
-  const where = { isActive: true };
+  const { type } = req.query as { type?: string };
+  const where: Record<string, unknown> = { isActive: true };
   if (type) where.type = type;
   const departments = await prisma.department.findMany({
     where,
@@ -41,8 +40,8 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.ADMIN_USERS), async
 }));
 
 router.patch('/:id', authenticate, requirePermission(PERMISSIONS.ADMIN_USERS), asyncHandler(async (req, res) => {
-  const { name, nameAr, slug, type, isActive, clinicId } = req.body;
-  const data = {};
+  const { name, nameAr, slug, type, isActive, clinicId } = req.body as Record<string, unknown>;
+  const data: Record<string, unknown> = {};
   if (name !== undefined) data.name = name;
   if (nameAr !== undefined) data.nameAr = nameAr;
   if (slug !== undefined) data.slug = slug;
@@ -59,3 +58,4 @@ router.patch('/:id', authenticate, requirePermission(PERMISSIONS.ADMIN_USERS), a
 }));
 
 export default router;
+

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
@@ -11,7 +10,7 @@ const router = Router();
 const prisma = new PrismaClient();
 
 router.post('/diagnose', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), asyncHandler(async (req, res) => {
-  const { patientId, symptoms, vitals, specialty } = req.body;
+  const { patientId, symptoms, vitals, specialty } = req.body as { patientId?: string; symptoms?: unknown[]; vitals?: Record<string, unknown>; specialty?: string };
   if (!patientId) throw new ValidationError('patientId is required');
 
   const patient = await prisma.patient.findUnique({ where: { id: patientId } });
@@ -39,11 +38,11 @@ router.post('/diagnose', authenticate, requirePermission(PERMISSIONS.CLINICAL_RE
 }));
 
 router.get('/icd10', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), asyncHandler(async (req, res) => {
-  const { q } = req.query;
+  const { q } = req.query as { q?: string };
   const where = q && q.length >= 2
     ? { OR: [
-        { code: { contains: q, mode: 'insensitive' } },
-        { name: { contains: q, mode: 'insensitive' } },
+        { code: { contains: q, mode: 'insensitive' as const } },
+        { name: { contains: q, mode: 'insensitive' as const } },
       ] }
     : {};
   const codes = await prisma.icd10Code.findMany({
@@ -55,3 +54,4 @@ router.get('/icd10', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ),
 }));
 
 export default router;
+

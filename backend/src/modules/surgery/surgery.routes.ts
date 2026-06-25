@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
@@ -10,8 +9,8 @@ const router = Router();
 const prisma = new PrismaClient();
 
 router.get('/', authenticate, requirePermission(PERMISSIONS.SURGERY_READ), asyncHandler(async (req, res) => {
-  const { date, orRoom } = req.query;
-  const where = {};
+  const { date, orRoom } = req.query as { date?: string; orRoom?: string };
+  const where: Record<string, unknown> = {};
   if (date) {
     const dayStart = new Date(date);
     dayStart.setHours(0, 0, 0, 0);
@@ -30,17 +29,17 @@ router.get('/', authenticate, requirePermission(PERMISSIONS.SURGERY_READ), async
 }));
 
 router.post('/', authenticate, requirePermission(PERMISSIONS.SURGERY_WRITE), asyncHandler(async (req, res) => {
-  const { patientId, orRoom, startTime, endTime, notes } = req.body;
+  const { patientId, orRoom, startTime, endTime, notes } = req.body as Record<string, unknown>;
   if (!patientId || !orRoom || !startTime || !endTime) {
     throw new ValidationError('patientId, orRoom, startTime, endTime are required');
   }
   const surgery = await prisma.surgery.create({
     data: {
-      patientId,
-      orRoom: parseInt(orRoom, 10),
-      startTime: new Date(startTime),
-      endTime: new Date(endTime),
-      notes: notes || null,
+      patientId: patientId as string,
+      orRoom: parseInt(orRoom as string, 10),
+      startTime: new Date(startTime as string),
+      endTime: new Date(endTime as string),
+      notes: (notes as string) || null,
     },
     include: { patient: { select: { fullName: true, mrn: true } } },
   });
@@ -48,9 +47,10 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.SURGERY_WRITE), asy
 }));
 
 router.patch('/:id/status', authenticate, requirePermission(PERMISSIONS.SURGERY_WRITE), asyncHandler(async (req, res) => {
-  const { status } = req.body;
-  const valid = ['SCHEDULED', 'PREP', 'IN_SURGERY', 'RECOVERY', 'COMPLETED', 'CANCELLED'];
-  if (!valid.includes(status)) throw new ValidationError('Invalid status');
+  type SurgeryStatus = 'SCHEDULED' | 'PREP' | 'IN_SURGERY' | 'RECOVERY' | 'COMPLETED' | 'CANCELLED';
+  const { status } = req.body as { status?: SurgeryStatus };
+  const valid: SurgeryStatus[] = ['SCHEDULED', 'PREP', 'IN_SURGERY', 'RECOVERY', 'COMPLETED', 'CANCELLED'];
+  if (!status || !valid.includes(status)) throw new ValidationError('Invalid status');
   const surgery = await prisma.surgery.update({
     where: { id: req.params.id },
     data: { status },
@@ -60,11 +60,11 @@ router.patch('/:id/status', authenticate, requirePermission(PERMISSIONS.SURGERY_
 }));
 
 router.patch('/:id', authenticate, requirePermission(PERMISSIONS.SURGERY_WRITE), asyncHandler(async (req, res) => {
-  const { startTime, endTime, orRoom, notes } = req.body;
-  const data = {};
-  if (startTime) data.startTime = new Date(startTime);
-  if (endTime) data.endTime = new Date(endTime);
-  if (orRoom) data.orRoom = parseInt(orRoom, 10);
+  const { startTime, endTime, orRoom, notes } = req.body as Record<string, unknown>;
+  const data: Record<string, unknown> = {};
+  if (startTime) data.startTime = new Date(startTime as string);
+  if (endTime) data.endTime = new Date(endTime as string);
+  if (orRoom) data.orRoom = parseInt(orRoom as string, 10);
   if (notes !== undefined) data.notes = notes;
   const surgery = await prisma.surgery.update({
     where: { id: req.params.id },
