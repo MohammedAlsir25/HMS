@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
@@ -50,14 +49,14 @@ router.get('/summary', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_RE
 }));
 
 router.get('/transactions', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_READ), asyncHandler(async (req, res) => {
-  const { type, paymentMethod, startDate, endDate, limit, offset } = req.query;
-  const where = {};
+  const { type, paymentMethod, startDate, endDate, limit, offset } = req.query as Record<string, string>;
+  const where: Record<string, unknown> = {};
   if (type) where.type = type;
   if (paymentMethod) where.paymentMethod = paymentMethod;
   if (startDate || endDate) {
-    where.createdAt = {};
-    if (startDate) where.createdAt.gte = new Date(startDate);
-    if (endDate) where.createdAt.lte = new Date(endDate);
+    where.createdAt = {} as Record<string, unknown>;
+    if (startDate) (where.createdAt as Record<string, unknown>).gte = new Date(startDate);
+    if (endDate) (where.createdAt as Record<string, unknown>).lte = new Date(endDate);
   }
   const [transactions, totalCount] = await Promise.all([
     prisma.transaction.findMany({
@@ -185,14 +184,14 @@ router.get('/shifts/:id', authenticate, requirePermission(PERMISSIONS.ACCOUNTING
 }));
 
 router.get('/expenses', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_READ), asyncHandler(async (req, res) => {
-  const { category, departmentId, startDate, endDate, limit, offset } = req.query;
-  const where = {};
+  const { category, departmentId, startDate, endDate, limit, offset } = req.query as Record<string, string>;
+  const where: Record<string, unknown> = {};
   if (category) where.category = category;
   if (departmentId) where.departmentId = departmentId;
   if (startDate || endDate) {
-    where.date = {};
-    if (startDate) where.date.gte = new Date(startDate);
-    if (endDate) where.date.lte = new Date(endDate);
+    where.date = {} as Record<string, unknown>;
+    if (startDate) (where.date as Record<string, unknown>).gte = new Date(startDate);
+    if (endDate) (where.date as Record<string, unknown>).lte = new Date(endDate);
   }
   const [expenses, totalCount] = await Promise.all([
     prisma.expense.findMany({
@@ -221,12 +220,12 @@ router.post('/expenses', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_
 }));
 
 router.patch('/expenses/:id', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_WRITE), asyncHandler(async (req, res) => {
-  const { amount, category, description, date, paidTo, paymentMethod, notes, receiptUrl, departmentId } = req.body;
-  const data = {};
-  if (amount !== undefined) data.amount = parseFloat(amount);
+  const { amount, category, description, date, paidTo, paymentMethod, notes, receiptUrl, departmentId } = req.body as Record<string, unknown>;
+  const data: Record<string, unknown> = {};
+  if (amount !== undefined) data.amount = parseFloat(amount as string);
   if (category !== undefined) data.category = category;
   if (description !== undefined) data.description = description;
-  if (date !== undefined) data.date = new Date(date);
+  if (date !== undefined) data.date = new Date(date as string);
   if (paidTo !== undefined) data.paidTo = paidTo;
   if (paymentMethod !== undefined) data.paymentMethod = paymentMethod;
   if (notes !== undefined) data.notes = notes;
@@ -246,18 +245,18 @@ router.delete('/expenses/:id', authenticate, requirePermission(PERMISSIONS.ACCOU
 }));
 
 router.get('/pnl', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_READ), asyncHandler(async (req, res) => {
-  const { startDate, endDate } = req.query;
-  const dateFilter = {};
+  const { startDate, endDate } = req.query as Record<string, string>;
+  const dateFilter: Record<string, unknown> = {};
   if (startDate || endDate) {
-    dateFilter.createdAt = {};
-    if (startDate) dateFilter.createdAt.gte = new Date(startDate);
-    if (endDate) dateFilter.createdAt.lte = new Date(endDate);
+    dateFilter.createdAt = {} as Record<string, unknown>;
+    if (startDate) (dateFilter.createdAt as Record<string, unknown>).gte = new Date(startDate);
+    if (endDate) (dateFilter.createdAt as Record<string, unknown>).lte = new Date(endDate);
   }
-  const expenseDateFilter = {};
+  const expenseDateFilter: Record<string, unknown> = {};
   if (startDate || endDate) {
-    expenseDateFilter.date = {};
-    if (startDate) expenseDateFilter.date.gte = new Date(startDate);
-    if (endDate) expenseDateFilter.date.lte = new Date(endDate);
+    expenseDateFilter.date = {} as Record<string, unknown>;
+    if (startDate) (expenseDateFilter.date as Record<string, unknown>).gte = new Date(startDate);
+    if (endDate) (expenseDateFilter.date as Record<string, unknown>).lte = new Date(endDate);
   }
   const [txGroups, expenseGroups, departments] = await Promise.all([
     prisma.transaction.groupBy({
@@ -297,10 +296,10 @@ router.get('/pnl', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_READ),
     deptMap[key].expense += Number(g._sum.amount) || 0;
     deptMap[key].expenseCount += g._count;
   }
-  const deptRows = Object.values(deptMap).map((d) => ({
-    ...d, grossProfit: d.revenue - d.cogs, net: d.revenue - d.cogs - d.expense,
+  const deptRows = (Object.values(deptMap) as Array<Record<string, unknown>>).map((d: any) => ({
+    ...d, grossProfit: Number(d.revenue) - Number(d.cogs), net: Number(d.revenue) - Number(d.cogs) - Number(d.expense),
   }));
-  const totals = deptRows.reduce((acc, d) => ({
+  const totals = deptRows.reduce((acc: any, d: any) => ({
     revenue: acc.revenue + d.revenue, cogs: acc.cogs + d.cogs,
     expense: acc.expense + d.expense, grossProfit: acc.grossProfit + d.grossProfit,
     net: acc.net + d.net, txCount: acc.txCount + d.txCount,
@@ -310,12 +309,12 @@ router.get('/pnl', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_READ),
 }));
 
 router.get('/revenue-by-department', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_READ), asyncHandler(async (req, res) => {
-  const { startDate, endDate } = req.query;
-  const where = {};
+  const { startDate, endDate } = req.query as Record<string, string>;
+  const where: Record<string, unknown> = {};
   if (startDate || endDate) {
-    where.createdAt = {};
-    if (startDate) where.createdAt.gte = new Date(startDate);
-    if (endDate) where.createdAt.lte = new Date(endDate);
+    where.createdAt = {} as Record<string, unknown>;
+    if (startDate) (where.createdAt as Record<string, unknown>).gte = new Date(startDate);
+    if (endDate) (where.createdAt as Record<string, unknown>).lte = new Date(endDate);
   }
   const transactions = await prisma.transaction.findMany({
     where,

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
@@ -28,7 +27,7 @@ router.get('/users/:id', authenticate, requirePermission(PERMISSIONS.ADMIN_USERS
   res.json(user);
 }));
 
-router.post('/users', authenticate, requirePermission(PERMISSIONS.ADMIN_USERS), auditMiddleware('CREATE_USER'), asyncHandler(async (req, res) => {
+router.post('/users', authenticate, requirePermission(PERMISSIONS.ADMIN_USERS), auditMiddleware('CREATE_USER', 'User'), asyncHandler(async (req, res) => {
   const { email, password, fullName, phone, roleId, clinicId } = req.body;
   if (!email || !password || !fullName || !roleId) {
     throw new ValidationError('Email, password, full name, and role are required');
@@ -43,7 +42,7 @@ router.post('/users', authenticate, requirePermission(PERMISSIONS.ADMIN_USERS), 
   res.status(201).json(user);
 }));
 
-router.patch('/users/:id', authenticate, requirePermission(PERMISSIONS.ADMIN_USERS), auditMiddleware('UPDATE_USER'), asyncHandler(async (req, res) => {
+router.patch('/users/:id', authenticate, requirePermission(PERMISSIONS.ADMIN_USERS), auditMiddleware('UPDATE_USER', 'User'), asyncHandler(async (req, res) => {
   const { fullName, phone, roleId, clinicId, isActive } = req.body;
   const user = await prisma.user.update({
     where: { id: req.params.id },
@@ -62,14 +61,14 @@ router.get('/roles', authenticate, requirePermission(PERMISSIONS.ADMIN_RBAC), as
   res.json(rolesWithCount);
 }));
 
-router.post('/roles', authenticate, requirePermission(PERMISSIONS.ADMIN_RBAC), auditMiddleware('CREATE_ROLE'), asyncHandler(async (req, res) => {
+router.post('/roles', authenticate, requirePermission(PERMISSIONS.ADMIN_RBAC), auditMiddleware('CREATE_ROLE', 'Role'), asyncHandler(async (req, res) => {
   const { name, description, permissions } = req.body;
   if (!name) throw new ValidationError('Role name is required');
   const role = await prisma.role.create({ data: { name, description, permissions: permissions || [] } });
   res.status(201).json(role);
 }));
 
-router.patch('/roles/:id', authenticate, requirePermission(PERMISSIONS.ADMIN_RBAC), auditMiddleware('UPDATE_ROLE'), asyncHandler(async (req, res) => {
+router.patch('/roles/:id', authenticate, requirePermission(PERMISSIONS.ADMIN_RBAC), auditMiddleware('UPDATE_ROLE', 'Role'), asyncHandler(async (req, res) => {
   const { name, description, permissions } = req.body;
   const role = await prisma.role.update({
     where: { id: req.params.id },
@@ -78,7 +77,7 @@ router.patch('/roles/:id', authenticate, requirePermission(PERMISSIONS.ADMIN_RBA
   res.json(role);
 }));
 
-router.delete('/roles/:id', authenticate, requirePermission(PERMISSIONS.ADMIN_RBAC), auditMiddleware('DELETE_ROLE'), asyncHandler(async (req, res) => {
+router.delete('/roles/:id', authenticate, requirePermission(PERMISSIONS.ADMIN_RBAC), auditMiddleware('DELETE_ROLE', 'Role'), asyncHandler(async (req, res) => {
   const userCount = await prisma.user.count({ where: { roleId: req.params.id } });
   if (userCount > 0) throw new ValidationError('Cannot delete role assigned to users');
   await prisma.role.delete({ where: { id: req.params.id } });

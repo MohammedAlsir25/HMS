@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
@@ -21,8 +20,8 @@ const loginLimiter = rateLimit({
   message: { message: 'Too many login attempts. Try again in 1 minute.' },
 });
 
-function generateTokens(user) {
-  const payload = {
+function generateTokens(user: any) {
+  const payload: Record<string, unknown> = {
     id: user.id,
     email: user.email,
     role: user.role.name,
@@ -30,9 +29,9 @@ function generateTokens(user) {
     clinicSlug: user.clinic?.slug || null,
     permissions: user.role.permissions,
   };
-  const token = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiry });
+  const token = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiry as any });
   const refreshToken = jwt.sign({ id: user.id }, config.jwt.refreshSecret, {
-    expiresIn: config.jwt.refreshExpiry,
+    expiresIn: config.jwt.refreshExpiry as any,
   });
   return { token, refreshToken };
 }
@@ -56,6 +55,7 @@ router.post('/login', loginLimiter, validate(loginSchema), asyncHandler(async (r
     action: 'LOGIN',
     entity: 'user',
     entityId: user.id,
+    details: { method: req.method, path: req.path, statusCode: 200 },
     ipAddress: req.ip,
   });
   res.json({
@@ -75,7 +75,7 @@ router.post('/login', loginLimiter, validate(loginSchema), asyncHandler(async (r
 
 router.post('/refresh', validate(refreshSchema), asyncHandler(async (req, res) => {
   const { refreshToken } = req.body;
-  const decoded = jwt.verify(refreshToken, config.jwt.refreshSecret);
+  const decoded = jwt.verify(refreshToken, config.jwt.refreshSecret) as { id: string };
   const user = await prisma.user.findUnique({
     where: { id: decoded.id },
     include: { role: true, clinic: true },
