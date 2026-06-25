@@ -1,8 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from '../stores/authStore';
 import { useUIStore } from '../stores/uiStore';
 import DotGrid from '../background/DotGrid';
 import AppShell from '../components/layout/AppShell';
+import ErrorBoundary from '../components/ui/ErrorBoundary';
 import LoginPage from '../features/auth/LoginPage';
 import SettingsPage from '../features/settings/SettingsPage';
 import DashboardRedirect from '../features/auth/DashboardRedirect';
@@ -32,7 +34,7 @@ import OptometryDashboard from '../features/clinics/OptometryDashboard';
 function ProtectedRoute({ children }) {
   const token = useAuthStore((s) => s.token);
   if (!token) return <Navigate to="/login" replace />;
-  return <AppShell>{children}</AppShell>;
+  return <AppShell><ErrorBoundary>{children}</ErrorBoundary></AppShell>;
 }
 
 function PublicRoute({ children }) {
@@ -52,6 +54,7 @@ export default function App() {
           <DotGrid />
         </div>
         <div className="relative z-10">
+          <Toaster position="top-right" toastOptions={{ className: '!bg-paper dark:!bg-obsidian !text-obsidian dark:!text-paper !shadow-lg !border !border-silver/20' }} />
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />

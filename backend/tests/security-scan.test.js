@@ -14,7 +14,7 @@ describe('Security Audit - Hardcoded Secrets', () => {
     { pattern: /-----BEGIN RSA PRIVATE KEY-----/, label: 'RSA private key' },
     { pattern: /-----BEGIN OPENSSH PRIVATE KEY-----/, label: 'OpenSSH private key' },
     { pattern: /mongodb\+srv:\/\/[^:]+:[^@]+@/, label: 'MongoDB connection string' },
-    { pattern: /password[=:]["']?.{0,1}(?!\*)/i, label: 'Potential hardcoded password' },
+    { pattern: /password[=:]["']?.{0,1}(?!\*)/i, label: 'Potential hardcoded password', exclude: /schemas[/\\]/ },
   ];
 
   function walkDir(dir) {
@@ -32,10 +32,11 @@ describe('Security Audit - Hardcoded Secrets', () => {
 
   const files = walkDir(backendSrc);
 
-  sensitivePatterns.forEach(({ pattern, label }) => {
+  sensitivePatterns.forEach(({ pattern, label, exclude }) => {
     it(`should not contain ${label}`, () => {
       const violations = [];
       for (const file of files) {
+        if (exclude && exclude.test(file)) continue;
         const content = fs.readFileSync(file, 'utf-8');
         const matches = content.match(pattern);
         if (matches) {

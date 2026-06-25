@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import { config } from './config/index.js';
+import { errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import usersRoutes from './modules/users/users.routes.js';
 import clinicsRoutes from './modules/clinics/clinics.routes.js';
@@ -58,9 +59,6 @@ app.use((_req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
-app.use((err, _req, res, _next) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({ message: 'Internal server error' });
-});
+app.use(errorHandler);
 
 export default app;
