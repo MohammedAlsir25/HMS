@@ -1,5 +1,4 @@
-// @ts-nocheck
-import { config } from '../../config/index.js';
+﻿import { config } from '../../config/index.js';
 
 export async function getAIDiagnosis({ symptoms, vitals, patient, specialty }) {
   const key = config.gemini.apiKey;
@@ -28,7 +27,7 @@ export async function getAIDiagnosis({ symptoms, vitals, patient, specialty }) {
     if (!res.ok) {
       const errText = await res.text();
       console.error('Gemini API error:', res.status, errText);
-      return mockDiagnosis({ symptoms, vitals, patient });
+      return mockDiagnosis({ symptoms, vitals, patient, specialty });
     }
 
     const data = await res.json();
@@ -36,7 +35,7 @@ export async function getAIDiagnosis({ symptoms, vitals, patient, specialty }) {
     return parseAIResponse(text);
   } catch (err) {
     console.error('AI service error:', err);
-    return mockDiagnosis({ symptoms, vitals, patient });
+    return mockDiagnosis({ symptoms, vitals, patient, specialty });
   }
 }
 
@@ -928,3 +927,4 @@ function mockRetinaDiagnosis({ symptoms, vitals, patient }) {
     notes: 'Retina AI-assisted assessment based on presenting symptoms and clinical findings. All diagnoses should be confirmed by comprehensive dilated fundus examination, appropriate retinal imaging (OCT, FA, ICGA), and clinical correlation. Any acute vision loss requires same-day ophthalmology evaluation. Treatment decisions should consider ocular and systemic comorbidities, patient preferences, and risk-benefit profile.',
   };
 }
+
