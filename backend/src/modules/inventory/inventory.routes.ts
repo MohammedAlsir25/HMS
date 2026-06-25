@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
@@ -10,12 +9,12 @@ const router = Router();
 const prisma = new PrismaClient();
 
 router.get('/items', authenticate, requirePermission(PERMISSIONS.WAREHOUSE_READ), asyncHandler(async (req, res) => {
-  const { search, category } = req.query;
-  const where = { isActive: true };
+  const { search, category } = req.query as Record<string, string>;
+  const where: Record<string, unknown> = { isActive: true };
   if (search) {
     where.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { sku: { contains: search, mode: 'insensitive' } },
+      { name: { contains: search, mode: 'insensitive' as const } },
+      { sku: { contains: search, mode: 'insensitive' as const } },
     ];
   }
   if (category) where.category = category;

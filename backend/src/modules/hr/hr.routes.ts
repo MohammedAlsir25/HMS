@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
@@ -10,12 +9,12 @@ const router = Router();
 const prisma = new PrismaClient();
 
 router.get('/employees', authenticate, requirePermission(PERMISSIONS.HR_READ), asyncHandler(async (req, res) => {
-  const { search, department, departmentId, isActive } = req.query;
-  const where = {};
+  const { search, department, departmentId, isActive } = req.query as Record<string, string>;
+  const where: Record<string, unknown> = {};
   if (search) {
     where.OR = [
-      { fullName: { contains: search, mode: 'insensitive' } },
-      { employeeCode: { contains: search, mode: 'insensitive' } },
+      { fullName: { contains: search, mode: 'insensitive' as const } },
+      { employeeCode: { contains: search, mode: 'insensitive' as const } },
     ];
   }
   if (department) where.department = department;
@@ -44,8 +43,8 @@ router.post('/employees', authenticate, requirePermission(PERMISSIONS.HR_WRITE),
 }));
 
 router.patch('/employees/:id', authenticate, requirePermission(PERMISSIONS.HR_WRITE), asyncHandler(async (req, res) => {
-  const { fullName, phone, email, gender, position, department, departmentId, baseSalary, isActive, userId } = req.body;
-  const data = {};
+  const { fullName, phone, email, gender, position, department, departmentId, baseSalary, isActive, userId } = req.body as Record<string, unknown>;
+  const data: Record<string, unknown> = {};
   if (fullName !== undefined) data.fullName = fullName;
   if (phone !== undefined) data.phone = phone;
   if (email !== undefined) data.email = email;
@@ -65,8 +64,8 @@ router.patch('/employees/:id', authenticate, requirePermission(PERMISSIONS.HR_WR
 }));
 
 router.get('/payroll', authenticate, requirePermission(PERMISSIONS.HR_READ), asyncHandler(async (req, res) => {
-  const { period, employeeId } = req.query;
-  const where = {};
+  const { period, employeeId } = req.query as Record<string, string>;
+  const where: Record<string, unknown> = {};
   if (period) where.period = period;
   if (employeeId) where.employeeId = employeeId;
   const records = await prisma.payrollRecord.findMany({
@@ -92,16 +91,16 @@ router.post('/payroll', authenticate, requirePermission(PERMISSIONS.HR_WRITE), a
 }));
 
 router.patch('/payroll/:id/status', authenticate, requirePermission(PERMISSIONS.HR_WRITE), asyncHandler(async (req, res) => {
-  const { status } = req.body;
-  const data = { status };
+  const { status } = req.body as { status?: string };
+  const data: Record<string, unknown> = { status };
   if (status === 'PAID') data.paidAt = new Date();
   const record = await prisma.payrollRecord.update({ where: { id: req.params.id }, data });
   res.json(record);
 }));
 
 router.get('/attendance', authenticate, requirePermission(PERMISSIONS.HR_READ), asyncHandler(async (req, res) => {
-  const { date, employeeId } = req.query;
-  const where = {};
+  const { date, employeeId } = req.query as Record<string, string>;
+  const where: Record<string, unknown> = {};
   if (date) where.date = new Date(date);
   if (employeeId) where.employeeId = employeeId;
   const records = await prisma.attendance.findMany({
@@ -124,8 +123,8 @@ router.post('/attendance', authenticate, requirePermission(PERMISSIONS.HR_WRITE)
 }));
 
 router.get('/leaves', authenticate, requirePermission(PERMISSIONS.HR_READ), asyncHandler(async (req, res) => {
-  const { status, employeeId } = req.query;
-  const where = {};
+  const { status, employeeId } = req.query as Record<string, string>;
+  const where: Record<string, unknown> = {};
   if (status) where.status = status;
   if (employeeId) where.employeeId = employeeId;
   const leaves = await prisma.leaveRequest.findMany({
