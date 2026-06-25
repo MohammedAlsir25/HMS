@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import multer from 'multer';
@@ -88,7 +87,7 @@ router.post('/patients', authenticate, requirePermission(PERMISSIONS.PATIENT_CRE
   res.status(201).json(patient);
 }));
 
-router.post('/check-in', authenticate, requirePermission(PERMISSIONS.APPOINTMENT_WRITE), auditMiddleware('CHECK_IN'), validate(checkInSchema), asyncHandler(async (req, res) => {
+router.post('/check-in', authenticate, requirePermission(PERMISSIONS.APPOINTMENT_WRITE), auditMiddleware('CHECK_IN', 'Appointment'), validate(checkInSchema), asyncHandler(async (req, res) => {
   const { patientId, clinicId, type, visitType, priority, notes, collectPayment, paymentMethod } = req.body;
   const patient = await prisma.patient.findUnique({ where: { id: patientId } });
   if (!patient) throw new NotFoundError('Patient not found');
@@ -164,8 +163,8 @@ router.post('/reservations', authenticate, requirePermission(PERMISSIONS.APPOINT
 }));
 
 router.get('/reservations', authenticate, requirePermission(PERMISSIONS.APPOINTMENT_READ), asyncHandler(async (req, res) => {
-  const { clinicId, q } = req.query;
-  const where = { status: 'RESERVED' };
+  const { clinicId, q } = req.query as { clinicId?: string; q?: string };
+  const where: Record<string, unknown> = { status: 'RESERVED' };
   if (clinicId) {
     const clinic = await resolveClinic(clinicId);
     if (clinic) where.clinicId = clinic.id;
@@ -179,7 +178,7 @@ router.get('/reservations', authenticate, requirePermission(PERMISSIONS.APPOINTM
     };
   }
   const appointments = await prisma.apppointment.findMany({
-    where,
+    where: where as any,
     include: { patient: { select: { fullName: true, mrn: true, nationalId: true } }, clinic: { select: { name: true, slug: true } } },
     orderBy: { createdAt: 'desc' },
     take: 50,
