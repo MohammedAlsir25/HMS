@@ -48,9 +48,9 @@ export default function App() {
   const language = useUIStore((s) => s.language);
 
   return (
-    <div className={theme === 'dark' ? 'dark' : ''} dir={language === 'ar' ? 'rtl' : 'ltr'}>
+    <div className={`${theme === 'dark' ? 'dark' : ''} bg-paper min-h-dvh`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <div className="relative min-h-dvh">
-        <div className="fixed inset-0 z-0 opacity-[0.35] pointer-events-none">
+        <div className="fixed inset-0 z-0 pointer-events-none">
           <DotGrid />
         </div>
         <div className="relative z-10">

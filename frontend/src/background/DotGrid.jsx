@@ -20,31 +20,28 @@ const throttle = (func, limit) => {
 function hexToRgb(hex) {
   const m = hex.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
   if (!m) return { r: 0, g: 0, b: 0 };
-  return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
-}
-
-function cssVar(name, fallback) {
-  if (typeof document === 'undefined') return fallback;
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+  return {
+    r: parseInt(m[1], 16),
+    g: parseInt(m[2], 16),
+    b: parseInt(m[3], 16),
+  };
 }
 
 const DotGrid = ({
   dotSize = 6,
   gap = 24,
-  baseColor,
-  activeColor,
-  proximity = 100,
+  baseColor = '#5227FF',
+  activeColor = '#5227FF',
+  proximity = 150,
   speedTrigger = 100,
-  shockRadius = 200,
-  shockStrength = 2,
+  shockRadius = 250,
+  shockStrength = 5,
   maxSpeed = 5000,
   resistance = 750,
   returnDuration = 1.5,
   className = '',
   style,
 }) => {
-  const resolvedBase = baseColor || cssVar('--color-lilac-bloom', '#f1ccff');
-  const resolvedActive = activeColor || cssVar('--color-sky-veil', '#91e0ff');
   const wrapperRef = useRef(null);
   const canvasRef = useRef(null);
   const dotsRef = useRef([]);
@@ -52,8 +49,8 @@ const DotGrid = ({
     x: 0, y: 0, vx: 0, vy: 0, speed: 0, lastTime: 0, lastX: 0, lastY: 0,
   });
 
-  const baseRgb = useMemo(() => hexToRgb(resolvedBase), [resolvedBase]);
-  const activeRgb = useMemo(() => hexToRgb(resolvedActive), [resolvedActive]);
+  const baseRgb = useMemo(() => hexToRgb(baseColor), [baseColor]);
+  const activeRgb = useMemo(() => hexToRgb(activeColor), [activeColor]);
 
   const circlePath = useMemo(() => {
     if (typeof window === 'undefined' || !window.Path2D) return null;
@@ -123,7 +120,7 @@ const DotGrid = ({
         const dy = dot.cy - py;
         const dsq = dx * dx + dy * dy;
 
-        let style = resolvedBase;
+        let style = baseColor;
         if (dsq <= proxSq) {
           const dist = Math.sqrt(dsq);
           const t = 1 - dist / proximity;
@@ -145,7 +142,7 @@ const DotGrid = ({
 
     draw();
     return () => cancelAnimationFrame(rafId);
-  }, [proximity, resolvedBase, activeRgb, baseRgb, circlePath]);
+  }, [proximity, baseColor, activeRgb, baseRgb, circlePath]);
 
   useEffect(() => {
     buildGrid();
