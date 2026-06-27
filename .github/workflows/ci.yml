@@ -8,7 +8,7 @@ on:
 
 env:
   NODE_VERSION: '20'
-  DATABASE_URL: postgresql://localhost:5432/jh_test
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/jh_test
   JWT_SECRET: test-secret
   JWT_REFRESH_SECRET: test-refresh-secret
   SUPABASE_URL: https://test.supabase.co
