@@ -51,7 +51,7 @@ export default function App() {
     <div className={`${theme === 'dark' ? 'dark' : ''} bg-paper min-h-dvh`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <div className="relative min-h-dvh">
         <div className="fixed inset-0 z-0 pointer-events-none">
-          <DotGrid />
+          <DotGrid baseColor={theme === 'dark' ? '#2F293A' : '#f1ccff'} activeColor="#5227FF" />
         </div>
         <div className="relative z-10">
           <Toaster position="top-right" toastOptions={{ className: '!bg-paper dark:!bg-obsidian !text-obsidian dark:!text-paper !shadow-lg !border !border-silver/20' }} />
