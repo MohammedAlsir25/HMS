@@ -28,8 +28,8 @@ function hexToRgb(hex) {
 }
 
 const DotGrid = ({
-  dotSize = 6,
-  gap = 24,
+  dotSize = 5,
+  gap = 15,
   baseColor = '#2F293A',
   activeColor = '#5227FF',
   proximity = 150,
