@@ -52,7 +52,7 @@ export default function App() {
       <div className="relative min-h-dvh">
         <div className={`fixed inset-0 z-0 pointer-events-none ${theme !== 'dark' ? 'opacity-[0.35]' : ''}`}>
           <DotGrid
-            baseColor={theme === 'dark' ? '#2F293A' : '#f1ccff'}
+            baseColor="#2F293A"
             activeColor={theme === 'dark' ? '#5227FF' : '#91e0ff'}
           />
         </div>
