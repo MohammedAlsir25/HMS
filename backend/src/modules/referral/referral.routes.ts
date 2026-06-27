@@ -1,15 +1,15 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
 import { asyncHandler } from '../../middleware/errorHandler.js';
 import { validate } from '../../middleware/validate.js';
 import { createReferralSchema, updateReferralStatusSchema } from '../../schemas/referral.schema.js';
-import { ValidationError, NotFoundError } from '../../utils/errors.js';
+import { NotFoundError } from '../../utils/errors.js';
 import { auditMiddleware } from '../../middleware/auditLog.js';
 import { PERMISSIONS } from '../../middleware/rbac.js';
+import { $Enums, Prisma } from '@prisma/client';
 
 const router = Router();
-const prisma = new PrismaClient();
+import prisma from '../../lib/prisma.js';
 
 const REFERRAL_INCLUDE = {
   patient: { select: { fullName: true, mrn: true } },
@@ -53,7 +53,7 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CLINICAL_WRITE), au
     testIds?: string[];
   };
   const { patientId, fromClinicId, toClinicId, type, notes, medications, testIds } = body;
-  const fromClinic = await resolveClinic(fromClinicId);
+  const fromClinic = await resolveClinic(fromClinicId!);
   if (!fromClinic) throw new NotFoundError('From clinic not found');
   let resolvedToClinicId = toClinicId ?? null;
   if (resolvedToClinicId) {
@@ -89,17 +89,17 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CLINICAL_WRITE), au
   }
 
   const referral = await prisma.referral.create({
-    data: data as any,
+    data: data as Prisma.ReferralCreateInput,
     include: REFERRAL_INCLUDE,
   });
 
   if (type === 'LAB_DISPATCH' && testIds?.length) {
-    await (prisma.diagnosticOrder as any).create({
+    await prisma.diagnosticOrder.create({
       data: {
         orderType: 'LAB',
         patientId: patientId as string,
         fromClinicId: fromClinic.id,
-        requestedById: (req as any).user.id,
+        requestedById: req.user!.id,
         referralId: referral.id,
         clinicalNotes: (notes as string) || null,
         tests: { create: (testIds as string[]).map((testId: string) => ({ testId })) },
@@ -114,10 +114,11 @@ router.patch('/:id/status', authenticate, requirePermission(PERMISSIONS.CLINICAL
   const { status } = req.body as { status?: string };
   const referral = await prisma.referral.update({
     where: { id: req.params.id },
-    data: { status } as any,
+    data: { status: status as $Enums.ReferralStatus },
     include: REFERRAL_INCLUDE,
   });
   res.json(referral);
 }));
 
 export default router;
+

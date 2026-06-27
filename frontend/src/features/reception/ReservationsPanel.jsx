@@ -21,7 +21,7 @@ export default function ReservationsPanel({ clinics }) {
       if (searchQ.trim().length >= 2) params.set('q', searchQ.trim());
       const data = await api.get(`/reception/reservations?${params}`);
       setReservations(data);
-    } catch { /* empty */ }
+    } catch (err) { console.error('[ReservationsPanel]', err); }
     finally { setLoading(false); }
   };
 
@@ -32,7 +32,7 @@ export default function ReservationsPanel({ clinics }) {
     try {
       await api.patch(`/reception/reservations/${id}/arrive`, { priority: 5, visitType: 'NEW_VISIT' });
       fetchReservations();
-    } catch { /* empty */ }
+    } catch (err) { console.error('[ReservationsPanel]', err); }
   };
 
   return (

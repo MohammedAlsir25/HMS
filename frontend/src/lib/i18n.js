@@ -11,7 +11,7 @@ if (typeof window !== 'undefined') {
       const parsed = JSON.parse(raw);
       if (parsed?.state?.language) initialLang = parsed.state.language;
     }
-  } catch { /* ignore */ }
+  } catch (err) { console.warn('[i18n] Failed to load translations', err); }
 }
 
 i18n.use(initReactI18next).init({

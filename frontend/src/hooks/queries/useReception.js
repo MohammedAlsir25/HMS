@@ -37,7 +37,7 @@ export function useCheckIn() {
 export function useUpdateAppointmentStatus() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, status }) => api.patch(`/reception/appointments/${id}/status`, { status }),
+    mutationFn: ({ id, status }) => api.patch(`/appointments/${id}/status`, { status }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reception', 'queue'] }),
   });
 }
@@ -45,7 +45,7 @@ export function useUpdateAppointmentStatus() {
 export function useUpdateAppointmentPriority() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, priority }) => api.patch(`/reception/appointments/${id}/priority`, { priority }),
+    mutationFn: ({ id, priority }) => api.patch(`/appointments/${id}/priority`, { priority }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reception', 'queue'] }),
   });
 }

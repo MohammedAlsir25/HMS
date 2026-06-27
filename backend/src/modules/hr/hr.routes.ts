@@ -1,12 +1,11 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
 import { asyncHandler } from '../../middleware/errorHandler.js';
 import { ValidationError, NotFoundError, ConflictError } from '../../utils/errors.js';
 import { PERMISSIONS } from '../../middleware/rbac.js';
 
 const router = Router();
-const prisma = new PrismaClient();
+import prisma from '../../lib/prisma.js';
 
 router.get('/employees', authenticate, requirePermission(PERMISSIONS.HR_READ), asyncHandler(async (req, res) => {
   const { search, department, departmentId, isActive } = req.query as Record<string, string>;
@@ -153,9 +152,10 @@ router.patch('/leaves/:id/status', authenticate, requirePermission(PERMISSIONS.H
   const { status } = req.body;
   const leave = await prisma.leaveRequest.update({
     where: { id: req.params.id },
-    data: { status, approvedById: req.user.id },
+    data: { status, approvedById: req.user!.id },
   });
   res.json(leave);
 }));
 
 export default router;
+

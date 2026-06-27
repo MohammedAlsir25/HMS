@@ -3,16 +3,12 @@ import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { api } from '../../lib/api';
-import { useDebounce } from '../../hooks/useDebounce';
+import { usePatientSearch } from '../../hooks/usePatients';
 
 const EMPTY_MEDICATION = { drugName: '', dosage: '', frequency: '', duration: '', route: 'oral', notes: '' };
 
 export default function CrossReferralModal({ open, onClose, fromClinicId, onCreated }) {
   const [step, setStep] = useState('patient');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState(null);
   const [referralType, setReferralType] = useState('INTERNAL_CLINIC');
   const [toClinicId, setToClinicId] = useState('');
   const [notes, setNotes] = useState('');
@@ -22,6 +18,8 @@ export default function CrossReferralModal({ open, onClose, fromClinicId, onCrea
   const [selectedTestIds, setSelectedTestIds] = useState([]);
   const [testSearch, setTestSearch] = useState('');
 
+  const { query: searchQuery, setQuery: setSearchQuery, results: searchResults, loading: searching, selectedPatient, selectPatient: setSelectedPatient } = usePatientSearch({ enabled: step === 'patient' });
+
   useEffect(() => {
     if (open) api.get('/clinics').then(setClinics).catch(() => {});
   }, [open]);
@@ -30,7 +28,6 @@ export default function CrossReferralModal({ open, onClose, fromClinicId, onCrea
     if (!open) {
       setStep('patient');
       setSearchQuery('');
-      setSearchResults([]);
       setSelectedPatient(null);
       setReferralType('INTERNAL_CLINIC');
       setToClinicId('');
@@ -40,17 +37,6 @@ export default function CrossReferralModal({ open, onClose, fromClinicId, onCrea
       setTestSearch('');
     }
   }, [open]);
-
-  const debouncedQuery = useDebounce(searchQuery, 300);
-
-  useEffect(() => {
-    if (debouncedQuery.length < 2 || step !== 'patient') { return; }
-    setSearching(true);
-    api.get(`/reception/search?q=${encodeURIComponent(debouncedQuery)}`)
-      .then(setSearchResults)
-      .catch(() => setSearchResults([]))
-      .finally(() => setSearching(false));
-  }, [debouncedQuery, step]);
 
   useEffect(() => {
     if (referralType === 'LAB_DISPATCH' && step === 'type') {
@@ -90,7 +76,7 @@ export default function CrossReferralModal({ open, onClose, fromClinicId, onCrea
       const referral = await api.post('/referrals', body);
       if (onCreated) onCreated(referral);
       onClose();
-    } catch { /* ignore */ }
+    } catch (err) { console.error('[CrossReferralModal]', err); }
   }, [selectedPatient, fromClinicId, toClinicId, referralType, notes, medications, selectedTestIds, onCreated, onClose]);
 
   return (

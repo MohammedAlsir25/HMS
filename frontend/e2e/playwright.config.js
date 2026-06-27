@@ -16,7 +16,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: 'node start-server.mjs',
+      command: 'npx tsx src/server.ts',
       cwd: '../../backend',
       port: 4001,
       timeout: 60000,

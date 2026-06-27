@@ -12,6 +12,8 @@
     "prisma:seed": "node prisma/seed.js",
     "prisma:studio": "prisma studio",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit --detectOpenHandles",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit --pretty",
     "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch",
     "test:stress": "node --experimental-vm-modules node_modules/.bin/jest tests/stress.test.js --forceExit"
   },
@@ -34,7 +36,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/compression": "^1.8.1",
     "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
+    "@types/express": "^4.17.25",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/multer": "^2.1.0",

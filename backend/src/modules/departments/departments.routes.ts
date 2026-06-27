@@ -1,12 +1,11 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
 import { asyncHandler } from '../../middleware/errorHandler.js';
 import { ValidationError, NotFoundError } from '../../utils/errors.js';
 import { PERMISSIONS } from '../../middleware/rbac.js';
 
 const router = Router();
-const prisma = new PrismaClient();
+import prisma from '../../lib/prisma.js';
 
 router.get('/', authenticate, asyncHandler(async (req, res) => {
   const { type } = req.query as { type?: string };
@@ -58,4 +57,5 @@ router.patch('/:id', authenticate, requirePermission(PERMISSIONS.ADMIN_USERS), a
 }));
 
 export default router;
+
 

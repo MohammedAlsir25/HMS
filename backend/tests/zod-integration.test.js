@@ -12,11 +12,11 @@ beforeAll(async () => {
 });
 
 describe('Protected route Zod validation (requires DB)', () => {
-  describe('POST /api/reception/patients', () => {
+  describe('POST /api/patients', () => {
     it('rejects empty body with ValidationError', async () => {
       if (!token) return;
       const res = await request(app)
-        .post('/api/reception/patients')
+        .post('/api/patients')
         .set('Authorization', `Bearer ${token}`)
         .send({});
       expect(res.status).toBe(400);
@@ -27,7 +27,7 @@ describe('Protected route Zod validation (requires DB)', () => {
     it('rejects invalid email when provided', async () => {
       if (!token) return;
       const res = await request(app)
-        .post('/api/reception/patients')
+        .post('/api/patients')
         .set('Authorization', `Bearer ${token}`)
         .send({ fullName: 'Test', email: 'bad' });
       expect(res.status).toBe(400);
@@ -36,7 +36,7 @@ describe('Protected route Zod validation (requires DB)', () => {
     it('accepts valid minimal patient body', async () => {
       if (!token) return;
       const res = await request(app)
-        .post('/api/reception/patients')
+        .post('/api/patients')
         .set('Authorization', `Bearer ${token}`)
         .send({ fullName: 'Integration Test Patient' });
       expect([201, 409, 500]).toContain(res.status);

@@ -10,13 +10,14 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src/",
+    "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test --config=e2e/playwright.config.js"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.40.0",
     "@tanstack/react-query-devtools": "^5.101.1",
     "gsap": "^3.15.0",
-    "i18next": "^26.3.1",
+    "i18next": "^26.3.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hot-toast": "^2.6.0",
@@ -26,10 +27,12 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
-    "@playwright/test": "^1.61.0",
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/vite": "^4.0.0",
     "@testing-library/jest-dom": "^6.4.5",
     "@testing-library/react": "^15.0.7",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.6",
     "@vitejs/plugin-react": "^4.3.0",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
@@ -40,6 +43,7 @@
     "jsdom": "^24.1.0",
     "prettier": "^3.8.4",
     "tailwindcss": "^4.0.0",
+    "typescript": "^6.0.3",
     "vite": "^5.2.12",
     "vitest": "^1.6.0"
   }

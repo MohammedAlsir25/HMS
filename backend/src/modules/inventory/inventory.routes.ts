@@ -1,12 +1,11 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
 import { asyncHandler } from '../../middleware/errorHandler.js';
 import { ValidationError, NotFoundError, ConflictError } from '../../utils/errors.js';
 import { PERMISSIONS } from '../../middleware/rbac.js';
 
 const router = Router();
-const prisma = new PrismaClient();
+import prisma from '../../lib/prisma.js';
 
 router.get('/items', authenticate, requirePermission(PERMISSIONS.WAREHOUSE_READ), asyncHandler(async (req, res) => {
   const { search, category } = req.query as Record<string, string>;
@@ -22,7 +21,7 @@ router.get('/items', authenticate, requirePermission(PERMISSIONS.WAREHOUSE_READ)
   res.json(items);
 }));
 
-router.get('/items/low-stock', authenticate, requirePermission(PERMISSIONS.WAREHOUSE_READ), asyncHandler(async (req, res) => {
+router.get('/items/low-stock', authenticate, requirePermission(PERMISSIONS.WAREHOUSE_READ), asyncHandler(async (_req, res) => {
   const items = await prisma.inventoryItem.findMany({ where: { isActive: true } });
   const lowStock = items.filter((i) => i.quantity <= i.minStock).sort((a, b) => a.quantity - b.quantity);
   res.json(lowStock);
@@ -84,9 +83,10 @@ router.post('/transactions', authenticate, requirePermission(PERMISSIONS.WAREHOU
   res.status(201).json(transaction);
 }));
 
-router.get('/locations', authenticate, requirePermission(PERMISSIONS.WAREHOUSE_READ), asyncHandler(async (req, res) => {
+router.get('/locations', authenticate, requirePermission(PERMISSIONS.WAREHOUSE_READ), asyncHandler(async (_req, res) => {
   const locations = await prisma.inventoryLocation.findMany({ include: { item: true } });
   res.json(locations);
 }));
 
 export default router;
+

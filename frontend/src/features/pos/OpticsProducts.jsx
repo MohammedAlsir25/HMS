@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -7,6 +8,8 @@ import { Badge } from "../../components/ui/Badge";
 import { Table } from "../../components/ui/Table";
 import { Modal } from "../../components/ui/Modal";
 import { api } from "../../lib/api";
+import { posKeys } from "../../hooks/queries/usePOS";
+import DeliveryModal from "./DeliveryModal";
 
 function AlertPanel({ alerts, onDismiss }) {
   const { t } = useTranslation();
@@ -46,6 +49,7 @@ function AlertPanel({ alerts, onDismiss }) {
 
 export default function OpticsProducts() {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const [items, setItems] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -55,10 +59,12 @@ export default function OpticsProducts() {
   const [adjustItem, setAdjustItem] = useState(null);
   const [adjustForm, setAdjustForm] = useState({ type: "IN", quantity: "", notes: "" });
   const [alerts, setAlerts] = useState({ lowStock: [], expired: [], expiringSoon: [] });
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [form, setForm] = useState({
     name: "",
     sku: "",
     price: "",
+    costPrice: "",
     initialQuantity: "",
     minStock: "",
   });
@@ -79,7 +85,7 @@ export default function OpticsProducts() {
     try {
       const data = await api.get("/pos/alerts?category=optics");
       setAlerts(data);
-    } catch { /* ignore */ }
+    } catch (err) { console.error('[OpticsProducts]', err); }
   }, []);
 
   useEffect(() => {
@@ -95,7 +101,7 @@ export default function OpticsProducts() {
 
   const openCreate = () => {
     setEditItem(null);
-    setForm({ name: "", sku: "", price: "", initialQuantity: "", minStock: "" });
+    setForm({ name: "", sku: "", price: "", costPrice: "", initialQuantity: "", minStock: "" });
     setShowModal(true);
   };
 
@@ -105,6 +111,7 @@ export default function OpticsProducts() {
       name: item.name || "",
       sku: item.sku || "",
       price: item.price ? String(item.price) : "",
+      costPrice: item.costPrice ? String(item.costPrice) : "",
       initialQuantity: "",
       minStock: item.minStock ? String(item.minStock) : "",
     });
@@ -118,6 +125,7 @@ export default function OpticsProducts() {
         name: form.name,
         sku: form.sku,
         price: form.price ? parseFloat(form.price) : 0,
+        costPrice: form.costPrice ? parseFloat(form.costPrice) : 0,
         minStock: form.minStock ? parseInt(form.minStock) : 0,
       };
       if (editItem) {
@@ -128,10 +136,11 @@ export default function OpticsProducts() {
       }
       setShowModal(false);
       setEditItem(null);
-      setForm({ name: "", sku: "", price: "", initialQuantity: "", minStock: "" });
+      setForm({ name: "", sku: "", price: "", costPrice: "", initialQuantity: "", minStock: "" });
       setLoading(true);
       loadItems();
       loadAlerts();
+      queryClient.invalidateQueries({ queryKey: posKeys.items('optics') });
     } catch (err) {
       alert(err.message || "Failed to save item");
     }
@@ -145,6 +154,7 @@ export default function OpticsProducts() {
       setLoading(true);
       loadItems();
       loadAlerts();
+      queryClient.invalidateQueries({ queryKey: posKeys.items('optics') });
     } catch (err) {
       alert(err.message || "Failed to delete item");
     }
@@ -164,6 +174,7 @@ export default function OpticsProducts() {
       setLoading(true);
       loadItems();
       loadAlerts();
+      queryClient.invalidateQueries({ queryKey: posKeys.items('optics') });
     } catch (err) {
       alert(err.message || "Failed to adjust stock");
     }
@@ -181,7 +192,9 @@ export default function OpticsProducts() {
         </span>
       ),
     },
-    { key: "price", label: t("opticsProducts.colPrice"), render: (row) => `$${Number(row.price).toFixed(2)}` },
+    { key: "price", label: "Selling Price", render: (row) => `$${Number(row.price).toFixed(2)}` },
+    { key: "costPrice", label: "Unit Cost", render: (row) => `$${Number(row.costPrice).toFixed(2)}` },
+    { key: "totalValue", label: "Total Value", render: (row) => `$${(Number(row.costPrice) * row.quantity).toFixed(2)}` },
     { key: "minStock", label: t("opticsProducts.colMinStock") },
     {
       key: "status",
@@ -214,7 +227,10 @@ export default function OpticsProducts() {
           <h1 className="text-heading-sm font-semibold text-obsidian">{t("opticsProducts.title")}</h1>
           <p className="text-body text-slate mt-1">{t("opticsProducts.description")}</p>
         </div>
-        <Button onClick={openCreate}>{t("opticsProducts.addProduct")}</Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setShowDeliveryModal(true)}>New Delivery</Button>
+          <Button onClick={openCreate}>{t("opticsProducts.addProduct")}</Button>
+        </div>
       </div>
 
       <AlertPanel alerts={alerts} />
@@ -229,7 +245,7 @@ export default function OpticsProducts() {
         <CardHeader>
           <CardTitle>{t("opticsProducts.inventory")}</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="max-h-[70vh] overflow-y-auto">
           <form onSubmit={handleSearch} className="mb-4">
             <div className="flex gap-2">
               <div className="flex-1">
@@ -256,7 +272,8 @@ export default function OpticsProducts() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input label={t("opticsProducts.formName")} required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <Input label={t("opticsProducts.formSku")} required value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
-          <Input label={t("opticsProducts.formPrice")} type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+          <Input label="Selling Price" type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+          <Input label="Unit Cost" type="number" min="0" step="0.01" value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: e.target.value })} />
           {!editItem && <Input label={t("opticsProducts.formInitialQty")} type="number" min="0" value={form.initialQuantity} onChange={(e) => setForm({ ...form, initialQuantity: e.target.value })} />}
           <Input label={t("opticsProducts.formMinStock")} type="number" min="0" value={form.minStock} onChange={(e) => setForm({ ...form, minStock: e.target.value })} />
           <div className="flex gap-3 pt-2">
@@ -297,6 +314,13 @@ export default function OpticsProducts() {
           </div>
         </div>
       </Modal>
+
+      <DeliveryModal
+        open={showDeliveryModal}
+        onClose={() => setShowDeliveryModal(false)}
+        category="optics"
+        onSuccess={() => { setLoading(true); loadItems(); loadAlerts(); }}
+      />
     </div>
   );
 }

@@ -1,18 +1,18 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import jwt, { type SignOptions } from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
 import { config } from '../../config/index.js';
 import { authenticate } from '../../middleware/auth.js';
 import { asyncHandler } from '../../middleware/errorHandler.js';
 import { validate } from '../../middleware/validate.js';
 import { loginSchema, refreshSchema } from '../../schemas/auth.schema.js';
-import { ValidationError, UnauthorizedError } from '../../utils/errors.js';
+import { UnauthorizedError } from '../../utils/errors.js';
 import { logAudit } from '../../utils/audit.js';
 
 const router = Router();
-const prisma = new PrismaClient();
+import { Prisma } from '@prisma/client';
+import prisma from '../../lib/prisma.js';
 
 const loginLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -20,7 +20,7 @@ const loginLimiter = rateLimit({
   message: { message: 'Too many login attempts. Try again in 1 minute.' },
 });
 
-function generateTokens(user: any) {
+function generateTokens(user: Prisma.UserGetPayload<{ include: { role: true; clinic: true } }>) {
   const payload: Record<string, unknown> = {
     id: user.id,
     email: user.email,
@@ -29,9 +29,9 @@ function generateTokens(user: any) {
     clinicSlug: user.clinic?.slug || null,
     permissions: user.role.permissions,
   };
-  const token = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiry as any });
+  const token = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiry as SignOptions['expiresIn'] });
   const refreshToken = jwt.sign({ id: user.id }, config.jwt.refreshSecret, {
-    expiresIn: config.jwt.refreshExpiry as any,
+    expiresIn: config.jwt.refreshExpiry as SignOptions['expiresIn'],
   });
   return { token, refreshToken };
 }
@@ -87,7 +87,7 @@ router.post('/refresh', validate(refreshSchema), asyncHandler(async (req, res) =
 
 router.get('/me', authenticate, asyncHandler(async (req, res) => {
   const user = await prisma.user.findUnique({
-    where: { id: req.user.id },
+    where: { id: req.user!.id },
     include: { role: true, clinic: true },
   });
   if (!user) throw new UnauthorizedError('User not found');
@@ -103,3 +103,4 @@ router.get('/me', authenticate, asyncHandler(async (req, res) => {
 }));
 
 export default router;
+

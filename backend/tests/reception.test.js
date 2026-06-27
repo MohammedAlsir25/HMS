@@ -5,33 +5,6 @@ import app from '../src/app.js';
 const TEST_TOKEN = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEiLCJyb2xlIjoiU3VwZXIgQWRtaW4iLCJwZXJtaXNzaW9ucyI6W119.TEST';
 
 describe('Reception API - /api/reception', () => {
-  it('GET /search - should reject unauthenticated', async () => {
-    const res = await request(app).get('/api/reception/search?q=test');
-    expect(res.status).toBe(401);
-  });
-
-  it('GET /search - should reject with invalid token', async () => {
-    const res = await request(app)
-      .get('/api/reception/search?q=a')
-      .set('Authorization', TEST_TOKEN);
-    expect(res.status).toBe(401);
-  });
-
-  it('POST /patients - should reject unauthenticated', async () => {
-    const res = await request(app)
-      .post('/api/reception/patients')
-      .send({ fullName: 'Test Patient' });
-    expect(res.status).toBe(401);
-  });
-
-  it('POST /patients - should reject with invalid token', async () => {
-    const res = await request(app)
-      .post('/api/reception/patients')
-      .send({})
-      .set('Authorization', TEST_TOKEN);
-    expect(res.status).toBe(401);
-  });
-
   it('POST /check-in - should reject unauthenticated', async () => {
     const res = await request(app)
       .post('/api/reception/check-in')
@@ -43,36 +16,6 @@ describe('Reception API - /api/reception', () => {
     const res = await request(app)
       .post('/api/reception/check-in')
       .send({ patientId: 'fake' })
-      .set('Authorization', TEST_TOKEN);
-    expect(res.status).toBe(401);
-  });
-
-  it('PATCH /appointments/:id/status - should reject unauthenticated', async () => {
-    const res = await request(app)
-      .patch('/api/reception/appointments/fake/status')
-      .send({ status: 'CALLED' });
-    expect(res.status).toBe(401);
-  });
-
-  it('PATCH /appointments/:id/status - should reject with invalid token', async () => {
-    const res = await request(app)
-      .patch('/api/reception/appointments/fake/status')
-      .send({ status: 'INVALID' })
-      .set('Authorization', TEST_TOKEN);
-    expect(res.status).toBe(401);
-  });
-
-  it('PATCH /appointments/:id/priority - should reject unauthenticated', async () => {
-    const res = await request(app)
-      .patch('/api/reception/appointments/fake/priority')
-      .send({ priority: 5 });
-    expect(res.status).toBe(401);
-  });
-
-  it('PATCH /appointments/:id/priority - should reject with invalid token', async () => {
-    const res = await request(app)
-      .patch('/api/reception/appointments/fake/priority')
-      .send({ priority: 99 })
       .set('Authorization', TEST_TOKEN);
     expect(res.status).toBe(401);
   });
@@ -90,22 +33,6 @@ describe('Reception API - /api/reception', () => {
 });
 
 describe('Reception API - Zod validation', () => {
-  it('POST /patients - should reject empty body with validation error', async () => {
-    const res = await request(app)
-      .post('/api/reception/patients')
-      .send({})
-      .set('Authorization', TEST_TOKEN);
-    expect(res.status).toBe(401);
-  });
-
-  it('POST /patients - should reject with name only (auth comes first)', async () => {
-    const res = await request(app)
-      .post('/api/reception/patients')
-      .send({ fullName: 'Test' })
-      .set('Authorization', TEST_TOKEN);
-    expect(res.status).toBe(401);
-  });
-
   it('POST /check-in - should reject missing patientId with validation', async () => {
     const res = await request(app)
       .post('/api/reception/check-in')

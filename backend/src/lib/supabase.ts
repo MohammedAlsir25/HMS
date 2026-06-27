@@ -1,7 +1,9 @@
-let supabaseClient = null;
-let bucketName = null;
+import type { SupabaseClient } from '@supabase/supabase-js';
 
-export async function getSupabase() {
+let supabaseClient: SupabaseClient | null = null;
+let bucketName: string | null = null;
+
+export async function getSupabase(): Promise<SupabaseClient> {
   if (supabaseClient) return supabaseClient;
   const { createClient } = await import('@supabase/supabase-js');
   const { config } = await import('../config/index.js');
@@ -12,7 +14,7 @@ export async function getSupabase() {
   return supabaseClient;
 }
 
-export async function getBucket() {
+export async function getBucket(): Promise<string> {
   if (bucketName) return bucketName;
   const { config } = await import('../config/index.js');
   bucketName = config.supabase.storageBucket;

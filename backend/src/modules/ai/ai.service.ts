@@ -1,6 +1,21 @@
 ﻿import { config } from '../../config/index.js';
 
-export async function getAIDiagnosis({ symptoms, vitals, patient, specialty }) {
+export interface Symptom {
+  name: string; bodyArea?: string; onset?: string; duration?: string; severity?: string; description?: string;
+}
+export interface VitalSigns {
+  bloodPressureSystolic?: number; bloodPressureDiastolic?: number; heartRate?: number;
+  temperature?: number; spo2?: number; bloodGlucose?: number; weight?: number;
+}
+export interface PatientInfo {
+  age?: number; gender?: string; chronicConditions?: string[]; diabetesType?: string;
+  [key: string]: unknown;
+}
+export interface AIDiagnosisInput {
+  symptoms: Symptom[]; vitals: VitalSigns; patient: PatientInfo; specialty: string;
+}
+
+export async function getAIDiagnosis({ symptoms, vitals, patient, specialty }: AIDiagnosisInput) {
   const key = config.gemini.apiKey;
   if (!key) return mockDiagnosis({ symptoms, vitals, patient, specialty });
 
@@ -39,8 +54,8 @@ export async function getAIDiagnosis({ symptoms, vitals, patient, specialty }) {
   }
 }
 
-function buildPrompt({ symptoms, vitals, patient, specialty }) {
-  const base = config.gemini.specialtyPrompts?.[specialty] || config.gemini.promptTemplate;
+export function buildPrompt({ symptoms, vitals, patient, specialty }: AIDiagnosisInput) {
+  const base = (config.gemini.specialtyPrompts as Record<string, string>)?.[specialty] || config.gemini.promptTemplate;
   const parts = [base, '\n\n## Patient Data\n'];
 
   if (patient) {
@@ -75,7 +90,7 @@ function buildPrompt({ symptoms, vitals, patient, specialty }) {
   return parts.join('\n');
 }
 
-function parseAIResponse(text) {
+export function parseAIResponse(text: string) {
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
     try {
@@ -87,7 +102,7 @@ function parseAIResponse(text) {
   return null;
 }
 
-function mockDiagnosis({ symptoms, vitals, patient, specialty }) {
+export function mockDiagnosis({ symptoms, vitals, patient, specialty }: AIDiagnosisInput) {
   if (specialty === 'ent') return mockENTDiagnosis({ symptoms, vitals, patient });
   if (specialty === 'dental') return mockDentalDiagnosis({ symptoms, vitals, patient });
   if (specialty === 'retina') return mockRetinaDiagnosis({ symptoms, vitals, patient });
@@ -107,11 +122,9 @@ function mockDiagnosis({ symptoms, vitals, patient, specialty }) {
   const hasNausea = symptoms?.some(s => /nausea|vomit/i.test(s.name));
   const hasDizziness = symptoms?.some(s => /dizziness|dizzy|vertigo/i.test(s.name));
 
-  const highBP = vitals?.bloodPressureSystolic >= 140;
-  const highBG = vitals?.bloodGlucose >= 126;
-  const lowSpO2 = vitals?.spo2 <= 94;
-  const highHR = vitals?.heartRate >= 100;
-  const highTemp = vitals?.temperature >= 38;
+  const highBP = (vitals?.bloodPressureSystolic ?? 0) >= 140;
+  const highBG = (vitals?.bloodGlucose ?? 0) >= 126;
+  const lowSpO2 = (vitals?.spo2 ?? 100) <= 94;
 
   if (hasFever && hasCough) {
     suggestions.push({ name: 'Upper Respiratory Tract Infection', confidence: 75, icd10: 'J06.9', rationale: 'Fever and cough are classic signs of URTI.' });
@@ -193,7 +206,7 @@ function mockDiagnosis({ symptoms, vitals, patient, specialty }) {
   };
 }
 
-function mockENTDiagnosis({ symptoms, vitals, patient }) {
+export function mockENTDiagnosis({ symptoms, vitals, patient }: Pick<AIDiagnosisInput, 'symptoms' | 'vitals' | 'patient'>) {
   const suggestions = [];
   const tests = [];
   const treatments = [];
@@ -222,7 +235,7 @@ function mockENTDiagnosis({ symptoms, vitals, patient }) {
   const hasGlobus = symptoms?.some(s => /globus|lump.*throat/i.test(s.name));
   const hasNeckMass = symptoms?.some(s => /neck.*mass|neck.*lump|cervical.*swell|lymphadenopathy/i.test(s.name));
 
-  const highTemp = vitals?.temperature >= 38;
+  const highTemp = (vitals?.temperature ?? 0) >= 38;
 
   // Ear conditions
   if (hasEarPain && hasFever) {
@@ -276,7 +289,7 @@ function mockENTDiagnosis({ symptoms, vitals, patient }) {
     suggestions.push({ name: 'Epistaxis', confidence: 65, icd10: 'R04.0', rationale: 'Nosebleed requires assessment of source (anterior vs posterior), frequency, and any underlying coagulopathy.' });
     suggestions.push({ name: 'Hereditary Hemorrhagic Telangiectasia', confidence: 20, icd10: 'I78.0', rationale: 'Consider in recurrent bilateral epistaxis with family history.' });
     tests.push('Anterior rhinoscopy', 'Nasal endoscopy', 'Complete Blood Count', 'Coagulation profile (PT/PTT/INR)');
-    if (vitals?.bloodPressureSystolic >= 140) {
+    if ((vitals?.bloodPressureSystolic ?? 0) >= 140) {
       suggestions.push({ name: 'Hypertension-related Epistaxis', confidence: 55, icd10: 'I10', rationale: 'Epistaxis with elevated BP suggests hypertensive etiology.' });
     }
   }
@@ -290,7 +303,7 @@ function mockENTDiagnosis({ symptoms, vitals, patient }) {
     suggestions.push({ name: 'Acute Pharyngitis', confidence: 70, icd10: 'J02.9', rationale: 'Sore throat with fever is most commonly viral pharyngitis.' });
     suggestions.push({ name: 'Streptococcal Pharyngitis', confidence: 50, icd10: 'J02.0', rationale: 'If exudates, cervical lymphadenopathy, and absence of cough — consider Group A Strep.' });
     tests.push('Rapid Strep Test', 'Throat swab culture');
-    if (vitals?.temperature >= 38.5) {
+    if ((vitals?.temperature ?? 0) >= 38.5) {
       suggestions.push({ name: 'Peritonsillar Abscess', confidence: 35, icd10: 'J36', rationale: 'Severe unilateral throat pain with fever and trismus suggests quinsy — requires urgent ENT evaluation.' });
       tests.push('CT Neck with contrast');
     }
@@ -299,7 +312,7 @@ function mockENTDiagnosis({ symptoms, vitals, patient }) {
     suggestions.push({ name: 'Acute Laryngitis', confidence: 65, icd10: 'J04.0', rationale: 'Hoarseness with recent URI is most commonly acute laryngitis, typically self-limited.' });
     suggestions.push({ name: 'Laryngopharyngeal Reflux', confidence: 50, icd10: 'K21.9', rationale: 'Silent reflux can cause hoarseness, throat clearing, and globus sensation.' });
     tests.push('Flexible laryngoscopy', 'Voice analysis');
-    if (patient?.age >= 40 && !hasCough) {
+    if ((patient?.age ?? 0) >= 40 && !hasCough) {
       suggestions.push({ name: 'Vocal Cord Lesion (nodule/polyp)', confidence: 40, icd10: 'J38.1', rationale: 'Persistent hoarseness >3 weeks warrants visualization of vocal cords, especially in professional voice users.' });
       tests.push('Stroboscopy');
     }
@@ -323,7 +336,7 @@ function mockENTDiagnosis({ symptoms, vitals, patient }) {
   if (hasNeckMass) {
     suggestions.push({ name: 'Cervical Lymphadenopathy', confidence: 55, icd10: 'R59.0', rationale: 'Neck mass requires thorough evaluation including ultrasound and possible FNA.' });
     tests.push('Neck Ultrasound', 'Fine Needle Aspiration (FNA)', 'CT Neck with contrast');
-    if (patient?.age >= 45) {
+    if ((patient?.age ?? 0) >= 45) {
       suggestions.push({ name: 'Head and Neck Neoplasm', confidence: 30, icd10: 'C76.0', rationale: 'Neck mass in older patient with risk factors requires malignancy workup.' });
     }
   }
@@ -390,7 +403,7 @@ function mockENTDiagnosis({ symptoms, vitals, patient }) {
   };
 }
 
-function mockDentalDiagnosis({ symptoms, vitals, patient }) {
+export function mockDentalDiagnosis({ symptoms, vitals, patient: _patient }: Pick<AIDiagnosisInput, 'symptoms' | 'vitals' | 'patient'>) {
   const suggestions = [];
   const tests = [];
   const treatments = [];
@@ -408,10 +421,9 @@ function mockDentalDiagnosis({ symptoms, vitals, patient }) {
   const hasBrokenTooth = symptoms?.some(s => /broken.*tooth|fractured.*tooth|chipped.*tooth|cracked.*tooth/i.test(s.name));
   const hasBadTaste = symptoms?.some(s => /bad.*taste|metallic.*taste|unpleasant.*taste/i.test(s.name));
   const hasTrismus = symptoms?.some(s => /trismus|limited.*open|can.*open.*mouth/i.test(s.name));
-  const hasNumbness = symptoms?.some(s => /numb|paresthesia|tingling/i.test(s.name));
 
   const hasFever = symptoms?.some(s => /fever/i.test(s.name));
-  const highTemp = vitals?.temperature >= 38;
+  const highTemp = (vitals?.temperature ?? 0) >= 38;
 
   // Caries & pulp conditions
   if (hasToothache && hasSensitivity) {
@@ -541,16 +553,14 @@ function mockDentalDiagnosis({ symptoms, vitals, patient }) {
   };
 }
 
-function mockGlaucomaDiagnosis({ symptoms, vitals, patient }) {
+export function mockGlaucomaDiagnosis({ symptoms, vitals, patient }: Pick<AIDiagnosisInput, 'symptoms' | 'vitals' | 'patient'>) {
   const suggestions = [];
   const tests = [];
   const treatments = [];
 
-  const hasSuddenVisionLoss = symptoms?.some(s => /sudden.*vision.*loss|acute.*vision.*loss/i.test(s.name));
   const hasGradualVisionLoss = symptoms?.some(s => /gradual.*vision.*loss|slow.*vision.*loss|blurred.*vision|blurry/i.test(s.name));
   const hasEyePain = symptoms?.some(s => /eye.*pain|pain.*eye|ocular.*pain/i.test(s.name));
   const hasHalos = symptoms?.some(s => /halos|rainbow|halo.*light|color.*ring/i.test(s.name));
-  const hasHeadache = symptoms?.some(s => /headache|head.*pain/i.test(s.name));
   const hasRedEye = symptoms?.some(s => /red.*eye|bloodshot|inject/i.test(s.name));
   const hasNauseaVomit = symptoms?.some(s => /nausea|vomit/i.test(s.name));
   const hasFieldLoss = symptoms?.some(s => /peripheral.*vision|side.*vision|field.*loss|tunnel.*vision/i.test(s.name));
@@ -558,7 +568,6 @@ function mockGlaucomaDiagnosis({ symptoms, vitals, patient }) {
   const hasPhotophobia = symptoms?.some(s => /photophobia|light.*sensitive/i.test(s.name));
   const hasBlurredVision = symptoms?.some(s => /blurred|blurry|cloudy.*vision|dim/i.test(s.name));
   const hasFloaters = symptoms?.some(s => /floaters|spots|strings|cobweb/i.test(s.name));
-  const hasFlashes = symptoms?.some(s => /flash|photopsia|light.*streak/i.test(s.name));
   const hasTransientBlur = symptoms?.some(s => /transient.*blur|exercise.*blur|intermittent.*blur/i.test(s.name));
   const hasAsymptomatic = symptoms?.some(s => /asymptomatic|routine|incidental|no.*complaint|screening/i.test(s.name));
   const hasTearyEye = symptoms?.some(s => /teary|watery.*eye|epiphora/i.test(s.name));
@@ -566,14 +575,14 @@ function mockGlaucomaDiagnosis({ symptoms, vitals, patient }) {
   const hasPhotophobiaInfant = symptoms?.some(s => /photophobia.*infant|child.*light|baby.*light/i.test(s.name));
   const hasCornealClouding = symptoms?.some(s => /corneal.*cloud|corneal.*haze|buphthalmos|large.*cornea/i.test(s.name));
 
-  const highBP = vitals?.bloodPressureSystolic >= 140;
-  const highBG = vitals?.bloodGlucose >= 126;
+  const highBP = (vitals?.bloodPressureSystolic ?? 0) >= 140;
+  const highBG = (vitals?.bloodGlucose ?? 0) >= 126;
   const hasDiabetes = patient?.diabetesType && patient?.diabetesType !== 'NONE';
   const hasDM = patient?.chronicConditions?.some(c => /diabetes|dm/i.test(c));
   const hasHTN = patient?.chronicConditions?.some(c => /hyper|hypertension/i.test(c));
   const hasSteroids = patient?.chronicConditions?.some(c => /steroid|asthma|rheumatoid| lupus|transplant/i.test(c));
-  const isOlder = patient?.age >= 60;
-  const isYoung = patient?.age <= 40;
+  const isOlder = (patient?.age ?? 0) >= 60;
+  const isYoung = (patient?.age ?? 0) <= 40;
   const isFemale = patient?.gender === 'FEMALE';
 
   // Acute Angle-Closure Glaucoma — EMERGENCY
@@ -754,7 +763,7 @@ function mockGlaucomaDiagnosis({ symptoms, vitals, patient }) {
   };
 }
 
-function mockRetinaDiagnosis({ symptoms, vitals, patient }) {
+export function mockRetinaDiagnosis({ symptoms, vitals, patient }: Pick<AIDiagnosisInput, 'symptoms' | 'vitals' | 'patient'>) {
   const suggestions = [];
   const tests = [];
   const treatments = [];
@@ -770,12 +779,10 @@ function mockRetinaDiagnosis({ symptoms, vitals, patient }) {
   const hasEyePain = symptoms?.some(s => /eye.*pain|pain.*eye|pain.*move|ocular.*pain/i.test(s.name));
   const hasPhotophobia = symptoms?.some(s => /photophobia|light.*sensitive|light.*sensitiv/i.test(s.name));
   const hasColorChanges = symptoms?.some(s => /color.*vision|faded.*color|washed.*color|dull.*color/i.test(s.name));
-  const hasFieldLoss = symptoms?.some(s => /peripheral.*vision|side.*vision|field.*loss/i.test(s.name));
   const hasMicropsia = symptoms?.some(s => /micropsia|smaller|object.*small/i.test(s.name));
-  const hasDiplopia = symptoms?.some(s => /diplopia|double.*vision/i.test(s.name));
 
-  const highBP = vitals?.bloodPressureSystolic >= 140;
-  const highBG = vitals?.bloodGlucose >= 126;
+  const highBP = (vitals?.bloodPressureSystolic ?? 0) >= 140;
+  const highBG = (vitals?.bloodGlucose ?? 0) >= 126;
   const hasDiabetes = patient?.diabetesType && patient.diabetesType !== 'NONE';
   const hasHypertension = patient?.chronicConditions?.some(c => /hyper/i.test(c));
   const hasDM = patient?.chronicConditions?.some(c => /diabetes|dm/i.test(c));

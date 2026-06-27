@@ -507,6 +507,7 @@ async function main() {
     { slug: 'gen-ophth-dept', name: 'General Ophthalmology', type: 'CLINIC', clinicId: clinics[7].id },
     { slug: 'optometry-dept', name: 'Optometry Clinic', type: 'CLINIC', clinicId: clinics[8].id },
     { slug: 'pharmacy-dept', name: 'Pharmacy', type: 'PHARMACY', clinicId: null },
+    { slug: 'optics-dept', name: 'Optics', type: 'OTHER', clinicId: null },
     { slug: 'lab-dept', name: 'Laboratory', type: 'LAB', clinicId: null },
     { slug: 'surgery-dept', name: 'Surgery', type: 'SURGERY', clinicId: null },
     { slug: 'admin-dept', name: 'Administration', type: 'ADMIN', clinicId: null },

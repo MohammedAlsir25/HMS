@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { usePOSItems } from '../../hooks/queries/usePOS';
+import { useQueryClient } from '@tanstack/react-query';
+import { usePOSItems, posKeys } from '../../hooks/queries/usePOS';
 import { useReferrals } from '../../hooks/queries/useReferrals';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
@@ -7,6 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { api } from '../../lib/api';
 import OpticsProducts from './OpticsProducts';
+import SuppliersTab from './SuppliersTab';
 
 const paymentMethods = [
   { value: 'CASH', label: 'Cash' },
@@ -16,6 +18,7 @@ const paymentMethods = [
 ];
 
 export default function OpticsPOS() {
+  const queryClient = useQueryClient();
   const [cart, setCart] = useState([]);
   const [search, setSearch] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('CASH');
@@ -73,7 +76,8 @@ export default function OpticsPOS() {
       setPaymentMethod('CASH');
       setRxDetails({ sph: '', cyl: '', axis: '' });
       setActiveReferralId(null);
-    } catch { /* ignore */ }
+      queryClient.invalidateQueries({ queryKey: posKeys.items('optics') });
+    } catch (err) { console.error('[OpticsPOS]', err); }
     setCompleting(false);
   }, [cart, paymentMethod, total, patientName, rxDetails]);
 
@@ -126,8 +130,11 @@ export default function OpticsPOS() {
           onClick={() => setActiveTab('referrals')}>Referrals</button>
         <button className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'products' ? 'border-b-2 border-lilac-bloom text-obsidian' : 'text-slate hover:text-obsidian'}`}
           onClick={() => setActiveTab('products')}>Products</button>
+        <button className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'suppliers' ? 'border-b-2 border-lilac-bloom text-obsidian' : 'text-slate hover:text-obsidian'}`}
+          onClick={() => setActiveTab('suppliers')}>Suppliers</button>
       </div>
 
+      {activeTab === 'suppliers' ? <SuppliersTab /> : null}
       {activeTab === 'referrals' ? (
         <Card>
           <CardHeader>
@@ -173,7 +180,7 @@ export default function OpticsPOS() {
               />
               {isLoading && <p className="text-body text-slate">Loading inventory...</p>}
               {!isLoading && (
-                <div className="max-h-80 overflow-y-auto space-y-1">
+                <div className="max-h-[50vh] overflow-y-auto space-y-1">
                   {filteredItems.map((item) => (
                     <div key={item.id} className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-bone transition-colors">
                       <div className="min-w-0 flex-1">

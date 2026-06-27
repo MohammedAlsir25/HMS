@@ -19,6 +19,8 @@ import hrRoutes from './modules/hr/hr.routes.js';
 import aiRoutes from './modules/ai/ai.routes.js';
 import labRoutes from './modules/lab/lab.routes.js';
 import departmentsRoutes from './modules/departments/departments.routes.js';
+import patientsRoutes from './modules/patients/patients.routes.js';
+import appointmentsRoutes from './modules/appointments/appointments.routes.js';
 
 const app = express();
 
@@ -26,7 +28,7 @@ app.use(helmet());
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin) return cb(null, true);
-    const normalize = (s) => s.replace(/\/+$/, '');
+    const normalize = (s: string) => s.replace(/\/+$/, '');
     const allowed = normalize(config.frontendUrl);
     cb(null, allowed === normalize(origin));
   },
@@ -54,6 +56,8 @@ app.use('/api/hr', hrRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/lab', labRoutes);
 app.use('/api/departments', departmentsRoutes);
+app.use('/api/patients', patientsRoutes);
+app.use('/api/appointments', appointmentsRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ message: 'Route not found' });

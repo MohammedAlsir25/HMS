@@ -21,6 +21,7 @@ class ApiClient {
           if (refreshed) {
             headers['Authorization'] = `Bearer ${useAuthStore.getState().token}`;
             const retry = await fetch(`${BASE_URL}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
+            if (!retry.ok) { const e = await retry.json().catch(() => ({ message: retry.statusText })); throw new Error(e.message || 'Request failed'); }
             return retry.json();
           }
           useAuthStore.getState().logout();
@@ -31,6 +32,7 @@ class ApiClient {
         window.location.href = '/login';
         return null;
       }
+      if (!res.ok) { const err = await res.json().catch(() => ({ message: res.statusText })); throw new Error(err.message || 'Request failed'); }
       return res.json();
     } catch (err) {
       if (err.name === 'AbortError') throw err;
@@ -61,24 +63,26 @@ class ApiClient {
     const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
     const res = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: formData, signal: opts.signal });
-    if (res.status === 401) {
-      const data = await res.json().catch(() => ({}));
-      if (data.code === 'TOKEN_EXPIRED') {
-        const refreshed = await this.refresh();
-        if (refreshed) {
-          headers['Authorization'] = `Bearer ${useAuthStore.getState().token}`;
-          const retry = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: formData });
-          return retry.json();
+      if (res.status === 401) {
+        const data = await res.json().catch(() => ({}));
+        if (data.code === 'TOKEN_EXPIRED') {
+          const refreshed = await this.refresh();
+          if (refreshed) {
+            headers['Authorization'] = `Bearer ${useAuthStore.getState().token}`;
+            const retry = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: formData });
+            if (!retry.ok) { const e = await retry.json().catch(() => ({ message: retry.statusText })); throw new Error(e.message || 'Request failed'); }
+            return retry.json();
+          }
+          useAuthStore.getState().logout();
+          window.location.href = '/login';
+          return null;
         }
         useAuthStore.getState().logout();
         window.location.href = '/login';
         return null;
       }
-      useAuthStore.getState().logout();
-      window.location.href = '/login';
-      return null;
-    }
-    return res.json();
+      if (!res.ok) { const err = await res.json().catch(() => ({ message: res.statusText })); throw new Error(err.message || 'Request failed'); }
+      return res.json();
   }
 
   get(path, opts) { return this.request('GET', path, undefined, opts); }

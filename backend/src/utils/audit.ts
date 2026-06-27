@@ -1,20 +1,22 @@
-import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+import prisma from '../lib/prisma.js';
+import { Prisma } from '@prisma/client';
 
-export async function logAudit({ userId, action, entity, entityId, details, ipAddress }) {
+export async function logAudit({ userId, action, entity, entityId, details, ipAddress }: {
+  userId?: string; action: string; entity: string; entityId?: string; details?: Record<string, unknown>; ipAddress?: string;
+}) {
   try {
     await prisma.auditLog.create({
       data: {
-        userId,
+        userId: userId!,
         action,
         entity,
         entityId,
-        details: details || {},
+        details: (details || {}) as Prisma.JsonObject,
         ipAddress,
       },
     });
   } catch (err) {
-    console.error('Audit log error:', err.message);
+    console.error('Audit log error:', (err as Error).message);
   }
 }

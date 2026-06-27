@@ -14,9 +14,9 @@ export default function FileUploader({ patientId, patientName }) {
   const fetchFiles = async () => {
     if (!patientId) return;
     try {
-      const data = await api.get(`/reception/files/${patientId}`);
+      const data = await api.get(`/patients/${patientId}/files`);
       setFiles(data);
-    } catch { /* empty */ }
+    } catch (err) { console.error('[FileUploader]', err); }
   };
 
   useEffect(() => { fetchFiles(); }, [patientId]);
@@ -28,10 +28,9 @@ export default function FileUploader({ patientId, patientName }) {
     try {
       const formData = new FormData();
       for (const f of selected) formData.append('files', f);
-      formData.append('patientId', patientId);
-      await api.upload('/reception/files', formData);
+      await api.upload(`/patients/${patientId}/files`, formData);
       fetchFiles();
-    } catch { /* empty */ }
+    } catch (err) { console.error('[FileUploader]', err); }
     finally { setUploading(false); if (inputRef.current) inputRef.current.value = ''; }
   };
 
@@ -66,7 +65,7 @@ export default function FileUploader({ patientId, patientName }) {
                   <p className="text-sm text-obsidian truncate">{f.originalName}</p>
                   <p className="text-xs text-graphite">{formatSize(f.size)}</p>
                 </div>
-                <a href={`/api/reception/files/download/${f.id}`} target="_blank" rel="noopener noreferrer">
+                <a href={`/api/patients/files/${f.id}/download`} target="_blank" rel="noopener noreferrer">
                   <Badge variant="primary" className="cursor-pointer">{t('reception.download')}</Badge>
                 </a>
               </div>

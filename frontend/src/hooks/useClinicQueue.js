@@ -15,7 +15,7 @@ export function useClinicQueue(clinicSlug, onSelectPatient) {
 
   const startConsultation = useCallback(async (appointment) => {
     try {
-      await api.patch(`/reception/appointments/${appointment.id}/status`, { status: 'IN_PROGRESS' });
+      await api.patch(`/appointments/${appointment.id}/status`, { status: 'IN_PROGRESS' });
     } catch {
       // if status update fails, still proceed with consultation
     }

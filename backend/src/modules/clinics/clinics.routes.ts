@@ -1,14 +1,14 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
 import { asyncHandler } from '../../middleware/errorHandler.js';
 import { ValidationError, NotFoundError } from '../../utils/errors.js';
 import { PERMISSIONS } from '../../middleware/rbac.js';
 
 const router = Router();
-const prisma = new PrismaClient();
+import prisma from '../../lib/prisma.js';
 
-router.get('/', authenticate, asyncHandler(async (req, res) => {
+router.get('/', authenticate, asyncHandler(async (_req, res) => {
   const clinics = await prisma.clinic.findMany({
     where: { isActive: true },
     orderBy: { name: 'asc' },
@@ -21,7 +21,7 @@ router.get('/:slug/dashboard', authenticate, requirePermission(PERMISSIONS.CLINI
   if (!clinic) throw new NotFoundError('Clinic not found');
 
   const patients = await prisma.patient.findMany({ take: 10, orderBy: { createdAt: 'desc' } });
-  const appointments = await prisma.apppointment.findMany({
+  const appointments = await prisma.appointment.findMany({
     where: { clinicId: clinic.id, status: { in: ['WAITING', 'IN_PROGRESS'] } },
     include: { patient: { select: { fullName: true, mrn: true } } },
     orderBy: { createdAt: 'desc' },
@@ -57,24 +57,24 @@ router.post('/:slug/record', authenticate, requirePermission(PERMISSIONS.CLINICA
           weight: vitalSigns.weight || null,
         },
       } : undefined,
-      symptoms: symptoms?.length ? {
-        create: symptoms.map(s => ({
-          name: s.name,
-          bodyArea: s.bodyArea || null,
-          onset: s.onset || null,
-          duration: s.duration || null,
-          severity: s.severity || null,
-          description: s.description || null,
+      symptoms: (symptoms as Array<Record<string, unknown>>)?.length ? {
+        create: (symptoms as Array<Record<string, unknown>>).map(s => ({
+          name: s.name as string,
+          bodyArea: (s.bodyArea as string) || null,
+          onset: (s.onset as string) || null,
+          duration: (s.duration as string) || null,
+          severity: (s.severity as string) || null,
+          description: (s.description as string) || null,
         })),
-      } : undefined,
-      medications: medications?.length ? {
-        create: medications.map(m => ({
-          drugName: m.drugName,
-          dosage: m.dosage || null,
-          frequency: m.frequency || null,
-          duration: m.duration || null,
-          route: m.route || null,
-          notes: m.notes || null,
+      } as unknown as Exclude<Prisma.ClinicalRecordCreateInput['symptoms'], undefined> : undefined,
+      medications: (medications as Array<Record<string, unknown>>)?.length ? {
+        create: (medications as Array<Record<string, unknown>>).map(m => ({
+          drugName: m.drugName as string,
+          dosage: (m.dosage as string) || null,
+          frequency: (m.frequency as string) || null,
+          duration: (m.duration as string) || null,
+          route: (m.route as string) || null,
+          notes: (m.notes as string) || null,
         })),
       } : undefined,
     },
@@ -115,7 +115,7 @@ router.get('/:slug/queue', authenticate, requirePermission(PERMISSIONS.CLINICAL_
   const clinic = await prisma.clinic.findUnique({ where: { slug: req.params.slug } });
   if (!clinic) throw new NotFoundError('Clinic not found');
 
-  const queue = await prisma.apppointment.findMany({
+  const queue = await prisma.appointment.findMany({
     where: {
       clinicId: clinic.id,
       status: { in: ['WAITING', 'CALLED', 'IN_PROGRESS'] },
@@ -141,7 +141,7 @@ router.get('/:slug/stats', authenticate, requirePermission(PERMISSIONS.CLINICAL_
       by: ['patientId'],
       where: { clinicId: clinic.id },
     }),
-    prisma.apppointment.count({
+    prisma.appointment.count({
       where: { clinicId: clinic.id, createdAt: { gte: today } },
     }),
     prisma.clinicalRecord.count({
@@ -169,8 +169,9 @@ router.get('/:slug/medications', authenticate, requirePermission(PERMISSIONS.CLI
       { sku: { contains: search, mode: 'insensitive' as const } },
     ];
   }
-  const items = await prisma.inventoryItem.findMany({ where: where as any, orderBy: { name: 'asc' }, take: 20 });
+  const items = await prisma.inventoryItem.findMany({ where: where as Prisma.InventoryItemWhereInput, orderBy: { name: 'asc' }, take: 20 });
   res.json(items);
 }));
 
 export default router;
+

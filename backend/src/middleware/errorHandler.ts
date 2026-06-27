@@ -1,24 +1,27 @@
+import type { Request, Response, NextFunction } from 'express';
+import type { RequestHandler } from 'express';
 import { AppError } from '../utils/errors.js';
 
-export function asyncHandler(fn) {
-  return (req, res, next) => {
+export function asyncHandler(fn: RequestHandler) {
+  return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 }
 
-export function errorHandler(err, _req, res, _next) {
+export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction) {
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
       message: err.message,
-      ...(err.details && { details: err.details }),
+      ...(err.details ? { details: err.details } : {}),
     });
   }
 
-  if (err.code === 'P2002') {
-    return res.status(409).json({ message: 'Duplicate entry', details: err.meta });
+  const prismaErr = err as { code?: string; meta?: unknown };
+  if (prismaErr.code === 'P2002') {
+    return res.status(409).json({ message: 'Duplicate entry', details: prismaErr.meta });
   }
 
-  if (err.code === 'P2025') {
+  if (prismaErr.code === 'P2025') {
     return res.status(404).json({ message: 'Resource not found' });
   }
 

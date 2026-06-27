@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
 import { asyncHandler } from '../../middleware/errorHandler.js';
@@ -8,9 +7,9 @@ import { auditMiddleware } from '../../middleware/auditLog.js';
 import { PERMISSIONS, DEFAULT_ROLES } from '../../middleware/rbac.js';
 
 const router = Router();
-const prisma = new PrismaClient();
+import prisma from '../../lib/prisma.js';
 
-router.get('/users', authenticate, requirePermission(PERMISSIONS.ADMIN_USERS), asyncHandler(async (req, res) => {
+router.get('/users', authenticate, requirePermission(PERMISSIONS.ADMIN_USERS), asyncHandler(async (_req, res) => {
   const users = await prisma.user.findMany({
     select: { id: true, email: true, fullName: true, phone: true, isActive: true, lastLogin: true, createdAt: true, role: true, clinic: true },
     orderBy: { createdAt: 'desc' },
@@ -52,12 +51,12 @@ router.patch('/users/:id', authenticate, requirePermission(PERMISSIONS.ADMIN_USE
   res.json(user);
 }));
 
-router.get('/roles', authenticate, requirePermission(PERMISSIONS.ADMIN_RBAC), asyncHandler(async (req, res) => {
+router.get('/roles', authenticate, requirePermission(PERMISSIONS.ADMIN_RBAC), asyncHandler(async (_req, res) => {
   const roles = await prisma.role.findMany({
     include: { _count: { select: { users: true } } },
     orderBy: { name: 'asc' },
   });
-  const rolesWithCount = roles.map((r) => ({ ...r, userCount: r._count.users, _count: undefined }));
+  const rolesWithCount = roles.map((r) => ({ id: r.id, name: r.name, description: r.description, permissions: r.permissions, userCount: (r as unknown as { _count: Record<string, number> })._count.users }));
   res.json(rolesWithCount);
 }));
 
@@ -84,9 +83,9 @@ router.delete('/roles/:id', authenticate, requirePermission(PERMISSIONS.ADMIN_RB
   res.json({ message: 'Role deleted' });
 }));
 
-router.post('/roles/seed', authenticate, requirePermission(PERMISSIONS.ADMIN_RBAC), asyncHandler(async (req, res) => {
+router.post('/roles/seed', authenticate, requirePermission(PERMISSIONS.ADMIN_RBAC), asyncHandler(async (_req, res) => {
   const results = [];
-  for (const [key, def] of Object.entries(DEFAULT_ROLES)) {
+  for (const [, def] of Object.entries(DEFAULT_ROLES)) {
     const existing = await prisma.role.findUnique({ where: { name: def.name } });
     if (!existing) {
       const role = await prisma.role.create({ data: { name: def.name, permissions: def.permissions } });
@@ -99,3 +98,4 @@ router.post('/roles/seed', authenticate, requirePermission(PERMISSIONS.ADMIN_RBA
 }));
 
 export default router;
+

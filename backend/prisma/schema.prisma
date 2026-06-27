@@ -101,7 +101,7 @@ model User {
   clinicId String?
   clinic  Clinic? @relation(fields: [clinicId], references: [id])
 
-  appointments Apppointment[]
+  appointments Appointment[]
   shifts       Shift[]
   createdPatients Patient[]    @relation("PatientCreator")
   cashierTransactions Transaction[] @relation("Cashier")
@@ -111,6 +111,7 @@ model User {
   requestedOrders  DiagnosticOrder[] @relation("OrderRequester")
   assignedOrders   DiagnosticOrder[] @relation("OrderAssignee")
   enteredResults   DiagnosticOrderTest[] @relation("ResultEnterer")
+  createdInvoices  SupplierInvoice[]
 
   @@map("users")
 }
@@ -137,7 +138,7 @@ model Clinic {
   followUpFee     Decimal?
 
   users        User[]
-  appointments Apppointment[]
+  appointments Appointment[]
   clinicalRecords ClinicalRecord[]
   referralsFrom  Referral[] @relation("FromClinic")
   referralsTo    Referral[] @relation("ToClinic")
@@ -206,6 +207,8 @@ model Expense {
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
 
+  supplierInvoice SupplierInvoice?
+
   @@map("expenses")
 }
 
@@ -228,7 +231,7 @@ model Patient {
   createdById String
   createdBy   User   @relation("PatientCreator", fields: [createdById], references: [id])
 
-  appointments     Apppointment[]
+  appointments     Appointment[]
   clinicalRecords  ClinicalRecord[]
   referrals        Referral[]
   surgeries        Surgery[]
@@ -252,7 +255,7 @@ model PatientFile {
   @@map("patient_files")
 }
 
-model Apppointment {
+model Appointment {
   id        String            @id @default(uuid())
   token     Int
   type      AppointmentType
@@ -430,6 +433,7 @@ model InventoryItem {
 
   locations   InventoryLocation[]
   transactions InventoryTransaction[]
+  supplierInvoiceItems SupplierInvoiceItem[]
 
   @@map("inventory_items")
 }
@@ -735,4 +739,61 @@ model AuditLog {
   user   User   @relation(fields: [userId], references: [id])
 
   @@map("audit_logs")
+}
+
+enum PaymentStatus {
+  PaidInFull
+  PartialPayment
+  Pending
+}
+
+model Supplier {
+  id             String   @id @default(uuid())
+  name           String
+  contactPerson  String?
+  phone          String?
+  email          String?
+  createdAt      DateTime @default(now())
+
+  invoices SupplierInvoice[]
+
+  @@map("suppliers")
+}
+
+model SupplierInvoice {
+  id             String        @id @default(uuid())
+  invoiceNumber  String?
+  invoiceTotal   Decimal
+  amountPaid     Decimal       @default(0)
+  paymentStatus  PaymentStatus @default(Pending)
+  category       String
+  notes          String?
+  receivedAt     DateTime      @default(now())
+  createdAt      DateTime      @default(now())
+
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+
+  items SupplierInvoiceItem[]
+
+  expenseId String? @unique
+  expense   Expense? @relation(fields: [expenseId], references: [id])
+
+  @@map("supplier_invoices")
+}
+
+model SupplierInvoiceItem {
+  id               String         @id @default(uuid())
+  quantityReceived Int
+  unitCost         Decimal
+  totalLineCost    Decimal
+
+  invoiceId String
+  invoice   SupplierInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  itemId    String
+  item      InventoryItem   @relation(fields: [itemId], references: [id])
+
+  @@map("supplier_invoice_items")
 }

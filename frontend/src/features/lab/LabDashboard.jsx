@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useLabOrders, useLabStats, useUpdateOrderStatus, useClaimOrder, useUnclaimOrder, useLabCheckout, labKeys } from '../../hooks/queries/useLab';
-import { useDebounce } from '../../hooks/useDebounce';
+import { usePatientSearch } from '../../hooks/usePatients';
 import { api } from '../../lib/api';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
@@ -53,7 +53,7 @@ function OrderDetailModal({ order, open, onClose, onSave }) {
       const updated = await api.put(`/lab/orders/${order.id}/results`, payload);
       if (onSave) onSave(updated);
       onClose();
-    } catch { /* ignore */ }
+    } catch (err) { console.error('[LabDashboard]', err); }
   }, [order, results, resultNotes, onSave, onClose]);
 
   if (!order) return null;
@@ -112,10 +112,6 @@ function OrderDetailModal({ order, open, onClose, onSave }) {
 function NewRequestModal({ open, onClose, onCreated }) {
   const { t } = useTranslation();
   const [step, setStep] = useState('patient');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState(null);
   const [testCatalog, setTestCatalog] = useState([]);
   const [selectedTests, setSelectedTests] = useState([]);
   const [priority, setPriority] = useState('ROUTINE');
@@ -123,11 +119,12 @@ function NewRequestModal({ open, onClose, onCreated }) {
   const [submitting, setSubmitting] = useState(false);
   const [testSearch, setTestSearch] = useState('');
 
+  const { query: searchQuery, setQuery: setSearchQuery, results: searchResults, loading: searching, selectedPatient, selectPatient: setSelectedPatient } = usePatientSearch({ enabled: step === 'patient' });
+
   useEffect(() => {
     if (!open) {
       setStep('patient');
       setSearchQuery('');
-      setSearchResults([]);
       setSelectedPatient(null);
       setSelectedTests([]);
       setPriority('ROUTINE');
@@ -135,17 +132,6 @@ function NewRequestModal({ open, onClose, onCreated }) {
       setTestSearch('');
     }
   }, [open]);
-
-  const debouncedQuery = useDebounce(searchQuery, 300);
-
-  useEffect(() => {
-    if (debouncedQuery.length < 2 || step !== 'patient') return;
-    setSearching(true);
-    api.get(`/reception/search?q=${encodeURIComponent(debouncedQuery)}`)
-      .then(setSearchResults)
-      .catch(() => setSearchResults([]))
-      .finally(() => setSearching(false));
-  }, [debouncedQuery, step]);
 
   const loadCatalog = useCallback(async () => {
     try {
@@ -192,7 +178,7 @@ function NewRequestModal({ open, onClose, onCreated }) {
       });
       if (onCreated) onCreated(order);
       onClose();
-    } catch { /* ignore */ }
+    } catch (err) { console.error('[LabDashboard]', err); }
     setSubmitting(false);
   }, [selectedPatient, selectedTests, priority, clinicalNotes, onCreated, onClose]);
 
@@ -358,7 +344,7 @@ function CatalogManager({ onRefresh }) {
       loadCatalog();
       if (onRefresh) onRefresh();
       setEditTest(null);
-    } catch { /* ignore */ }
+    } catch (err) { console.error('[LabDashboard]', err); }
   }, [loadCatalog, onRefresh]);
 
   if (loading) return <p className="text-caption text-slate">{t('common.loading')}</p>;

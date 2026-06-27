@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { $Enums, Prisma } from '@prisma/client';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
 import { asyncHandler } from '../../middleware/errorHandler.js';
 import { validate } from '../../middleware/validate.js';
@@ -8,7 +8,7 @@ import { ValidationError, NotFoundError } from '../../utils/errors.js';
 import { PERMISSIONS } from '../../middleware/rbac.js';
 
 const router = Router();
-const prisma = new PrismaClient();
+import prisma from '../../lib/prisma.js';
 
 const ORDER_INCLUDE = {
   patient: { select: { id: true, fullName: true, mrn: true, dateOfBirth: true, gender: true } },
@@ -32,11 +32,11 @@ router.get('/tests', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_REA
   if (search) where.name = { contains: search, mode: 'insensitive' as const };
   if (category) where.category = category;
   if (isActive !== undefined) where.isActive = isActive === 'true';
-  const tests = await prisma.diagnosticTest.findMany({ where: where as any, orderBy: { sortOrder: 'asc' as const } });
+  const tests = await prisma.diagnosticTest.findMany({ where: where as Prisma.DiagnosticTestWhereInput, orderBy: { sortOrder: 'asc' as const } });
   res.json(tests);
 }));
 
-router.get('/tests/categories', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_READ), asyncHandler(async (req, res) => {
+router.get('/tests/categories', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_READ), asyncHandler(async (_req, res) => {
   const tests = await prisma.diagnosticTest.findMany({
     where: { orderType: 'LAB', isActive: true },
     select: { category: true },
@@ -87,7 +87,7 @@ router.delete('/tests/:id', authenticate, requirePermission(PERMISSIONS.DIAGNOST
   res.json({ success: true });
 }));
 
-router.get('/panels', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_READ), asyncHandler(async (req, res) => {
+router.get('/panels', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_READ), asyncHandler(async (_req, res) => {
   const panels = await prisma.diagnosticPanel.findMany({
     where: { orderType: 'LAB', isActive: true },
     include: { panelTests: { include: { test: true }, orderBy: { test: { sortOrder: 'asc' as const } } } },
@@ -96,7 +96,10 @@ router.get('/panels', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_RE
 }));
 
 router.post('/panels', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_CATALOG), asyncHandler(async (req, res) => {
-  const { name, nameAr, testIds } = req.body;
+  const body = req.body as Record<string, unknown>;
+  const name = body.name as string;
+  const nameAr = body.nameAr as string | undefined;
+  const testIds = body.testIds as string[];
   if (!name || !testIds?.length) throw new ValidationError('name and testIds are required');
   const panel = await prisma.diagnosticPanel.create({
     data: {
@@ -121,7 +124,7 @@ router.get('/orders', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_RE
   if (fromClinicId) where.fromClinicId = fromClinicId;
   if (search) where.patient = { fullName: { contains: search, mode: 'insensitive' as const } };
   const orders = await prisma.diagnosticOrder.findMany({
-    where: where as any,
+    where: where as Prisma.DiagnosticOrderWhereInput,
     include: ORDER_INCLUDE,
     orderBy: { createdAt: 'desc' },
     take: 50,
@@ -158,8 +161,8 @@ router.post('/orders', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_O
       orderType: 'LAB', patientId, fromClinicId, panelId: panelId || null,
       clinicalNotes: clinicalNotes || null,
       priority: typeof priority === 'number' ? priority : priority === 'URGENT' ? 1 : priority === 'STAT' ? 2 : 0,
-      requestedById: req.user.id, referralId: referral.id,
-      tests: { create: allTestIds.map(testId => ({ testId })) },
+      requestedById: req.user!.id, referralId: referral.id,
+      tests: { create: (allTestIds as string[]).map(testId => ({ testId })) },
     },
     include: ORDER_INCLUDE,
   });
@@ -169,7 +172,7 @@ router.post('/orders', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_O
 router.patch('/orders/:id/claim', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_WRITE), asyncHandler(async (req, res) => {
   const order = await prisma.diagnosticOrder.update({
     where: { id: req.params.id },
-    data: { status: 'IN_PROGRESS', assignedToId: req.user.id },
+    data: { status: 'IN_PROGRESS', assignedToId: req.user!.id },
     include: ORDER_INCLUDE,
   });
   res.json(order);
@@ -189,7 +192,7 @@ router.patch('/orders/:id/status', authenticate, requirePermission(PERMISSIONS.D
   const valid = ['SUBMITTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
   if (!status || !valid.includes(status)) throw new ValidationError('Invalid status');
   const data: Record<string, unknown> = { status };
-  if (status === 'IN_PROGRESS') data.assignedToId = req.user.id;
+  if (status === 'IN_PROGRESS') data.assignedToId = req.user!.id;
   if (status === 'COMPLETED') data.completedAt = new Date();
   const order = await prisma.diagnosticOrder.update({
     where: { id: req.params.id },
@@ -198,7 +201,7 @@ router.patch('/orders/:id/status', authenticate, requirePermission(PERMISSIONS.D
   });
   if (status === 'COMPLETED') {
     await prisma.referral.update({
-      where: { id: order.referralId },
+      where: { id: order.referralId! },
       data: { status: 'FULFILLED' },
     });
   }
@@ -214,24 +217,25 @@ router.put('/orders/:id/results', authenticate, requirePermission(PERMISSIONS.DI
   });
   if (!order) throw new NotFoundError('Order not found');
   await prisma.$transaction(
-    results.map(r => {
-      const isAbnormal = r.flag && r.flag !== 'NORMAL';
+    (results as Array<Record<string, unknown>>).map(r => {
+      const r2 = r as { orderTestId: string; value?: string; unit?: string; refRangeLow?: string; refRangeHigh?: string; refRangeText?: string; flag?: string; notes?: string };
+      const isAbnormal = !!(r2.flag && r2.flag !== 'NORMAL');
       return prisma.diagnosticOrderTest.update({
-        where: { id: r.orderTestId },
+        where: { id: r2.orderTestId },
         data: {
-          value: r.value ?? null, unit: r.unit ?? null,
-          refRangeLow: r.refRangeLow !== undefined ? parseFloat(r.refRangeLow) : null,
-          refRangeHigh: r.refRangeHigh !== undefined ? parseFloat(r.refRangeHigh) : null,
-          refRangeText: r.refRangeText ?? null,
-          flag: r.flag || 'NORMAL', notes: r.notes ?? null,
-          resultEnteredAt: new Date(), resultEnteredById: req.user.id, isAbnormal,
+          value: r2.value ?? null, unit: r2.unit ?? null,
+          refRangeLow: r2.refRangeLow !== undefined ? parseFloat(r2.refRangeLow) : null,
+          refRangeHigh: r2.refRangeHigh !== undefined ? parseFloat(r2.refRangeHigh) : null,
+          refRangeText: r2.refRangeText ?? null,
+          flag: (r2.flag || 'NORMAL') as $Enums.ResultFlag, notes: r2.notes ?? null,
+          resultEnteredAt: new Date(), resultEnteredById: req.user!.id, isAbnormal,
         },
       });
     })
   );
   const updated = await prisma.diagnosticOrder.update({
     where: { id: req.params.id },
-    data: { status: 'COMPLETED', completedAt: new Date(), assignedToId: req.user.id },
+    data: { status: 'COMPLETED', completedAt: new Date(), assignedToId: req.user!.id },
     include: ORDER_INCLUDE,
   });
   if (updated.referralId) {
@@ -244,7 +248,7 @@ router.put('/orders/:id/results', authenticate, requirePermission(PERMISSIONS.DI
 }));
 
 router.get('/results', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_READ), asyncHandler(async (req, res) => {
-  const { patientId } = req.query;
+  const patientId = req.query.patientId as string;
   if (!patientId) return res.json([]);
   const orders = await prisma.diagnosticOrder.findMany({
     where: { patientId, orderType: 'LAB' },
@@ -293,21 +297,21 @@ router.post('/checkout', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS
   }
   let shift = await prisma.shift.findFirst({ where: { closedAt: null } });
   if (!shift) {
-    shift = await prisma.shift.create({ data: { userId: req.user.id } });
+    shift = await prisma.shift.create({ data: { userId: req.user!.id } });
   }
   const labDept = await prisma.department.findUnique({ where: { slug: 'lab-dept' } });
   const transaction = await prisma.transaction.create({
     data: {
       type: 'LAB', amount: totalAmount, paymentMethod,
       description: `Lab billing: ${descriptions.join(', ')}`,
-      shiftId: shift.id, cashierId: req.user.id, departmentId: labDept?.id || null,
+      shiftId: shift.id, cashierId: req.user!.id, departmentId: labDept?.id || null,
     },
     include: { department: { select: { id: true, name: true, slug: true } } },
   });
   res.status(201).json({ transaction, totalAmount, orderCount: orders.length });
 }));
 
-router.get('/stats', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_READ), asyncHandler(async (req, res) => {
+router.get('/stats', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_READ), asyncHandler(async (_req, res) => {
   const [pending, inProgress, completed, total] = await Promise.all([
     prisma.diagnosticOrder.count({ where: { orderType: 'LAB', status: 'SUBMITTED' } }),
     prisma.diagnosticOrder.count({ where: { orderType: 'LAB', status: 'IN_PROGRESS' } }),
@@ -318,3 +322,4 @@ router.get('/stats', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_REA
 }));
 
 export default router;
+

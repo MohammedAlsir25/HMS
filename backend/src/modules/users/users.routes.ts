@@ -1,15 +1,12 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
 import { asyncHandler } from '../../middleware/errorHandler.js';
 import { PERMISSIONS } from '../../middleware/rbac.js';
-import { config } from '../../config/index.js';
 
 const router = Router();
-const prisma = new PrismaClient();
+import prisma from '../../lib/prisma.js';
 
-router.get('/', authenticate, requirePermission(PERMISSIONS.ADMIN_USERS), asyncHandler(async (req, res) => {
+router.get('/', authenticate, requirePermission(PERMISSIONS.ADMIN_USERS), asyncHandler(async (_req, res) => {
   const users = await prisma.user.findMany({
     include: { role: { select: { id: true, name: true } }, clinic: { select: { id: true, name: true, slug: true } } },
     orderBy: { createdAt: 'desc' },
@@ -27,7 +24,7 @@ router.get('/', authenticate, requirePermission(PERMISSIONS.ADMIN_USERS), asyncH
   })));
 }));
 
-router.get('/roles', authenticate, requirePermission(PERMISSIONS.ADMIN_RBAC), asyncHandler(async (req, res) => {
+router.get('/roles', authenticate, requirePermission(PERMISSIONS.ADMIN_RBAC), asyncHandler(async (_req, res) => {
   const roles = await prisma.role.findMany({ orderBy: { name: 'asc' } });
   res.json(roles);
 }));
@@ -39,7 +36,9 @@ router.put('/:id/roles', authenticate, requirePermission(PERMISSIONS.ADMIN_RBAC)
     data: { roleId, clinicId },
     include: { role: true, clinic: true },
   });
-  res.json({ id: updated.id, role: updated.role, clinic: updated.clinic });
+  const result = updated as unknown as { id: string; role: unknown; clinic: unknown };
+  res.json({ id: result.id, role: result.role, clinic: result.clinic });
 }));
 
 export default router;
+

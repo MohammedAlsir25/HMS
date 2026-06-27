@@ -55,7 +55,7 @@ export default function ReceptionPage() {
   const debouncedQuery = useDebounce(searchQuery, 300);
   const { data: searchResults = [], isLoading: searching } = useQuery({
     queryKey: patientKeys.search(debouncedQuery),
-    queryFn: () => api.get(`/reception/search?q=${encodeURIComponent(debouncedQuery)}`),
+    queryFn: () => api.get(`/patients/search?q=${encodeURIComponent(debouncedQuery)}`),
     enabled: debouncedQuery.length >= 2,
   });
 
@@ -73,7 +73,7 @@ export default function ReceptionPage() {
       setCollectPayment(false);
       setPaymentMethod('CASH');
       setSearchQuery('');
-    } catch { /* ignore */ }
+    } catch (err) { console.error('[ReceptionPage]', err); }
   };
 
   const handleStatusChange = (id, status) => {

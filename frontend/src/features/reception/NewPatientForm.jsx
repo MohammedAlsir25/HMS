@@ -35,7 +35,7 @@ export default function NewPatientForm({ clinics, onPatientCreated }) {
     setSaving(true);
     setError('');
     try {
-      const patient = await api.post('/reception/patients', {
+      const patient = await api.post('/patients', {
         fullName: form.fullName,
         phone: form.phone || undefined,
         nationalId: form.nationalId || undefined,
