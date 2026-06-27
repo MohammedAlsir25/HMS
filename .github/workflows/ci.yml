@@ -53,8 +53,11 @@ jobs:
       - name: Generate Prisma client
         run: npm run prisma:generate
 
-      - name: Run migrations
-        run: npx prisma migrate deploy
+      - name: Push schema to DB
+        run: npx prisma db push
+
+      - name: Run seed
+        run: npx tsx prisma/seed.js
 
       - name: Typecheck
         run: npm run typecheck
