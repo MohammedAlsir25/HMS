@@ -8,5 +8,6 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/tests/setup.js'],
     css: true,
+    exclude: ['e2e/**', 'node_modules/**'],
   },
 });
