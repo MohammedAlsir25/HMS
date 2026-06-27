@@ -1,4 +1,4 @@
-# Al Jawahir Hospital
+# Al Jawarih
 
 [![Backend CI](https://github.com/moham/AL-Jawahir-Hospital/actions/workflows/backend.yml/badge.svg)](https://github.com/moham/AL-Jawahir-Hospital/actions/workflows/backend.yml)
 [![Frontend CI](https://github.com/moham/AL-Jawahir-Hospital/actions/workflows/frontend.yml/badge.svg)](https://github.com/moham/AL-Jawahir-Hospital/actions/workflows/frontend.yml)
@@ -147,7 +147,7 @@ See individual route files in `src/modules/*/*.routes.ts` for full endpoint list
 
 ```env
 # Database
-DATABASE_URL=postgresql://user:pass@localhost:5432/jawahir
+DATABASE_URL=postgresql://user:pass@localhost:5432/jawarih
 
 # JWT
 JWT_SECRET=your-secret

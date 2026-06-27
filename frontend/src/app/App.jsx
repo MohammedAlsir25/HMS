@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from '../stores/authStore';
 import { useUIStore } from '../stores/uiStore';
-import DotGrid from '../background/DotGrid';
+import LiquidEther from '../background/LiquidEther';
 import AppShell from '../components/layout/AppShell';
 import ErrorBoundary from '../components/ui/ErrorBoundary';
 import LoginPage from '../features/auth/LoginPage';
@@ -51,7 +51,7 @@ export default function App() {
     <div className={`${theme === 'dark' ? 'dark' : ''} bg-paper min-h-dvh`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <div className="relative min-h-dvh">
         <div className={`fixed inset-0 z-0 pointer-events-none ${theme !== 'dark' ? 'opacity-[0.35]' : ''}`}>
-          <DotGrid
+          <LiquidEther
             baseColor="#2F293A"
             activeColor={theme === 'dark' ? '#5227FF' : '#91e0ff'}
           />

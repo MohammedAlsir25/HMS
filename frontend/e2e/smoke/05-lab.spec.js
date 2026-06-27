@@ -4,7 +4,7 @@ test.describe('Lab Module — Smoke Tests', () => {
 
   test('dashboard shows Laboratory icon for lab technician', async ({ page }) => {
     await page.goto('/login', { waitUntil: 'networkidle' });
-    await page.fill('input[type="email"]', 'lab.tech@aljawahir.ae');
+    await page.fill('input[type="email"]', 'lab.tech@aljawarih.sd');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL(/\/dashboard/, { timeout: 30000 });
@@ -13,7 +13,7 @@ test.describe('Lab Module — Smoke Tests', () => {
 
   test('lab page renders with tabs and stats', async ({ page }) => {
     await page.goto('/login', { waitUntil: 'networkidle' });
-    await page.fill('input[type="email"]', 'lab.tech@aljawahir.ae');
+    await page.fill('input[type="email"]', 'lab.tech@aljawarih.sd');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL(/\/dashboard/, { timeout: 30000 });
@@ -29,7 +29,7 @@ test.describe('Lab Module — Smoke Tests', () => {
 
   test('NewRequestModal shows test categories', async ({ page }) => {
     await page.goto('/login', { waitUntil: 'networkidle' });
-    await page.fill('input[type="email"]', 'lab.tech@aljawahir.ae');
+    await page.fill('input[type="email"]', 'lab.tech@aljawarih.sd');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL(/\/dashboard/, { timeout: 30000 });
@@ -66,7 +66,7 @@ test.describe('Lab Module — Smoke Tests', () => {
     const loginRes = await (await fetch('http://127.0.0.1:4001/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'doctor.medicine@aljawahir.ae', password: 'password123' }),
+      body: JSON.stringify({ email: 'doctor.medicine@aljawarih.sd', password: 'password123' }),
     })).json();
     const token = loginRes.token;
     expect(token).toBeDefined();
@@ -105,7 +105,7 @@ test.describe('Lab Module — Smoke Tests', () => {
     expect(order).toHaveProperty('id');
 
     await page.goto('/login', { waitUntil: 'networkidle' });
-    await page.fill('input[type="email"]', 'lab.tech@aljawahir.ae');
+    await page.fill('input[type="email"]', 'lab.tech@aljawarih.sd');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL(/\/dashboard/, { timeout: 30000 });

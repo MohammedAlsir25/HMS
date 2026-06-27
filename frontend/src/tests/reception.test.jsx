@@ -40,7 +40,7 @@ describe('ReceptionPage', () => {
 describe('WaitingRoomTV', () => {
   it('renders hospital name and waiting room header', () => {
     render(<WithRouter><WaitingRoomTV /></WithRouter>);
-    expect(screen.getByText('AL Jawahir Hospital')).toBeInTheDocument();
+    expect(screen.getByText('Al Jawarih')).toBeInTheDocument();
     expect(screen.getByText('Waiting Room Status')).toBeInTheDocument();
   });
 

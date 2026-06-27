@@ -25,7 +25,7 @@ export default function WaitingRoomTV() {
     <div className="min-h-dvh bg-gradient-to-br from-gray-950 via-obsidian to-gray-900 text-paper p-6 flex flex-col">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">AL Jawahir Hospital</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Al Jawarih</h1>
           <p className="text-base text-slate mt-0.5">Waiting Room Status</p>
         </div>
         <div className="text-right">

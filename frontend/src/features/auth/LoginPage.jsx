@@ -39,9 +39,9 @@ export default function LoginPage() {
     <div className="min-h-dvh flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-            <img src="/logo.png" alt="AL Jawahir Hospital" className="h-14 w-auto mb-2" />
+            <img src="/logo.png" alt="Al Jawarih" className="h-14 w-auto mb-2" />
           <h1 className="text-heading-sm font-switzer font-semibold text-obsidian text-center">
-            AL Jawahir Hospital
+            Al Jawarih
           </h1>
           <p className="text-body text-slate mt-1">{t('login.subtitle')}</p>
         </div>
@@ -53,7 +53,7 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="doctor@aljawahir.ae"
+              placeholder="doctor@aljawarih.sd"
               autoComplete="email"
               required
             />
@@ -78,7 +78,7 @@ export default function LoginPage() {
         </Card>
 
         <p className="text-center text-caption text-slate mt-6">
-          Demo accounts: admin@aljawahir.ae / reception@aljawahir.ae / doctor.medicine@aljawahir.ae — password: password123
+          Demo accounts: admin@aljawarih.sd / reception@aljawarih.sd / doctor.medicine@aljawarih.sd — password: password123
         </p>
       </div>
     </div>

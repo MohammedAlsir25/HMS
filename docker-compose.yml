@@ -22,7 +22,7 @@ services:
     container_name: jh-pgadmin
     restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@aljawahir.ae
+      PGADMIN_DEFAULT_EMAIL: admin@aljawarih.sd
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin_pass_2026}
     ports:
       - '5050:80'

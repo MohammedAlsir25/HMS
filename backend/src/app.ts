@@ -25,12 +25,20 @@ import appointmentsRoutes from './modules/appointments/appointments.routes.js';
 const app = express();
 
 app.use(helmet());
+const capacitorOrigins = [
+  'capacitor://localhost',
+  'http://localhost',
+  'ionic://localhost',
+];
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin) return cb(null, true);
     const normalize = (s: string) => s.replace(/\/+$/, '');
-    const allowed = normalize(config.frontendUrl);
-    cb(null, allowed === normalize(origin));
+    const allowed = [
+      normalize(config.frontendUrl),
+      ...capacitorOrigins.map((o) => normalize(o)),
+    ];
+    cb(null, allowed.includes(normalize(origin)));
   },
   credentials: true,
 }));

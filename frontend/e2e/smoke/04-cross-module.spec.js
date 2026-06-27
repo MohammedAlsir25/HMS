@@ -7,7 +7,7 @@ test.describe('Cross-Module — Referral Flow', () => {
     const loginRes = await (await fetch('http://127.0.0.1:4001/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'reception@aljawahir.ae', password: 'password123' }),
+      body: JSON.stringify({ email: 'reception@aljawarih.sd', password: 'password123' }),
     })).json();
     const token = loginRes.token;
     expect(token).toBeDefined();
@@ -16,7 +16,7 @@ test.describe('Cross-Module — Referral Flow', () => {
     const patient = await createTestPatientViaAPI(request, token);
     await checkInPatient(request, token, patient.id, medicineClinic.id);
 
-    await loginAs(page, 'doctor.medicine@aljawahir.ae', 'password123');
+    await loginAs(page, 'doctor.medicine@aljawarih.sd', 'password123');
     await expect(page).toHaveURL(/\/clinic\/medicine/);
 
     await expect(page.getByText(patient.mrn).first()).toBeVisible({ timeout: 20000 });

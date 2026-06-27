@@ -40,10 +40,10 @@ async function main() {
   const passwordHash = await bcrypt.hash('password123', 12);
 
   await prisma.user.upsert({
-    where: { email: 'admin@aljawahir.ae' },
+    where: { email: 'admin@aljawarih.sd' },
     update: {},
     create: {
-      email: 'admin@aljawahir.ae',
+      email: 'admin@aljawarih.sd',
       passwordHash,
       fullName: 'Admin User',
       roleId: roles.SUPER_ADMIN.id,
@@ -51,15 +51,15 @@ async function main() {
   });
 
   const doctorClinicPairs = [
-    { email: 'doctor.medicine@aljawahir.ae', name: 'Dr. Ahmed', clinicIdx: 0 },
-    { email: 'doctor.ent@aljawahir.ae', name: 'Dr. Fatima', clinicIdx: 1 },
-    { email: 'doctor.dental@aljawahir.ae', name: 'Dr. Hassan', clinicIdx: 2 },
-    { email: 'doctor.retina@aljawahir.ae', name: 'Dr. Noor', clinicIdx: 3 },
-    { email: 'doctor.glaucoma@aljawahir.ae', name: 'Dr. Layla', clinicIdx: 4 },
-    { email: 'doctor.orbit@aljawahir.ae', name: 'Dr. Omar', clinicIdx: 5 },
-    { email: 'doctor.peds@aljawahir.ae', name: 'Dr. Sara', clinicIdx: 6 },
-    { email: 'doctor.ophth@aljawahir.ae', name: 'Dr. Khalid', clinicIdx: 7 },
-    { email: 'doctor.optometry@aljawahir.ae', name: 'Dr. Mariam', clinicIdx: 8 },
+    { email: 'doctor.medicine@aljawarih.sd', name: 'Dr. Ahmed', clinicIdx: 0 },
+    { email: 'doctor.ent@aljawarih.sd', name: 'Dr. Fatima', clinicIdx: 1 },
+    { email: 'doctor.dental@aljawarih.sd', name: 'Dr. Hassan', clinicIdx: 2 },
+    { email: 'doctor.retina@aljawarih.sd', name: 'Dr. Noor', clinicIdx: 3 },
+    { email: 'doctor.glaucoma@aljawarih.sd', name: 'Dr. Layla', clinicIdx: 4 },
+    { email: 'doctor.orbit@aljawarih.sd', name: 'Dr. Omar', clinicIdx: 5 },
+    { email: 'doctor.peds@aljawarih.sd', name: 'Dr. Sara', clinicIdx: 6 },
+    { email: 'doctor.ophth@aljawarih.sd', name: 'Dr. Khalid', clinicIdx: 7 },
+    { email: 'doctor.optometry@aljawarih.sd', name: 'Dr. Mariam', clinicIdx: 8 },
   ];
 
   for (const pair of doctorClinicPairs) {
@@ -77,10 +77,10 @@ async function main() {
   }
 
   await prisma.user.upsert({
-    where: { email: 'reception@aljawahir.ae' },
+    where: { email: 'reception@aljawarih.sd' },
     update: {},
     create: {
-      email: 'reception@aljawahir.ae',
+      email: 'reception@aljawarih.sd',
       passwordHash,
       fullName: 'Reception Staff',
       roleId: roles.RECEPTIONIST.id,
@@ -88,10 +88,10 @@ async function main() {
   });
 
   await prisma.user.upsert({
-    where: { email: 'lab.tech@aljawahir.ae' },
+    where: { email: 'lab.tech@aljawarih.sd' },
     update: {},
     create: {
-      email: 'lab.tech@aljawahir.ae',
+      email: 'lab.tech@aljawarih.sd',
       passwordHash,
       fullName: 'Lab Technician',
       roleId: roles.LAB_TECHNICIAN.id,
@@ -99,10 +99,10 @@ async function main() {
   });
 
   await prisma.user.upsert({
-    where: { email: 'pharmacy@aljawahir.ae' },
+    where: { email: 'pharmacy@aljawarih.sd' },
     update: {},
     create: {
-      email: 'pharmacy@aljawahir.ae',
+      email: 'pharmacy@aljawarih.sd',
       passwordHash,
       fullName: 'Pharmacist',
       roleId: roles.PHARMACIST.id,
@@ -110,10 +110,10 @@ async function main() {
   });
 
   await prisma.user.upsert({
-    where: { email: 'optics@aljawahir.ae' },
+    where: { email: 'optics@aljawarih.sd' },
     update: {},
     create: {
-      email: 'optics@aljawahir.ae',
+      email: 'optics@aljawarih.sd',
       passwordHash,
       fullName: 'Optician',
       roleId: roles.OPTICIAN.id,

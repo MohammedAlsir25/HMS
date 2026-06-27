@@ -27,7 +27,7 @@ async function checkIfSeeded() {
     });
     req.on('error', () => resolvePromise(false));
     req.on('timeout', () => { req.destroy(); resolvePromise(false); });
-    req.write(JSON.stringify({ email: 'reception@aljawahir.ae', password: 'password123' }));
+    req.write(JSON.stringify({ email: 'reception@aljawarih.sd', password: 'password123' }));
     req.end();
   });
 }

@@ -5,3 +5,13 @@ build/
 *.log
 .DS_Store
 frontend/test-results/
+migration_diff.sql
+schema_full.sql
+frontend/android/.gradle/
+frontend/android/build/
+frontend/android/app/build/
+frontend/android/local.properties
+frontend/android/capacitor-cordova-android-plugins/build/
+frontend/android/capacitor-cordova-android-plugins/.cxx/
+*.apk
+*.aab

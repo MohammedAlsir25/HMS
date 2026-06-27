@@ -42,7 +42,7 @@ export default function AppShell({ children }) {
           <div className="flex-1 flex justify-center">
             <img
               src="/logo.png"
-              alt="AL Jawahir Hospital"
+              alt="Al Jawarih"
               className={`h-9 w-auto transition-opacity duration-200 ${isAdmin && menuOpen ? 'invisible' : ''}`}
             />
           </div>

@@ -24,7 +24,7 @@ test.describe('Glaucoma Clinic — Full Consultation Workflow', () => {
     const loginRes = await (await fetch('http://127.0.0.1:4001/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'reception@aljawahir.ae', password: 'password123' }),
+      body: JSON.stringify({ email: 'reception@aljawarih.sd', password: 'password123' }),
     })).json();
     const token = loginRes.token;
     expect(token).toBeDefined();
@@ -33,7 +33,7 @@ test.describe('Glaucoma Clinic — Full Consultation Workflow', () => {
     const patient = await createTestPatientViaAPI(request, token);
     await checkInPatient(request, token, patient.id, clinic.id);
 
-    await loginAsDoctor(page, 'doctor.glaucoma@aljawahir.ae', 'glaucoma');
+    await loginAsDoctor(page, 'doctor.glaucoma@aljawarih.sd', 'glaucoma');
 
     await expect(page.getByText(patient.mrn).first()).toBeVisible({ timeout: 15000 });
     await page.getByRole('button', { name: 'See Patient' }).first().click();

@@ -5,7 +5,7 @@ test.describe('Reception — Patient Intake API Flow', () => {
 
   test('register patient and check into glaucoma clinic via API', async ({ page, request }) => {
     // Login as receptionist to get auth token
-    await loginAs(page, 'reception@aljawahir.ae', 'password123');
+    await loginAs(page, 'reception@aljawarih.sd', 'password123');
     await expect(page).toHaveURL(/\/dashboard/);
 
     // Get auth token from localStorage

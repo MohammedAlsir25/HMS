@@ -73,13 +73,13 @@ describe('Auth API - /api/auth', () => {
     it('should reject wrong password', async () => {
       const res = await request(app)
         .post('/api/auth/login')
-        .send({ email: 'admin@aljawahir.ae', password: 'wrongpassword' });
+        .send({ email: 'admin@aljawarih.sd', password: 'wrongpassword' });
       expect([401, 429, 500]).toContain(res.status);
     });
 
     const rateLimitTest = config.nodeEnv === 'production' ? it : it.skip;
     rateLimitTest('rate limiting should trigger after exceeding max attempts', async () => {
-      const payload = { email: 'ratelimit-test@aljawahir.ae', password: 'wrongpass' };
+      const payload = { email: 'ratelimit-test@aljawarih.sd', password: 'wrongpass' };
       for (let i = 0; i < 5; i++) {
         await request(app).post('/api/auth/login').send(payload);
       }

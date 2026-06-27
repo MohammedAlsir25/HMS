@@ -279,7 +279,7 @@ function NewRequestModal({ open, onClose, onCreated }) {
                             )}
                           </div>
                           {test.price != null && (
-                            <span className="text-caption text-slate shrink-0">AED {Number(test.price).toFixed(0)}</span>
+                            <span className="text-caption text-slate shrink-0">SDG {Number(test.price).toFixed(0)}</span>
                           )}
                         </label>
                       ))}
@@ -365,7 +365,7 @@ function CatalogManager({ onRefresh }) {
           { key: 'specimen', label: t('lab.specimen') },
           { key: 'unit', label: t('lab.unit') },
           { key: 'refRange', label: t('lab.refRange') },
-          { key: 'price', label: t('lab.price'), render: (v) => v != null ? `AED ${Number(v).toFixed(2)}` : '-' },
+          { key: 'price', label: t('lab.price'), render: (v) => v != null ? `SDG ${Number(v).toFixed(2)}` : '-' },
           { key: 'actions', label: t('lab.actions'), render: (row) => (
             <button onClick={() => setEditTest(row)} className="text-lilac-bloom hover:underline text-caption">
               {t('common.edit')}
@@ -454,7 +454,7 @@ export default function LabDashboard() {
         orderIds: selectedForBilling,
         paymentMethod: billingPaymentMethod,
       });
-      alert(`Invoice created: AED ${Number(result.totalAmount).toFixed(2)} for ${result.orderCount} orders`);
+      alert(`Invoice created: SDG ${Number(result.totalAmount).toFixed(2)} for ${result.orderCount} orders`);
       setSelectedForBilling([]);
     } catch (err) {
       alert(err.message || 'Checkout failed');
@@ -660,7 +660,7 @@ export default function LabDashboard() {
               { key: 'tests', header: 'Tests', render: (r) => (r.tests || []).map((t) => t.test?.name).join(', ') || '-' },
               { key: 'total', header: 'Total', render: (r) => {
                 const total = (r.tests || []).reduce((s, t) => s + Number(t.test?.price || 0), 0);
-                return <span className="font-semibold">AED {total.toFixed(2)}</span>;
+                return <span className="font-semibold">SDG {total.toFixed(2)}</span>;
               }},
               { key: 'createdAt', header: 'Date', render: (r) => new Date(r.createdAt).toLocaleDateString() },
             ]}

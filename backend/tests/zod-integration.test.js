@@ -7,7 +7,7 @@ let token = null;
 beforeAll(async () => {
   const res = await request(app)
     .post('/api/auth/login')
-    .send({ email: 'admin@aljawahir.ae', password: 'password123' });
+    .send({ email: 'admin@aljawarih.sd', password: 'password123' });
   if (res.status === 200) token = res.body.token;
 });
 

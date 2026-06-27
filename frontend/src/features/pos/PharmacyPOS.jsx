@@ -92,7 +92,7 @@ export default function PharmacyPOS() {
             <div className="space-y-2">
               <div className="flex justify-between text-body">
                 <span className="text-graphite">Amount</span>
-                <span className="font-semibold text-obsidian">${Number(receipt.amount).toFixed(2)}</span>
+                <span className="font-semibold text-obsidian">SDG ${Number(receipt.amount).toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-body">
                 <span className="text-graphite">Payment</span>
@@ -199,7 +199,7 @@ export default function PharmacyPOS() {
                         <p className="text-caption text-slate">{item.sku} · Stock: {item.quantity}</p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0 ml-2">
-                        <span className="text-body font-medium text-obsidian">${Number(item.price).toFixed(2)}</span>
+                        <span className="text-body font-medium text-obsidian">SDG ${Number(item.price).toFixed(2)}</span>
                         <Button size="sm" onClick={() => addToCart(item)} disabled={item.quantity < 1}>Add</Button>
                       </div>
                     </div>
@@ -222,7 +222,7 @@ export default function PharmacyPOS() {
                 <div key={c.id} className="flex items-center justify-between pb-2 border-b border-bone last:border-0">
                   <div className="min-w-0 flex-1">
                     <p className="text-body text-obsidian truncate">{c.name}</p>
-                    <p className="text-caption text-slate">${c.price.toFixed(2)} each</p>
+                    <p className="text-caption text-slate">SDG ${c.price.toFixed(2)} each</p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0 ml-2">
                     <select
@@ -244,7 +244,7 @@ export default function PharmacyPOS() {
                 <div className="pt-2 border-t border-silver">
                   <div className="flex justify-between text-body font-semibold">
                     <span>Total</span>
-                    <span>${total.toFixed(2)}</span>
+                    <span>SDG ${total.toFixed(2)}</span>
                   </div>
                 </div>
               )}
@@ -274,7 +274,7 @@ export default function PharmacyPOS() {
                   </div>
                 </div>
                 <Button className="w-full" onClick={handleComplete} disabled={completing}>
-                  {completing ? 'Processing...' : `Charge $${total.toFixed(2)}`}
+                  {completing ? 'Processing...' : `Charge SDG ${total.toFixed(2)}`}
                 </Button>
               </CardContent>
             </Card>

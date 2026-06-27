@@ -28,7 +28,7 @@ test.describe('Referral — Pharmacy & Lab Flow', () => {
     const loginRes = await (await fetch('http://127.0.0.1:4001/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'reception@aljawahir.ae', password: 'password123' }),
+      body: JSON.stringify({ email: 'reception@aljawarih.sd', password: 'password123' }),
     })).json();
     const token = loginRes.token;
     expect(token).toBeDefined();
@@ -37,7 +37,7 @@ test.describe('Referral — Pharmacy & Lab Flow', () => {
     const patient = await createTestPatientViaAPI(request, token);
     await checkInPatient(request, token, patient.id, medicineClinic.id);
 
-    const doctorRes = await loginAsDoctorViaAPI(page, 'doctor.medicine@aljawahir.ae', 'medicine');
+    const doctorRes = await loginAsDoctorViaAPI(page, 'doctor.medicine@aljawarih.sd', 'medicine');
     await expect(page.getByText(patient.mrn).first()).toBeVisible({ timeout: 20000 });
 
     await page.getByRole('button', { name: 'See Patient' }).first().click();
@@ -84,14 +84,14 @@ test.describe('Referral — Pharmacy & Lab Flow', () => {
     const docRes = await (await fetch('http://127.0.0.1:4001/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'doctor.medicine@aljawahir.ae', password: 'password123' }),
+      body: JSON.stringify({ email: 'doctor.medicine@aljawarih.sd', password: 'password123' }),
     })).json();
     expect(docRes.token).toBeDefined();
 
     const recepRes = await (await fetch('http://127.0.0.1:4001/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'reception@aljawahir.ae', password: 'password123' }),
+      body: JSON.stringify({ email: 'reception@aljawarih.sd', password: 'password123' }),
     })).json();
 
     const clinic = await getClinicBySlug(request, recepRes.token, 'medicine');
@@ -113,7 +113,7 @@ test.describe('Referral — Pharmacy & Lab Flow', () => {
     const pharmRes = await (await fetch('http://127.0.0.1:4001/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'pharmacy@aljawahir.ae', password: 'password123' }),
+      body: JSON.stringify({ email: 'pharmacy@aljawarih.sd', password: 'password123' }),
     })).json();
     expect(pharmRes.token).toBeDefined();
 
@@ -138,7 +138,7 @@ test.describe('Referral — Pharmacy & Lab Flow', () => {
     const loginRes = await (await fetch('http://127.0.0.1:4001/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'doctor.medicine@aljawahir.ae', password: 'password123' }),
+      body: JSON.stringify({ email: 'doctor.medicine@aljawarih.sd', password: 'password123' }),
     })).json();
     const doctorToken = loginRes.token;
     expect(doctorToken).toBeDefined();
@@ -146,7 +146,7 @@ test.describe('Referral — Pharmacy & Lab Flow', () => {
     const loginResReception = await (await fetch('http://127.0.0.1:4001/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'reception@aljawahir.ae', password: 'password123' }),
+      body: JSON.stringify({ email: 'reception@aljawarih.sd', password: 'password123' }),
     })).json();
     const receptionToken = loginResReception.token;
 
@@ -162,7 +162,7 @@ test.describe('Referral — Pharmacy & Lab Flow', () => {
     expect(testCatalog.length).toBeGreaterThan(0);
     const testIds = testCatalog.slice(0, 2).map(t => t.id);
 
-    await loginAsDoctorViaAPI(page, 'doctor.medicine@aljawahir.ae', 'medicine');
+    await loginAsDoctorViaAPI(page, 'doctor.medicine@aljawarih.sd', 'medicine');
     await expect(page.getByText(patient.mrn).first()).toBeVisible({ timeout: 20000 });
 
     await page.getByRole('button', { name: 'See Patient' }).first().click();
@@ -209,7 +209,7 @@ test.describe('Referral — Pharmacy & Lab Flow', () => {
     const res = await (await fetch('http://127.0.0.1:4001/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'lab.tech@aljawahir.ae', password: 'password123' }),
+      body: JSON.stringify({ email: 'lab.tech@aljawarih.sd', password: 'password123' }),
     })).json();
     expect(res.token).toBeDefined();
 

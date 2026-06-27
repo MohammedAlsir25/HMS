@@ -192,9 +192,9 @@ export default function OpticsProducts() {
         </span>
       ),
     },
-    { key: "price", label: "Selling Price", render: (row) => `$${Number(row.price).toFixed(2)}` },
-    { key: "costPrice", label: "Unit Cost", render: (row) => `$${Number(row.costPrice).toFixed(2)}` },
-    { key: "totalValue", label: "Total Value", render: (row) => `$${(Number(row.costPrice) * row.quantity).toFixed(2)}` },
+    { key: "price", label: "Selling Price", render: (row) => `SDG ${Number(row.price).toFixed(2)}` },
+    { key: "costPrice", label: "Unit Cost", render: (row) => `SDG ${Number(row.costPrice).toFixed(2)}` },
+    { key: "totalValue", label: "Total Value", render: (row) => `SDG ${(Number(row.costPrice) * row.quantity).toFixed(2)}` },
     { key: "minStock", label: t("opticsProducts.colMinStock") },
     {
       key: "status",

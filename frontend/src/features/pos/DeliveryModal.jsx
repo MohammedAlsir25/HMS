@@ -104,9 +104,9 @@ export default function DeliveryModal({ open, onClose, category, onSuccess }) {
             onChange={(e) => setForm({ ...form, receivedAt: e.target.value })} />
         </div>
         <div className="grid grid-cols-3 gap-3">
-          <Input label="Invoice Total ($)" type="number" min="0" step="0.01" value={form.invoiceTotal}
+          <Input label="Invoice Total (SDG)" type="number" min="0" step="0.01" value={form.invoiceTotal}
             onChange={(e) => setForm({ ...form, invoiceTotal: e.target.value })} required />
-          <Input label="Amount Paid ($)" type="number" min="0" step="0.01" value={form.amountPaid}
+          <Input label="Amount Paid (SDG)" type="number" min="0" step="0.01" value={form.amountPaid}
             onChange={(e) => setForm({ ...form, amountPaid: e.target.value })} />
           <div>
             <label className="text-sm font-medium text-graphite block mb-1">Payment Status</label>
@@ -148,7 +148,7 @@ export default function DeliveryModal({ open, onClose, category, onSuccess }) {
               <div className="col-span-2 flex items-end gap-1">
                 <div className="flex-1 text-right">
                   <label className="text-xs text-slate block mb-1">Total</label>
-                  <p className="text-caption font-medium text-obsidian py-1.5">${lineTotal(idx).toFixed(2)}</p>
+                  <p className="text-caption font-medium text-obsidian py-1.5">SDG ${lineTotal(idx).toFixed(2)}</p>
                 </div>
                 {items.length > 1 && (
                   <button type="button" className="text-slate hover:text-red-500 p-1 mt-5"
@@ -160,7 +160,7 @@ export default function DeliveryModal({ open, onClose, category, onSuccess }) {
             </div>
           ))}
           <div className="flex justify-between text-caption text-slate pt-1">
-            <span>Items Total: <strong className="text-obsidian">${itemsTotal.toFixed(2)}</strong></span>
+            <span>Items Total: <strong className="text-obsidian">SDG ${itemsTotal.toFixed(2)}</strong></span>
             {form.invoiceTotal && Math.abs(itemsTotal - Number(form.invoiceTotal)) > 0.01 && (
               <span className="text-yellow-600">Mismatch with invoice total</span>
             )}
