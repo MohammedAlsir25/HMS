@@ -11,12 +11,12 @@ import { Modal } from '../../components/ui/Modal';
 const columns = [
   { key: 'sku', header: 'SKU' },
   { key: 'name', header: 'Name' },
-  { key: 'category', header: 'Category', render: (v) => <Badge>{v}</Badge> },
-  { key: 'quantity', header: 'Qty', render: (v, row) => (
-    <span className={v <= row.minStock ? 'text-red-500 dark:text-red-400 font-semibold' : ''}>{v}</span>
+  { key: 'category', header: 'Category', render: (row) => <Badge>{row.category}</Badge> },
+  { key: 'quantity', header: 'Qty', render: (row) => (
+    <span className={row.quantity <= row.minStock ? 'text-red-500 dark:text-red-400 font-semibold' : ''}>{row.quantity}</span>
   )},
-  { key: 'price', header: 'Price', render: (v) => `$${Number(v).toFixed(2)}` },
-  { key: 'costPrice', header: 'Cost', render: (v) => v ? `$${Number(v).toFixed(2)}` : '-' },
+  { key: 'price', header: 'Price', render: (row) => `SDG ${Number(row.price).toFixed(2)}` },
+  { key: 'costPrice', header: 'Cost', render: (row) => row.costPrice ? `SDG ${Number(row.costPrice).toFixed(2)}` : '-' },
   { key: 'minStock', header: 'Min Stock' },
 ];
 
@@ -116,8 +116,8 @@ export default function InventoryPage() {
                   <p className="text-body"><span className="font-medium">SKU:</span> {selectedItem.sku}</p>
                   <p className="text-body"><span className="font-medium">Category:</span> {selectedItem.category}</p>
                   <p className="text-body"><span className="font-medium">Quantity:</span> {selectedItem.quantity}</p>
-                  <p className="text-body"><span className="font-medium">Price:</span> ${Number(selectedItem.price).toFixed(2)}</p>
-                  {selectedItem.costPrice != null && <p className="text-body"><span className="font-medium">Cost:</span> ${Number(selectedItem.costPrice).toFixed(2)}</p>}
+                  <p className="text-body"><span className="font-medium">Price:</span> SDG {Number(selectedItem.price).toFixed(2)}</p>
+                  {selectedItem.costPrice != null && <p className="text-body"><span className="font-medium">Cost:</span> SDG {Number(selectedItem.costPrice).toFixed(2)}</p>}
                   <p className="text-body"><span className="font-medium">Min Stock:</span> {selectedItem.minStock}</p>
                   {selectedItem.quantity <= selectedItem.minStock && (
                     <Badge variant="danger">Low Stock</Badge>
