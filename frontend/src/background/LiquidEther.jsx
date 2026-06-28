@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import './LiquidEther.css';
 
@@ -25,6 +25,7 @@ export default function LiquidEther({
 }) {
   const mountRef = useRef(null);
   const webglRef = useRef(null);
+  const [hasWebGL, setHasWebGL] = useState(true);
   const resizeObserverRef = useRef(null);
   const rafRef = useRef(null);
   const intersectionObserverRef = useRef(null);
@@ -773,8 +774,21 @@ export default function LiquidEther({
         this.createShaderPass();
       }
       getFloatType() {
-        const isIOS = /(iPad|iPhone|iPod)/i.test(navigator.userAgent);
-        return isIOS ? THREE.HalfFloatType : THREE.FloatType;
+        try {
+          const gl = Common.renderer.getContext();
+          const isWebGL2 = typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext;
+          const texFloat = gl.getExtension('OES_texture_float');
+          const texHalfFloat = gl.getExtension('OES_texture_half_float');
+          const canRenderFloat = isWebGL2 || !!gl.getExtension('EXT_color_buffer_float') || !!gl.getExtension('WEBGL_color_buffer_float');
+          const canRenderHalfFloat = isWebGL2 || !!gl.getExtension('EXT_color_buffer_half_float');
+          if (texFloat && canRenderFloat) return THREE.FloatType;
+          if (texHalfFloat && canRenderHalfFloat) return THREE.HalfFloatType;
+          console.warn('LiquidEther: no float texture support, forcing HalfFloatType');
+          return THREE.HalfFloatType;
+        } catch (e) {
+          console.warn('LiquidEther: error detecting float type, defaulting to HalfFloatType');
+          return THREE.HalfFloatType;
+        }
       }
       createAllFBO() {
         const type = this.getFloatType();
@@ -1006,71 +1020,76 @@ export default function LiquidEther({
 
     const container = mountRef.current;
     container.style.position = container.style.position || 'relative';
-    container.style.overflow = container.style.overflow || 'hidden';
+    container.style.overflow = container.style.overflow || 'overflow';
 
-    const webgl = new WebGLManager({
-      $wrapper: container,
-      autoDemo,
-      autoSpeed,
-      autoIntensity,
-      takeoverDuration,
-      autoResumeDelay,
-      autoRampDuration
-    });
-    webglRef.current = webgl;
-
-    const applyOptionsFromProps = () => {
-      if (!webglRef.current) return;
-      const sim = webglRef.current.output?.simulation;
-      if (!sim) return;
-      const prevRes = sim.options.resolution;
-      Object.assign(sim.options, {
-        mouse_force: mouseForce,
-        cursor_size: cursorSize,
-        isViscous,
-        viscous,
-        iterations_viscous: iterationsViscous,
-        iterations_poisson: iterationsPoisson,
-        dt,
-        BFECC,
-        resolution,
-        isBounce
+    try {
+      const webgl = new WebGLManager({
+        $wrapper: container,
+        autoDemo,
+        autoSpeed,
+        autoIntensity,
+        takeoverDuration,
+        autoResumeDelay,
+        autoRampDuration
       });
-      if (resolution !== prevRes) {
-        sim.resize();
-      }
-    };
-    applyOptionsFromProps();
+      webglRef.current = webgl;
 
-    webgl.start();
-
-    const io = new IntersectionObserver(
-      entries => {
-        const entry = entries[0];
-        const isVisible = entry.isIntersecting && entry.intersectionRatio > 0;
-        isVisibleRef.current = isVisible;
+      const applyOptionsFromProps = () => {
         if (!webglRef.current) return;
-        if (isVisible && !document.hidden) {
-          webglRef.current.start();
-        } else {
-          webglRef.current.pause();
+        const sim = webglRef.current.output?.simulation;
+        if (!sim) return;
+        const prevRes = sim.options.resolution;
+        Object.assign(sim.options, {
+          mouse_force: mouseForce,
+          cursor_size: cursorSize,
+          isViscous,
+          viscous,
+          iterations_viscous: iterationsViscous,
+          iterations_poisson: iterationsPoisson,
+          dt,
+          BFECC,
+          resolution,
+          isBounce
+        });
+        if (resolution !== prevRes) {
+          sim.resize();
         }
-      },
-      { threshold: [0, 0.01, 0.1] }
-    );
-    io.observe(container);
-    intersectionObserverRef.current = io;
+      };
+      applyOptionsFromProps();
 
-    const ro = new ResizeObserver(() => {
-      if (!webglRef.current) return;
-      if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current);
-      resizeRafRef.current = requestAnimationFrame(() => {
+      webgl.start();
+
+      const io = new IntersectionObserver(
+        entries => {
+          const entry = entries[0];
+          const isVisible = entry.isIntersecting && entry.intersectionRatio > 0;
+          isVisibleRef.current = isVisible;
+          if (!webglRef.current) return;
+          if (isVisible && !document.hidden) {
+            webglRef.current.start();
+          } else {
+            webglRef.current.pause();
+          }
+        },
+        { threshold: [0, 0.01, 0.1] }
+      );
+      io.observe(container);
+      intersectionObserverRef.current = io;
+
+      const ro = new ResizeObserver(() => {
         if (!webglRef.current) return;
-        webglRef.current.resize();
+        if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current);
+        resizeRafRef.current = requestAnimationFrame(() => {
+          if (!webglRef.current) return;
+          webglRef.current.resize();
+        });
       });
-    });
-    ro.observe(container);
-    resizeObserverRef.current = ro;
+      ro.observe(container);
+      resizeObserverRef.current = ro;
+    } catch (e) {
+      console.error('LiquidEther: WebGL initialization failed', e);
+      setHasWebGL(false);
+    }
 
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -1163,5 +1182,15 @@ export default function LiquidEther({
     autoRampDuration
   ]);
 
-  return <div ref={mountRef} className={`liquid-ether-container ${className || ''}`} style={style} />;
+  const bgGradient = colors.length >= 2
+    ? `linear-gradient(135deg, ${colors[0]}22, ${colors[1] || colors[0]}22)`
+    : `linear-gradient(135deg, ${colors[0]}22, ${colors[0]}44)`;
+
+  return (
+    <div
+      ref={mountRef}
+      className={`liquid-ether-container ${className || ''}`}
+      style={!hasWebGL ? { ...style, background: bgGradient } : style}
+    />
+  );
 }

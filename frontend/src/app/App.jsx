@@ -52,8 +52,7 @@ export default function App() {
       <div className="relative min-h-dvh">
         <div className={`fixed inset-0 z-0 pointer-events-none ${theme !== 'dark' ? 'opacity-[0.35]' : ''}`}>
           <LiquidEther
-            baseColor="#2F293A"
-            activeColor={theme === 'dark' ? '#5227FF' : '#91e0ff'}
+            colors={theme === 'dark' ? ['#5227FF', '#FF9FFC', '#B497CF'] : ['#91e0ff', '#7ec8e0', '#6ab0d0']}
           />
         </div>
         <div className="relative z-10">
