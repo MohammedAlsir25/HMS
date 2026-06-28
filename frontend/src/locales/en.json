@@ -34,6 +34,7 @@
   "login.password": "Password",
   "login.passwordPlaceholder": "Enter your password",
   "login.submit": "Sign In",
+  "login.signIn": "Login",
   "login.signingIn": "Signing in...",
   "login.error": "Invalid email or password",
   "login.loginFailed": "Login failed",

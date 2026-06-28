@@ -34,6 +34,7 @@
   "login.password": "كلمة المرور",
   "login.passwordPlaceholder": "أدخل كلمة المرور",
   "login.submit": "تسجيل الدخول",
+  "login.signIn": "تسجيل الدخول",
   "login.signingIn": "جاري تسجيل الدخول...",
   "login.error": "بريد إلكتروني أو كلمة مرور غير صالحة",
   "login.loginFailed": "فشل تسجيل الدخول",
