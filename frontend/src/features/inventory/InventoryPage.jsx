@@ -67,7 +67,7 @@ export default function InventoryPage() {
   const lowStockCount = items.filter((i) => i.quantity <= i.minStock).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-obsidian">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-heading-sm font-semibold text-obsidian">Inventory</h1>
@@ -180,8 +180,8 @@ export default function InventoryPage() {
               className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
               <option value="">Select category</option>
               <option value="medication">Medication</option>
-              <option value="consumable">Consumable</option>
-              <option value="instrument">Instrument</option>
+              <option value="consumable">Medical Consumable</option>
+              <option value="instrument">Medical Devices</option>
               <option value="frame">Frame</option>
               <option value="lens">Lens</option>
               <option value="other">Other</option>
