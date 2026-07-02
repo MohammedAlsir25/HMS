@@ -35,6 +35,8 @@ export default function HRPage() {
   const [userRoleId, setUserRoleId] = useState('');
   const [payForm, setPayForm] = useState({ employeeId: '', period: '', grossPay: 0, deductions: 0, notes: '' });
   const [leaveForm, setLeaveForm] = useState({ employeeId: '', type: 'ANNUAL', startDate: '', endDate: '', reason: '' });
+  const [mutationLoading, setMutationLoading] = useState(false);
+  const [mutationError, setMutationError] = useState('');
 
   const { data: employees = [], isLoading: loadingEmp } = useHREmployees();
   const { data: payroll = [], isLoading: loadingPay } = useHRPayroll();
@@ -48,6 +50,8 @@ export default function HRPage() {
 
   const handleCreateEmployee = async (e) => {
     e.preventDefault();
+    setMutationError('');
+    setMutationLoading(true);
     try {
       await api.post('/hr/employees', { ...empForm, createUser, userEmail, userPassword, userRoleId });
       setShowEmpModal(false);
@@ -58,52 +62,81 @@ export default function HRPage() {
       setUserRoleId('');
       queryClient.invalidateQueries({ queryKey: hrKeys.employees });
     } catch (err) {
-      alert(err.message || 'Failed to create employee');
+      setMutationError(err.message || 'Failed to create employee');
+    } finally {
+      setMutationLoading(false);
     }
   };
 
   const handleCreatePayroll = async (e) => {
     e.preventDefault();
+    setMutationError('');
+    setMutationLoading(true);
     try {
       await api.post('/hr/payroll', payForm);
       setShowPayrollModal(false);
       setPayForm({ employeeId: '', period: '', grossPay: 0, deductions: 0, notes: '' });
       queryClient.invalidateQueries({ queryKey: hrKeys.payroll });
     } catch (err) {
-      alert(err.message || 'Failed to create payroll record');
+      setMutationError(err.message || 'Failed to create payroll record');
+    } finally {
+      setMutationLoading(false);
     }
   };
 
   const handlePayrollStatus = async (id, status) => {
+    setMutationError('');
+    setMutationLoading(true);
     try {
       await updatePayrollStatus.mutateAsync({ id, status });
     } catch (err) {
-      alert(err.message || 'Failed to update payroll status');
+      setMutationError(err.message || 'Failed to update payroll status');
+    } finally {
+      setMutationLoading(false);
     }
   };
 
   const handleCreateLeave = async (e) => {
     e.preventDefault();
+    setMutationError('');
+    setMutationLoading(true);
     try {
       await api.post('/hr/leaves', leaveForm);
       setShowLeaveModal(false);
       setLeaveForm({ employeeId: '', type: 'ANNUAL', startDate: '', endDate: '', reason: '' });
       queryClient.invalidateQueries({ queryKey: hrKeys.leaves });
     } catch (err) {
-      alert(err.message || 'Failed to create leave request');
+      setMutationError(err.message || 'Failed to create leave request');
+    } finally {
+      setMutationLoading(false);
     }
   };
 
   const handleLeaveStatus = async (id, status) => {
+    setMutationError('');
+    setMutationLoading(true);
     try {
       await updateLeaveStatus.mutateAsync({ id, status });
     } catch (err) {
-      alert(err.message || 'Failed to update leave status');
+      setMutationError(err.message || 'Failed to update leave status');
+    } finally {
+      setMutationLoading(false);
     }
   };
 
   return (
     <div className="space-y-6">
+      {mutationError && (
+        <div className="bg-red-50 dark:bg-red-900/50 border border-red-200 dark:border-red-700 rounded-lg px-4 py-3 flex items-start gap-2 mb-4">
+          <span className="text-sm text-red-700 dark:text-red-300 flex-1">{mutationError}</span>
+          <button onClick={() => setMutationError('')} className="text-red-500 hover:text-red-700">&times;</button>
+        </div>
+      )}
+      {mutationLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-obsidian/30">
+          <div className="loader" />
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-heading-sm font-semibold text-obsidian">HR & Payroll</h1>

@@ -60,6 +60,7 @@ export default function PharmacyProducts() {
   const [adjustForm, setAdjustForm] = useState({ type: "IN", quantity: "", notes: "" });
   const [alerts, setAlerts] = useState({ lowStock: [], expired: [], expiringSoon: [] });
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [mutationError, setMutationError] = useState('');
   const [form, setForm] = useState({
     name: "",
     sku: "",
@@ -124,6 +125,7 @@ export default function PharmacyProducts() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setMutationError('');
     try {
       const payload = {
         name: form.name,
@@ -148,12 +150,13 @@ export default function PharmacyProducts() {
       loadAlerts();
       queryClient.invalidateQueries({ queryKey: posKeys.items('pharmacy') });
     } catch (err) {
-      alert(err.message || "Failed to save item");
+      setMutationError(err.message || "Failed to save item");
     }
   };
 
   const handleDelete = async () => {
     if (!deleteItem) return;
+    setMutationError('');
     try {
       await api.delete(`/pos/pharmacy/items/${deleteItem.id}`);
       setDeleteItem(null);
@@ -162,13 +165,14 @@ export default function PharmacyProducts() {
       loadAlerts();
       queryClient.invalidateQueries({ queryKey: posKeys.items('pharmacy') });
     } catch (err) {
-      alert(err.message || "Failed to delete item");
+      setMutationError(err.message || "Failed to delete item");
     }
   };
 
   const handleAdjust = async (e) => {
     e.preventDefault();
     if (!adjustItem) return;
+    setMutationError('');
     try {
       await api.post(`/pos/pharmacy/items/${adjustItem.id}/adjust`, {
         type: adjustForm.type,
@@ -182,7 +186,7 @@ export default function PharmacyProducts() {
       loadAlerts();
       queryClient.invalidateQueries({ queryKey: posKeys.items('pharmacy') });
     } catch (err) {
-      alert(err.message || "Failed to adjust stock");
+      setMutationError(err.message || "Failed to adjust stock");
     }
   };
 
@@ -249,6 +253,12 @@ export default function PharmacyProducts() {
 
   return (
     <div className="space-y-6">
+      {mutationError && (
+        <div className="bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg flex items-center justify-between">
+          <span>{mutationError}</span>
+          <button onClick={() => setMutationError('')} className="text-red-500 hover:text-red-700 dark:hover:text-red-200 text-xl leading-none touch-target">&times;</button>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-heading-sm font-semibold text-obsidian">{t("pharmacyProducts.title")}</h1>

@@ -50,6 +50,7 @@ export default function ProcurementPage() {
   const [poForm, setPoForm] = useState({ departmentType: 'pharmacy', expenseType: 'COGS', supplierId: '', costCenterId: '', notes: '', items: [] });
   const [assetForm, setAssetForm] = useState({ name: '', assetType: 'EQUIPMENT', acquisitionCost: '', usefulLifeYears: '5', purchaseDate: '', location: '', serialNumber: '', notes: '' });
 
+  const [mutationError, setMutationError] = useState('');
   const [search, setSearch] = useState('');
 
   const fetchRequisitions = useCallback(async () => {
@@ -98,6 +99,7 @@ export default function ProcurementPage() {
 
   const handleSubmitRequisition = async (e) => {
     e.preventDefault();
+    setMutationError('');
     try {
       const payload = {
         ...reqForm,
@@ -110,11 +112,12 @@ export default function ProcurementPage() {
       setShowRequisitionModal(false);
       setReqForm({ departmentId: '', notes: '', items: [] });
       fetchRequisitions();
-    } catch (err) { alert(err.message); }
+    } catch (err) { setMutationError(err.message); }
   };
 
   const handleSubmitPO = async (e) => {
     e.preventDefault();
+    setMutationError('');
     try {
       const payload = {
         ...poForm,
@@ -127,35 +130,41 @@ export default function ProcurementPage() {
       setShowPOModal(false);
       setPoForm({ departmentType: 'pharmacy', expenseType: 'COGS', supplierId: '', costCenterId: '', notes: '', items: [] });
       fetchPurchaseOrders();
-    } catch (err) { alert(err.message); }
+    } catch (err) { setMutationError(err.message); }
   };
 
   const handleSubmitAsset = async (e) => {
     e.preventDefault();
+    setMutationError('');
     try {
       await api.post('/procurement/assets', assetForm);
       setShowAssetModal(false);
       setAssetForm({ name: '', assetType: 'EQUIPMENT', acquisitionCost: '', usefulLifeYears: '5', purchaseDate: '', location: '', serialNumber: '', notes: '' });
       fetchFixedAssets();
-    } catch (err) { alert(err.message); }
+    } catch (err) { setMutationError(err.message); }
   };
 
   const handleApprove = async (id) => {
-    try { await api.post(`/procurement/purchase-orders/${id}/approve`); fetchPendingApprovals(); fetchPurchaseOrders(); } catch (err) { alert(err.message); }
+    setMutationError('');
+    try { await api.post(`/procurement/purchase-orders/${id}/approve`); fetchPendingApprovals(); fetchPurchaseOrders(); } catch (err) { setMutationError(err.message); }
   };
   const handleReject = async (id) => {
     const reason = prompt('Rejection reason:');
     if (!reason) return;
-    try { await api.post(`/procurement/purchase-orders/${id}/reject`, { rejectionReason: reason }); fetchPendingApprovals(); fetchPurchaseOrders(); } catch (err) { alert(err.message); }
+    setMutationError('');
+    try { await api.post(`/procurement/purchase-orders/${id}/reject`, { rejectionReason: reason }); fetchPendingApprovals(); fetchPurchaseOrders(); } catch (err) { setMutationError(err.message); }
   };
   const handleSubmit = async (id) => {
-    try { await api.post(`/procurement/purchase-orders/${id}/submit`); fetchPurchaseOrders(); fetchPendingApprovals(); } catch (err) { alert(err.message); }
+    setMutationError('');
+    try { await api.post(`/procurement/purchase-orders/${id}/submit`); fetchPurchaseOrders(); fetchPendingApprovals(); } catch (err) { setMutationError(err.message); }
   };
   const handleReceive = async (id) => {
-    try { await api.post(`/procurement/purchase-orders/${id}/receive`, { receivedItems: [] }); fetchPurchaseOrders(); } catch (err) { alert(err.message); }
+    setMutationError('');
+    try { await api.post(`/procurement/purchase-orders/${id}/receive`, { receivedItems: [] }); fetchPurchaseOrders(); } catch (err) { setMutationError(err.message); }
   };
   const handleDepreciate = async (id) => {
-    try { await api.put(`/procurement/assets/${id}/depreciate`); fetchFixedAssets(); } catch (err) { alert(err.message); }
+    setMutationError('');
+    try { await api.put(`/procurement/assets/${id}/depreciate`); fetchFixedAssets(); } catch (err) { setMutationError(err.message); }
   };
 
   const addReqLine = () => setReqForm((f) => ({ ...f, items: [...f.items, { description: '', quantity: 1, itemId: '' }] }));
@@ -230,6 +239,12 @@ export default function ProcurementPage() {
 
   return (
     <div className="space-y-6">
+      {mutationError && (
+        <div className="bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg flex items-center justify-between">
+          <span>{mutationError}</span>
+          <button onClick={() => setMutationError('')} className="text-red-500 hover:text-red-700 dark:hover:text-red-200 text-xl leading-none touch-target">&times;</button>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-heading-sm font-semibold text-obsidian">Procurement</h1>

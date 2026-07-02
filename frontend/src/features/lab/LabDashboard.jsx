@@ -420,6 +420,7 @@ export default function LabDashboard() {
   const [selectedForBilling, setSelectedForBilling] = useState([]);
   const [billingPaymentMethod, setBillingPaymentMethod] = useState('CASH');
   const [billingSubmitting, setBillingSubmitting] = useState(false);
+  const [mutationError, setMutationError] = useState('');
 
   const orderParams = statusFilter !== 'ALL' ? `status=${statusFilter}` : '';
   const { data: orders = [], isLoading } = useLabOrders(orderParams);
@@ -450,6 +451,7 @@ export default function LabDashboard() {
     if (selectedForBilling.length === 0) { alert('Select at least one order'); return; }
     setBillingSubmitting(true);
     try {
+      setMutationError('');
       const result = await labCheckout.mutateAsync({
         orderIds: selectedForBilling,
         paymentMethod: billingPaymentMethod,
@@ -457,7 +459,7 @@ export default function LabDashboard() {
       alert(`Invoice created: SDG ${Number(result.totalAmount).toFixed(2)} for ${result.orderCount} orders`);
       setSelectedForBilling([]);
     } catch (err) {
-      alert(err.message || 'Checkout failed');
+      setMutationError(err.message || 'Checkout failed');
     } finally {
       setBillingSubmitting(false);
     }
@@ -484,6 +486,12 @@ export default function LabDashboard() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
+      {mutationError && (
+        <div className="bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg flex items-center justify-between">
+          <span>{mutationError}</span>
+          <button onClick={() => setMutationError('')} className="text-red-500 hover:text-red-700 dark:hover:text-red-200 text-xl leading-none touch-target">&times;</button>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-heading font-medium text-obsidian">{t('lab.title')}</h1>

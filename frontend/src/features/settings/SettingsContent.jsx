@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Ca
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Avatar } from '../../components/ui/Avatar';
+import UpdateManager from '../../components/ui/UpdateManager';
 import i18n from '../../lib/i18n';
 
 function Section({ title, children }) {
@@ -114,6 +115,7 @@ export default function SettingsContent() {
         <Button variant="secondary" disabled>{t('settings.updatePassword')}</Button>
       </Section>
 
+      <UpdateManager />
     </div>
   );
 }

@@ -27,6 +27,7 @@ export default function InventoryPage() {
   const [transactions, setTransactions] = useState([]);
   const [form, setForm] = useState({ name: '', sku: '', category: '', quantity: 0, price: 0, costPrice: 0, minStock: 0 });
   const [txForm, setTxForm] = useState({ type: 'IN', quantity: 1, notes: '' });
+  const [mutationError, setMutationError] = useState('');
 
   const { data: items = [], isLoading } = useInventoryItems(search);
   const createItem = useCreateInventoryItem();
@@ -44,11 +45,12 @@ export default function InventoryPage() {
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
+      setMutationError('');
       await createItem.mutateAsync(form);
       setShowModal(false);
       setForm({ name: '', sku: '', category: '', quantity: 0, price: 0, costPrice: 0, minStock: 0 });
     } catch (err) {
-      alert(err.message || 'Failed to create item');
+      setMutationError(err.message || 'Failed to create item');
     }
   };
 
@@ -56,11 +58,12 @@ export default function InventoryPage() {
     e.preventDefault();
     if (!selectedItem) return;
     try {
+      setMutationError('');
       await api.post('/inventory/transactions', { itemId: selectedItem.id, ...txForm });
       setTxForm({ type: 'IN', quantity: 1, notes: '' });
       handleSelectItem(selectedItem);
     } catch (err) {
-      alert(err.message || 'Transaction failed');
+      setMutationError(err.message || 'Transaction failed');
     }
   };
 
@@ -68,6 +71,12 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-6 text-obsidian">
+      {mutationError && (
+        <div className="bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg flex items-center justify-between">
+          <span>{mutationError}</span>
+          <button onClick={() => setMutationError('')} className="text-red-500 hover:text-red-700 dark:hover:text-red-200 text-xl leading-none touch-target">&times;</button>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-heading-sm font-semibold text-obsidian">Inventory</h1>

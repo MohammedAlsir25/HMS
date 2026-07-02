@@ -41,6 +41,8 @@ export default function AdminPage() {
   const [userForm, setUserForm] = useState({ email: '', password: '', fullName: '', phone: '', roleId: '', clinicId: '' });
   const [roleForm, setRoleForm] = useState({ name: '', description: '', permissions: [] });
   const [deptForm, setDeptForm] = useState({ name: '', nameAr: '', slug: '', type: 'OTHER' });
+  const [mutationLoading, setMutationLoading] = useState(false);
+  const [mutationError, setMutationError] = useState('');
 
   const { data: users = [], isLoading: loadingUsers } = useAdminUsers();
   const { data: roles = [] } = useAdminRoles();
@@ -53,12 +55,16 @@ export default function AdminPage() {
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
+    setMutationError('');
+    setMutationLoading(true);
     try {
       await createUser.mutateAsync(userForm);
       setShowUserModal(false);
       setUserForm({ email: '', password: '', fullName: '', phone: '', roleId: '', clinicId: '' });
     } catch (err) {
-      alert(err.message || 'Failed to create user');
+      setMutationError(err.message || 'Failed to create user');
+    } finally {
+      setMutationLoading(false);
     }
   };
 
@@ -66,6 +72,8 @@ export default function AdminPage() {
 
   const handleCreateRole = async (e) => {
     e.preventDefault();
+    setMutationError('');
+    setMutationLoading(true);
     try {
       if (editingRole) {
         await api.patch(`/admin/roles/${editingRole.id}`, roleForm);
@@ -77,7 +85,9 @@ export default function AdminPage() {
       setRoleForm({ name: '', description: '', permissions: [] });
       invalidateAll();
     } catch (err) {
-      alert(err.message || 'Failed to save role');
+      setMutationError(err.message || 'Failed to save role');
+    } finally {
+      setMutationLoading(false);
     }
   };
 
@@ -89,16 +99,22 @@ export default function AdminPage() {
 
   const handleDeleteRole = async (roleId) => {
     if (!confirm('Delete this role?')) return;
+    setMutationError('');
+    setMutationLoading(true);
     try {
       await api.delete(`/admin/roles/${roleId}`);
       invalidateAll();
     } catch (err) {
-      alert(err.message || 'Failed to delete role');
+      setMutationError(err.message || 'Failed to delete role');
+    } finally {
+      setMutationLoading(false);
     }
   };
 
   const handleCreateDepartment = async (e) => {
     e.preventDefault();
+    setMutationError('');
+    setMutationLoading(true);
     try {
       if (editingDept) {
         await api.patch(`/departments/${editingDept.id}`, deptForm);
@@ -110,7 +126,9 @@ export default function AdminPage() {
       setDeptForm({ name: '', nameAr: '', slug: '', type: 'OTHER' });
       queryClient.invalidateQueries({ queryKey: adminKeys.departments });
     } catch (err) {
-      alert(err.message || 'Failed to save department');
+      setMutationError(err.message || 'Failed to save department');
+    } finally {
+      setMutationLoading(false);
     }
   };
 
@@ -125,6 +143,17 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6">
+      {mutationError && (
+        <div className="bg-red-50 dark:bg-red-900/50 border border-red-200 dark:border-red-700 rounded-lg px-4 py-3 flex items-start gap-2 mb-4">
+          <span className="text-sm text-red-700 dark:text-red-300 flex-1">{mutationError}</span>
+          <button onClick={() => setMutationError('')} className="text-red-500 hover:text-red-700">&times;</button>
+        </div>
+      )}
+      {mutationLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-obsidian/30">
+          <div className="loader" />
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-heading-sm font-semibold text-obsidian">Admin</h1>

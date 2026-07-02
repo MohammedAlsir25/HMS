@@ -15,6 +15,7 @@ export default function SuppliersTab({ category }) {
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState({ name: '', contactPerson: '', phone: '', email: '' });
+  const [mutationError, setMutationError] = useState('');
 
   const openCreate = () => {
     setEditItem(null);
@@ -36,6 +37,7 @@ export default function SuppliersTab({ category }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      setMutationError('');
       if (editItem) {
         await updateSupplier.mutateAsync({ id: editItem.id, ...form });
       } else {
@@ -44,21 +46,28 @@ export default function SuppliersTab({ category }) {
       setShowModal(false);
       setEditItem(null);
     } catch (err) {
-      alert(err.message || 'Failed to save supplier');
+      setMutationError(err.message || 'Failed to save supplier');
     }
   };
 
   const handleDelete = async (id) => {
     if (!confirm('Delete this supplier?')) return;
     try {
+      setMutationError('');
       await deleteSupplier.mutateAsync(id);
     } catch (err) {
-      alert(err.message || 'Failed to delete supplier');
+      setMutationError(err.message || 'Failed to delete supplier');
     }
   };
 
   return (
     <div className="space-y-4">
+      {mutationError && (
+        <div className="bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg flex items-center justify-between">
+          <span>{mutationError}</span>
+          <button onClick={() => setMutationError('')} className="text-red-500 hover:text-red-700 dark:hover:text-red-200 text-xl leading-none touch-target">&times;</button>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <h2 className="text-heading-xs font-semibold text-obsidian">Suppliers</h2>
         <Button onClick={openCreate}>Add Supplier</Button>

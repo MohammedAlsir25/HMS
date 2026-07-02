@@ -1,0 +1,47 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicotran/tauri-config-schema/main/schema.json",
+  "productName": "Al Jawarih Hospital",
+  "version": "1.0.0",
+  "identifier": "com.aljawarih.hospital",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Al Jawarih Hospital",
+        "width": 1280,
+        "height": 800,
+        "resizable": true,
+        "fullscreen": false,
+        "minWidth": 900,
+        "minHeight": 600
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/icon.png",
+      "icons/icon.ico",
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png"
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnRzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJEN0Q3MzhENTdGOTg3M0EKUlRRNmgvbFhqWE45TGMwaDBBZ0hCcWVqZG9MU21adjN2SmcwOC81dGdFOGp0YUFkdVJnTG5uWmsK",
+      "endpoints": [
+        "https://github.com/MohammedAlsir25/AL-Jawahir-Hospital/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

@@ -129,6 +129,7 @@ export default function DeliveryModal({ open, onClose, category, onSuccess }) {
   const [supplierBalance, setSupplierBalance] = useState(null);
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [mutationError, setMutationError] = useState('');
 
   const fetchSupplierBalance = useCallback(async (supplierId) => {
     if (!supplierId) { setSupplierBalance(null); return; }
@@ -191,6 +192,7 @@ export default function DeliveryModal({ open, onClose, category, onSuccess }) {
 
   const saveNewProduct = async (idx) => {
     if (!newProductForm.name || !newProductForm.sku) { alert('Name and SKU are required'); return; }
+    setMutationError('');
     setCreatingProduct(true);
     try {
       const product = await api.post(`/pos/${category}/items`, {
@@ -204,7 +206,7 @@ export default function DeliveryModal({ open, onClose, category, onSuccess }) {
       setNewProductIdx(null);
       setNewProductForm({ name: '', sku: '', price: '', minStock: '0' });
     } catch (err) {
-      alert(err.message || 'Failed to create product');
+      setMutationError(err.message || 'Failed to create product');
     }
     setCreatingProduct(false);
   };
@@ -220,6 +222,7 @@ export default function DeliveryModal({ open, onClose, category, onSuccess }) {
     });
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     const validItems = items.filter((it) => it.itemId && Number(it.qty) > 0);
+    setMutationError('');
     setSubmitting(true);
     try {
       const payload = {
@@ -241,7 +244,7 @@ export default function DeliveryModal({ open, onClose, category, onSuccess }) {
       setErrors({});
       onSuccess?.();
     } catch (err) {
-      alert(err.message || 'Failed to create delivery');
+      setMutationError(err.message || 'Failed to create delivery');
     }
     setSubmitting(false);
   };
@@ -292,6 +295,12 @@ export default function DeliveryModal({ open, onClose, category, onSuccess }) {
 
   return (
     <Modal open={open} onClose={onClose} title="New Delivery">
+      {mutationError && (
+        <div className="bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg flex items-center justify-between mb-4">
+          <span>{mutationError}</span>
+          <button onClick={() => setMutationError('')} className="text-red-500 hover:text-red-700 dark:hover:text-red-200 text-xl leading-none touch-target">&times;</button>
+        </div>
+      )}
       <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto">
         <div>
           <label className="text-sm font-medium text-graphite block mb-1">Supplier</label>

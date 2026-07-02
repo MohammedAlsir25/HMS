@@ -60,6 +60,7 @@ export default function OpticsProducts() {
   const [adjustForm, setAdjustForm] = useState({ type: "IN", quantity: "", notes: "" });
   const [alerts, setAlerts] = useState({ lowStock: [], expired: [], expiringSoon: [] });
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [mutationError, setMutationError] = useState('');
   const [form, setForm] = useState({
     name: "",
     sku: "",
@@ -121,6 +122,7 @@ export default function OpticsProducts() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      setMutationError('');
       const payload = {
         name: form.name,
         sku: form.sku,
@@ -142,13 +144,14 @@ export default function OpticsProducts() {
       loadAlerts();
       queryClient.invalidateQueries({ queryKey: posKeys.items('optics') });
     } catch (err) {
-      alert(err.message || "Failed to save item");
+      setMutationError(err.message || "Failed to save item");
     }
   };
 
   const handleDelete = async () => {
     if (!deleteItem) return;
     try {
+      setMutationError('');
       await api.delete(`/pos/optics/items/${deleteItem.id}`);
       setDeleteItem(null);
       setLoading(true);
@@ -156,7 +159,7 @@ export default function OpticsProducts() {
       loadAlerts();
       queryClient.invalidateQueries({ queryKey: posKeys.items('optics') });
     } catch (err) {
-      alert(err.message || "Failed to delete item");
+      setMutationError(err.message || "Failed to delete item");
     }
   };
 
@@ -164,6 +167,7 @@ export default function OpticsProducts() {
     e.preventDefault();
     if (!adjustItem) return;
     try {
+      setMutationError('');
       await api.post(`/pos/optics/items/${adjustItem.id}/adjust`, {
         type: adjustForm.type,
         quantity: parseInt(adjustForm.quantity),
@@ -176,7 +180,7 @@ export default function OpticsProducts() {
       loadAlerts();
       queryClient.invalidateQueries({ queryKey: posKeys.items('optics') });
     } catch (err) {
-      alert(err.message || "Failed to adjust stock");
+      setMutationError(err.message || "Failed to adjust stock");
     }
   };
 
@@ -222,6 +226,12 @@ export default function OpticsProducts() {
 
   return (
     <div className="space-y-6">
+      {mutationError && (
+        <div className="bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg flex items-center justify-between">
+          <span>{mutationError}</span>
+          <button onClick={() => setMutationError('')} className="text-red-500 hover:text-red-700 dark:hover:text-red-200 text-xl leading-none touch-target">&times;</button>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-heading-sm font-semibold text-obsidian">{t("opticsProducts.title")}</h1>

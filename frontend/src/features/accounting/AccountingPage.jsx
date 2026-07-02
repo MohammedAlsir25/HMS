@@ -175,6 +175,7 @@ export default function AccountingPage() {
   const [showAddDebt, setShowAddDebt] = useState(false);
   const [newDebt, setNewDebt] = useState({ creditor: '', description: '', amount: '', dueDate: '', notes: '' });
   const [debtSaving, setDebtSaving] = useState(false);
+  const [mutationError, setMutationError] = useState('');
 
   const { data: summary, isLoading: loading } = useAccountingSummary();
   const { data: departments } = useDepartments();
@@ -236,17 +237,19 @@ export default function AccountingPage() {
   };
 
   const handleOpenShift = async () => {
+    setMutationError('');
     try {
       await api.post('/accounting/shifts/open', {});
       queryClient.invalidateQueries({ queryKey: ['accounting'] });
     } catch (err) {
-      alert(err.message || 'Failed to open shift');
+      setMutationError(err.message || 'Failed to open shift');
     }
   };
 
   const handleCloseShift = async () => {
     const expected = prompt('Expected total:');
     if (expected === null) return;
+    setMutationError('');
     try {
       await api.post('/accounting/shifts/close', {
         expectedTotal: parseFloat(expected) || 0,
@@ -254,13 +257,14 @@ export default function AccountingPage() {
       });
       queryClient.invalidateQueries({ queryKey: ['accounting'] });
     } catch (err) {
-      alert(err.message || 'Failed to close shift');
+      setMutationError(err.message || 'Failed to close shift');
     }
   };
 
   const handleAddTransaction = async () => {
-    if (!newTx.amount || parseFloat(newTx.amount) <= 0) { alert('Enter a valid amount'); return; }
+    if (!newTx.amount || parseFloat(newTx.amount) <= 0) { setMutationError('Enter a valid amount'); return; }
     setAddSaving(true);
+    setMutationError('');
     try {
       await api.post('/accounting/transactions', {
         type: newTx.type,
@@ -274,7 +278,7 @@ export default function AccountingPage() {
       queryClient.invalidateQueries({ queryKey: ['accounting'] });
       setTxFilters((prev) => ({ ...prev, offset: 0 }));
     } catch (err) {
-      alert(err.message || 'Failed to create transaction');
+      setMutationError(err.message || 'Failed to create transaction');
     } finally {
       setAddSaving(false);
     }
@@ -284,6 +288,7 @@ export default function AccountingPage() {
 
   const handleExpenseSave = async (formData) => {
     setExpenseSaving(true);
+    setMutationError('');
     try {
       if (editingExpense) {
         await api.patch(`/accounting/expenses/${editingExpense.id}`, formData);
@@ -294,7 +299,7 @@ export default function AccountingPage() {
       setEditingExpense(null);
       invalidateExpenses();
     } catch (err) {
-      alert(err.message || 'Failed to save expense');
+      setMutationError(err.message || 'Failed to save expense');
     } finally {
       setExpenseSaving(false);
     }
@@ -302,11 +307,12 @@ export default function AccountingPage() {
 
   const handleExpenseDelete = async (id) => {
     if (!confirm('Delete this expense?')) return;
+    setMutationError('');
     try {
       await api.delete(`/accounting/expenses/${id}`);
       invalidateExpenses();
     } catch (err) {
-      alert(err.message || 'Failed to delete expense');
+      setMutationError(err.message || 'Failed to delete expense');
     }
   };
 
@@ -389,8 +395,21 @@ export default function AccountingPage() {
 
   const todayByType = summary?.today?.byType || {};
 
+  const isLoadingOverlay = addSaving || expenseSaving || paySaving || debtSaving;
+
   return (
     <div className="space-y-6">
+      {isLoadingOverlay && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-obsidian/40" style={{ backdropFilter: 'blur(2px)' }}>
+          <div className="loader"></div>
+        </div>
+      )}
+      {mutationError && (
+        <div className="bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg flex items-center justify-between">
+          <span>{mutationError}</span>
+          <button onClick={() => setMutationError('')} className="text-red-500 hover:text-red-700 dark:hover:text-red-200 text-xl leading-none touch-target">&times;</button>
+        </div>
+      )}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-heading-sm font-semibold text-obsidian">{t('accounting.title')}</h1>
@@ -931,13 +950,14 @@ export default function AccountingPage() {
               <div className="mt-6 flex justify-end gap-2">
                 <Button variant="ghost" onClick={() => setPayingDebt(null)}>Cancel</Button>
                 <Button variant="primary" onClick={async () => {
-                  if (!payAmount || parseFloat(payAmount) <= 0) { alert('Enter a valid amount'); return; }
+                  if (!payAmount || parseFloat(payAmount) <= 0) { setMutationError('Enter a valid amount'); return; }
+                  setMutationError('');
                   setPaySaving(true);
                   try {
                     await payDebtMutation.mutateAsync({ id: payingDebt.id, amount: parseFloat(payAmount) });
                     setPayingDebt(null);
                     setPayAmount('');
-                  } catch (err) { alert(err.message || 'Failed to record payment'); }
+                  } catch (err) { setMutationError(err.message || 'Failed to record payment'); }
                   setPaySaving(false);
                 }} disabled={paySaving}>
                   {paySaving ? 'Recording...' : 'Confirm Payment'}
@@ -982,7 +1002,8 @@ export default function AccountingPage() {
               <div className="mt-6 flex justify-end gap-2">
                 <Button variant="ghost" onClick={() => { setShowAddDebt(false); setNewDebt({ creditor: '', description: '', amount: '', dueDate: '', notes: '' }); }}>Cancel</Button>
                 <Button variant="primary" onClick={async () => {
-                  if (!newDebt.creditor || !newDebt.description || !newDebt.amount || parseFloat(newDebt.amount) <= 0) { alert('Creditor, description, and amount are required'); return; }
+                  if (!newDebt.creditor || !newDebt.description || !newDebt.amount || parseFloat(newDebt.amount) <= 0) { setMutationError('Creditor, description, and amount are required'); return; }
+                  setMutationError('');
                   setDebtSaving(true);
                   try {
                     await createDebtMutation.mutateAsync({
@@ -994,7 +1015,7 @@ export default function AccountingPage() {
                     });
                     setShowAddDebt(false);
                     setNewDebt({ creditor: '', description: '', amount: '', dueDate: '', notes: '' });
-                  } catch (err) { alert(err.message || 'Failed to create debt'); }
+                  } catch (err) { setMutationError(err.message || 'Failed to create debt'); }
                   setDebtSaving(false);
                 }} disabled={debtSaving}>
                   {debtSaving ? 'Creating...' : 'Create Debt'}
