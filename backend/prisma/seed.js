@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import { DEFAULT_ROLES } from '../dist/middleware/rbac.js';
+import { DEFAULT_ROLES } from '../src/middleware/rbac.js';
 
 const prisma = new PrismaClient();
 
