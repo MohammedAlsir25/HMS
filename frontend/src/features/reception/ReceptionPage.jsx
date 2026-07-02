@@ -10,6 +10,7 @@ import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { printReceipt } from '../../lib/printReceipt';
 import NewPatientForm from './NewPatientForm';
 import ReservationsPanel from './ReservationsPanel';
 import FileUploader from './FileUploader';
@@ -42,6 +43,7 @@ export default function ReceptionPage() {
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [queueClinicFilter, setQueueClinicFilter] = useState('');
   const [queueSearch, setQueueSearch] = useState('');
+  const [lastReceipt, setLastReceipt] = useState(null);
 
   const { data: clinics = [] } = useClinics();
   const activeClinic = queueClinicFilter || selectedClinic;
@@ -62,13 +64,22 @@ export default function ReceptionPage() {
   const handleCheckIn = async () => {
     if (!selectedPatient || !selectedClinic) return;
     try {
-      await checkIn.mutateAsync({
+      const result = await checkIn.mutateAsync({
         patientId: selectedPatient.id,
         clinicId: selectedClinic,
         type: appointmentType,
         collectPayment: collectPayment || undefined,
         paymentMethod: collectPayment ? paymentMethod : undefined,
       });
+      if (result.transaction) {
+        const clinic = clinics.find((c) => c.id === selectedClinic);
+        setLastReceipt({
+          transaction: result.transaction,
+          patientName: selectedPatient.fullName,
+          mrn: selectedPatient.mrn,
+          clinicName: clinic?.name || '',
+        });
+      }
       setSelectedPatient(null);
       setCollectPayment(false);
       setPaymentMethod('CASH');
@@ -104,13 +115,34 @@ export default function ReceptionPage() {
   const activeStats = queueStats.find((s) => s.id === activeClinic);
 
   return (
-    <div className="space-y-6">
+      <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-heading-sm font-semibold text-obsidian">{t('reception.title')}</h1>
           <p className="text-body text-slate mt-1">{t('reception.description')}</p>
         </div>
       </div>
+
+      {lastReceipt && (
+        <div className="bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-700 rounded-lg p-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-green-700 dark:text-green-300">Payment Collected — SDG {Number(lastReceipt.transaction.amount).toFixed(2)}</p>
+            <p className="text-caption text-green-600 dark:text-green-400">{lastReceipt.patientName} · {lastReceipt.clinicName}</p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Button variant="primary" size="sm" onClick={() => {
+              printReceipt({
+                title: 'Consultation Fee',
+                transaction: lastReceipt.transaction,
+                patientName: lastReceipt.patientName,
+                mrn: lastReceipt.mrn,
+                clinicName: lastReceipt.clinicName,
+              });
+            }}>Print Receipt</Button>
+            <Button variant="ghost" size="sm" onClick={() => setLastReceipt(null)}>&times;</Button>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-2 border-b border-silver pb-2">
         {TABS.map((k) => (

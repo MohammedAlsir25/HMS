@@ -26,6 +26,7 @@ const navItems = [
   { label: 'Optics', link: '/optics' },
   { label: 'Optics Products', link: '/optics/products' },
   { label: 'Inventory', link: '/inventory' },
+  { label: 'Procurement', link: '/procurement' },
   { label: 'Accounting', link: '/accounting' },
   { label: 'Admin', link: '/admin' },
   { label: 'HR', link: '/hr' },
@@ -443,6 +444,15 @@ export default function StaggeredMenu({
             )}
 
           </header>
+
+        {open && (
+          <div
+            className="absolute inset-0 z-[6]"
+            style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+            onClick={closeMenu}
+            aria-hidden="true"
+          />
+        )}
 
         <aside
           id="staggered-menu-panel"

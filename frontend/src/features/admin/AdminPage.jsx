@@ -239,7 +239,7 @@ export default function AdminPage() {
           <div>
             <label className="text-sm font-medium text-graphite">Role</label>
             <select required value={userForm.roleId} onChange={(e) => setUserForm({ ...userForm, roleId: e.target.value })}
-              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
+              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
               <option value="">Select role</option>
               {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
@@ -247,7 +247,7 @@ export default function AdminPage() {
           <div>
             <label className="text-sm font-medium text-graphite">Clinic (optional)</label>
             <select value={userForm.clinicId} onChange={(e) => setUserForm({ ...userForm, clinicId: e.target.value })}
-              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
+              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
               <option value="">No clinic</option>
               {rolesList.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
@@ -290,7 +290,7 @@ export default function AdminPage() {
           <div>
             <label className="text-sm font-medium text-graphite">Department Type</label>
             <select required value={deptForm.type} onChange={(e) => setDeptForm({ ...deptForm, type: e.target.value })}
-              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
+              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
               <option value="CLINIC">Clinic</option>
               <option value="PHARMACY">Pharmacy</option>
               <option value="LAB">Lab</option>

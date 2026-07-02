@@ -36,7 +36,12 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-dvh flex items-center justify-center p-4">
+    <div className="min-h-dvh flex items-center justify-center p-4 relative">
+      {loading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-obsidian/30">
+          <div className="loader" />
+        </div>
+      )}
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
             <img src="/logo.png" alt="Al Jawarih" className="h-14 w-auto mb-2" />

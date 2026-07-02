@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+﻿import { useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePOSItems, posKeys } from '../../hooks/queries/usePOS';
 import { useReferrals } from '../../hooks/queries/useReferrals';
@@ -6,9 +6,11 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Ca
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { StripCounter } from '../../components/ui/StripCounter';
 import { api } from '../../lib/api';
 import OpticsProducts from './OpticsProducts';
 import SuppliersTab from './SuppliersTab';
+import { printReceipt } from '../../lib/printReceipt';
 
 const paymentMethods = [
   { value: 'CASH', label: 'Cash' },
@@ -26,13 +28,16 @@ export default function OpticsPOS() {
   const [rxDetails, setRxDetails] = useState({ sph: '', cyl: '', axis: '' });
   const [completing, setCompleting] = useState(false);
   const [receipt, setReceipt] = useState(null);
+  const [receiptItems, setReceiptItems] = useState([]);
   const [activeTab, setActiveTab] = useState('sale');
   const [activeReferralId, setActiveReferralId] = useState(null);
+  const [error, setError] = useState('');
 
   const { data: items = [], isLoading } = usePOSItems('optics');
   const { data: referrals = [], isLoading: referralsLoading } = useReferrals(activeTab === 'referrals' ? 'type=OPTICS_DISPATCH&status=PENDING' : null);
 
   const addToCart = (item) => {
+    setError('');
     setCart((prev) => {
       const existing = prev.find((c) => c.id === item.id);
       if (existing) {
@@ -71,13 +76,19 @@ export default function OpticsPOS() {
         referralId: activeReferralId || undefined,
       });
       setReceipt(result.transaction);
+      setReceiptItems(cart.map((c) => ({
+        name: c.name,
+        quantity: c.quantity,
+        price: Number(c.price),
+        total: Number(c.price) * c.quantity,
+      })));
       setCart([]);
       setPatientName('');
       setPaymentMethod('CASH');
       setRxDetails({ sph: '', cyl: '', axis: '' });
       setActiveReferralId(null);
       queryClient.invalidateQueries({ queryKey: posKeys.items('optics') });
-    } catch (err) { console.error('[OpticsPOS]', err); }
+    } catch (err) { console.error('[OpticsPOS]', err); setError(err.message || 'Transaction failed'); }
     setCompleting(false);
   }, [cart, paymentMethod, total, patientName, rxDetails]);
 
@@ -93,10 +104,32 @@ export default function OpticsPOS() {
               <p className="text-lg font-bold text-green-700 dark:text-green-300">Transaction Complete</p>
               <p className="text-caption text-green-600 dark:text-green-400">ID: {receipt.id.slice(0, 8)}</p>
             </div>
+            <div className="text-caption text-slate space-y-1">
+              <p>Date: {new Date(receipt.createdAt).toLocaleString()}</p>
+              <p>Cashier: {receipt.cashier?.fullName || '-'}</p>
+            </div>
+            {receiptItems.length > 0 && (
+              <div>
+                <div className="flex justify-between text-caption font-semibold text-graphite border-b border-silver pb-1 mb-1">
+                  <span className="flex-1">Item</span>
+                  <span className="w-16 text-center">Qty</span>
+                  <span className="w-28 text-right">Price</span>
+                  <span className="w-28 text-right">Total</span>
+                </div>
+                {receiptItems.map((it, i) => (
+                  <div key={i} className="flex justify-between text-body text-obsidian py-1 border-b border-bone">
+                    <span className="flex-1 truncate">{it.name}</span>
+                    <span className="w-16 text-center">{it.quantity}</span>
+                    <span className="w-28 text-right whitespace-nowrap">SDG {it.price.toFixed(2)}</span>
+                    <span className="w-28 text-right whitespace-nowrap">SDG {it.total.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="space-y-2">
               <div className="flex justify-between text-body">
                 <span className="text-graphite">Amount</span>
-                <span className="font-semibold text-obsidian">SDG ${Number(receipt.amount).toFixed(2)}</span>
+                <span className="font-semibold text-obsidian">SDG {Number(receipt.amount).toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-body">
                 <span className="text-graphite">Payment</span>
@@ -107,7 +140,14 @@ export default function OpticsPOS() {
                 <span className="text-obsidian">{new Date(receipt.createdAt).toLocaleString()}</span>
               </div>
             </div>
-            <Button className="w-full" onClick={() => setReceipt(null)}>New Sale</Button>
+            <div className="flex gap-2">
+              <Button className="flex-1" onClick={() => printReceipt({
+                title: 'Sale Receipt',
+                transaction: receipt,
+                items: receiptItems.map((it) => ({ name: it.name, quantity: it.quantity, price: it.price, total: it.total })),
+              })}>Print Receipt</Button>
+              <Button className="flex-1" onClick={() => { setReceipt(null); setReceiptItems([]); setError(''); }}>New Sale</Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -115,7 +155,18 @@ export default function OpticsPOS() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {completing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="loader" />
+        </div>
+      )}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg px-4 py-3 flex items-center justify-between">
+          <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+          <button className="text-red-500 hover:text-red-700 touch-target p-1 shrink-0" onClick={() => setError('')}>&times;</button>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-heading-sm font-semibold text-obsidian">Optics POS</h1>
@@ -134,7 +185,7 @@ export default function OpticsPOS() {
           onClick={() => setActiveTab('suppliers')}>Suppliers</button>
       </div>
 
-      {activeTab === 'suppliers' ? <SuppliersTab /> : null}
+      {activeTab === 'suppliers' ? <SuppliersTab category="optics" /> : null}
       {activeTab === 'referrals' ? (
         <Card>
           <CardHeader>
@@ -181,18 +232,21 @@ export default function OpticsPOS() {
               {isLoading && <p className="text-body text-slate">Loading inventory...</p>}
               {!isLoading && (
                 <div className="max-h-[50vh] overflow-y-auto space-y-1">
-                  {filteredItems.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-bone transition-colors">
+                  {filteredItems.map((item) => {
+                    const outOfStock = item.quantity < 1;
+                    return (
+                    <div key={item.id}
+                      className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${outOfStock ? 'opacity-50 cursor-not-allowed' : 'hover:bg-bone cursor-pointer'}`}
+                      onClick={() => !outOfStock && addToCart(item)}
+                    >
                       <div className="min-w-0 flex-1">
                         <p className="text-body text-obsidian truncate">{item.name}</p>
                         <p className="text-caption text-slate">{item.sku} · Stock: {item.quantity}</p>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0 ml-2">
-                        <span className="text-body font-medium text-obsidian">SDG ${Number(item.price).toFixed(2)}</span>
-                        <Button size="sm" onClick={() => addToCart(item)} disabled={item.quantity < 1}>Add</Button>
-                      </div>
+                      <span className="text-body font-medium text-obsidian shrink-0 ml-2">SDG ${Number(item.price).toFixed(2)}</span>
                     </div>
-                  ))}
+                    );
+                  })}
                   {filteredItems.length === 0 && <p className="text-body text-slate text-center py-4">No items found</p>}
                 </div>
               )}
@@ -208,22 +262,20 @@ export default function OpticsPOS() {
             <CardContent className="space-y-3">
               {cart.length === 0 && <p className="text-body text-slate text-center py-4">Cart is empty</p>}
               {cart.map((c) => (
-                <div key={c.id} className="flex items-center justify-between pb-2 border-b border-bone last:border-0">
-                  <div className="min-w-0 flex-1">
+                <div key={c.id} className="pb-3 border-b border-bone last:border-0">
+                  <div className="flex items-center justify-between">
                     <p className="text-body text-obsidian truncate">{c.name}</p>
-                    <p className="text-caption text-slate">SDG ${c.price.toFixed(2)} each</p>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0 ml-2">
-                    <select className="w-14 px-1 py-1 bg-paper border border-silver rounded text-caption"
-                      value={c.quantity}
-                      onChange={(e) => updateQty(c.id, parseInt(e.target.value))}>
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-                        <option key={n} value={n}>{n}</option>
-                      ))}
-                    </select>
                     <button className="text-slate hover:text-red-500 dark:hover:text-red-400 touch-target p-1" onClick={() => removeFromCart(c.id)}>
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+                      <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
                     </button>
+                  </div>
+                  <div className="flex items-center gap-3 mt-2">
+                    <span className="text-caption text-slate whitespace-nowrap">SDG ${c.price.toFixed(2)} each</span>
+                    <StripCounter
+                      value={c.quantity}
+                      min={1}
+                      onChange={(v) => updateQty(c.id, v)}
+                    />
                   </div>
                 </div>
               ))}

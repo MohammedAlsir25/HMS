@@ -10,6 +10,7 @@ export const accountingKeys = {
   pnl: (params) => ['accounting', 'pnl', params],
   shifts: ['accounting', 'shifts'],
   checkout: ['accounting', 'checkout'],
+  debts: ['accounting', 'debts'],
 };
 
 export function useAccountingSummary() {
@@ -71,6 +72,32 @@ export function useCloseShift() {
   return useMutation({
     mutationFn: (data) => api.post('/accounting/shifts/close', data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: accountingKeys.shifts }),
+  });
+}
+
+export function useDebts() {
+  return useQuery({
+    queryKey: accountingKeys.debts,
+    queryFn: () => api.get('/accounting/debts'),
+  });
+}
+
+export function useCreateDebt() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/accounting/debts', data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: accountingKeys.debts }),
+  });
+}
+
+export function usePayDebt() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, amount }) => api.put(`/accounting/debts/${id}/payment`, { amount }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: accountingKeys.debts });
+      queryClient.invalidateQueries({ queryKey: accountingKeys.summary });
+    },
   });
 }
 

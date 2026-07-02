@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+﻿import { useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePOSItems, posKeys } from '../../hooks/queries/usePOS';
 import { useReferrals } from '../../hooks/queries/useReferrals';
@@ -6,7 +6,9 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Ca
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { StripCounter } from '../../components/ui/StripCounter';
 import { api } from '../../lib/api';
+import { printReceipt } from '../../lib/printReceipt';
 import PharmacyProducts from './PharmacyProducts';
 import SuppliersTab from './SuppliersTab';
 
@@ -25,25 +27,47 @@ export default function PharmacyPOS() {
   const [patientName, setPatientName] = useState('');
   const [completing, setCompleting] = useState(false);
   const [receipt, setReceipt] = useState(null);
+  const [receiptItems, setReceiptItems] = useState([]);
   const [activeTab, setActiveTab] = useState('sale');
   const [activeReferralId, setActiveReferralId] = useState(null);
+  const [error, setError] = useState('');
 
   const { data: items = [], isLoading } = usePOSItems('pharmacy');
   const { data: referrals = [], isLoading: referralsLoading } = useReferrals(activeTab === 'referrals' ? 'type=PHARMACY_DISPATCH&status=PENDING' : null);
 
   const addToCart = (item) => {
+    setError('');
+    const packSize = item.packSize || 1;
     setCart((prev) => {
       const existing = prev.find((c) => c.id === item.id);
       if (existing) {
-        return prev.map((c) => c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c);
+        return prev.map((c) => c.id === item.id ? { ...c, quantity: c.quantity + packSize } : c);
       }
-      return [...prev, { id: item.id, name: item.name, sku: item.sku, price: Number(item.price), quantity: 1 }];
+      return [...prev, { id: item.id, name: item.name, sku: item.sku, price: Number(item.price), packSize, quantity: packSize, mode: 'box' }];
     });
   };
 
   const removeFromCart = (id) => setCart((prev) => prev.filter((c) => c.id !== id));
-  const updateQty = (id, qty) => setCart((prev) => prev.map((c) => c.id === id ? { ...c, quantity: Math.max(1, qty) } : c));
-  const total = cart.reduce((sum, c) => sum + c.price * c.quantity, 0);
+
+  const toggleMode = (id, newMode) => {
+    setCart((prev) => prev.map((c) => {
+      if (c.id !== id) return c;
+      if (newMode === 'box' && c.quantity % c.packSize !== 0) {
+        return { ...c, mode: newMode, quantity: Math.floor(c.quantity / c.packSize) * c.packSize };
+      }
+      return { ...c, mode: newMode };
+    }));
+  };
+
+  const updateQty = (id, displayQty) => {
+    setCart((prev) => prev.map((c) => {
+      if (c.id !== id) return c;
+      const strips = c.mode === 'box' ? displayQty * c.packSize : displayQty;
+      return { ...c, quantity: Math.max(c.mode === 'box' ? c.packSize : 1, strips) };
+    }));
+  };
+
+  const total = cart.reduce((sum, c) => sum + (c.price / c.packSize) * c.quantity, 0);
 
   const handleDispenseReferral = useCallback((referral) => {
     setPatientName(referral.patient?.fullName || '');
@@ -68,14 +92,20 @@ export default function PharmacyPOS() {
         referralId: activeReferralId || undefined,
       });
       setReceipt(result.transaction);
+      setReceiptItems(cart.map((c) => ({
+        name: c.name,
+        quantity: c.quantity,
+        price: Number(c.price) / Number(c.packSize),
+        total: (Number(c.price) / Number(c.packSize)) * c.quantity,
+      })));
       setCart([]);
       setPatientName('');
       setPaymentMethod('CASH');
       setActiveReferralId(null);
       queryClient.invalidateQueries({ queryKey: posKeys.items('pharmacy') });
-    } catch (err) { console.error('[PharmacyPOS]', err); }
+    } catch (err) { console.error('[PharmacyPOS]', err); setError(err.message || 'Transaction failed'); }
     setCompleting(false);
-  }, [cart, paymentMethod, total, patientName]);
+  }, [cart, paymentMethod, total, patientName, activeReferralId]);
 
   if (receipt) {
     return (
@@ -89,10 +119,32 @@ export default function PharmacyPOS() {
               <p className="text-lg font-bold text-green-700 dark:text-green-300">Transaction Complete</p>
               <p className="text-caption text-green-600 dark:text-green-400">ID: {receipt.id.slice(0, 8)}</p>
             </div>
+            <div className="text-caption text-slate space-y-1">
+              <p>Date: {new Date(receipt.createdAt).toLocaleString()}</p>
+              <p>Cashier: {receipt.cashier?.fullName || '-'}</p>
+            </div>
+            {receiptItems.length > 0 && (
+              <div>
+                <div className="flex justify-between text-caption font-semibold text-graphite border-b border-silver pb-1 mb-1">
+                  <span className="flex-1">Item</span>
+                  <span className="w-16 text-center">Qty</span>
+                  <span className="w-28 text-right">Price</span>
+                  <span className="w-28 text-right">Total</span>
+                </div>
+                {receiptItems.map((it, i) => (
+                  <div key={i} className="flex justify-between text-body text-obsidian py-1 border-b border-bone">
+                    <span className="flex-1 truncate">{it.name}</span>
+                    <span className="w-16 text-center">{it.quantity}</span>
+                    <span className="w-28 text-right whitespace-nowrap">SDG {it.price.toFixed(2)}</span>
+                    <span className="w-28 text-right whitespace-nowrap">SDG {it.total.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="space-y-2">
               <div className="flex justify-between text-body">
                 <span className="text-graphite">Amount</span>
-                <span className="font-semibold text-obsidian">SDG ${Number(receipt.amount).toFixed(2)}</span>
+                <span className="font-semibold text-obsidian">SDG {Number(receipt.amount).toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-body">
                 <span className="text-graphite">Payment</span>
@@ -103,7 +155,14 @@ export default function PharmacyPOS() {
                 <span className="text-obsidian">{new Date(receipt.createdAt).toLocaleString()}</span>
               </div>
             </div>
-            <Button className="w-full" onClick={() => setReceipt(null)}>New Sale</Button>
+            <div className="flex gap-2">
+              <Button className="flex-1" onClick={() => printReceipt({
+                title: 'Sale Receipt',
+                transaction: receipt,
+                items: receiptItems.map((it) => ({ name: it.name, quantity: it.quantity, price: it.price, total: it.total })),
+              })}>Print Receipt</Button>
+              <Button className="flex-1" onClick={() => { setReceipt(null); setReceiptItems([]); setError(''); }}>New Sale</Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -111,7 +170,18 @@ export default function PharmacyPOS() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {completing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="loader" />
+        </div>
+      )}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg px-4 py-3 flex items-center justify-between">
+          <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+          <button className="text-red-500 hover:text-red-700 touch-target p-1 shrink-0" onClick={() => setError('')}>&times;</button>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-heading-sm font-semibold text-obsidian">Pharmacy POS</h1>
@@ -130,7 +200,7 @@ export default function PharmacyPOS() {
           onClick={() => setActiveTab('suppliers')}>Suppliers</button>
       </div>
 
-      {activeTab === 'suppliers' ? <SuppliersTab /> : null}
+      {activeTab === 'suppliers' ? <SuppliersTab category="pharmacy" /> : null}
       {activeTab === 'referrals' ? (
         <Card>
           <CardHeader>
@@ -192,18 +262,21 @@ export default function PharmacyPOS() {
               {isLoading && <p className="text-body text-slate">Loading inventory...</p>}
               {!isLoading && (
                 <div className="max-h-[50vh] overflow-y-auto space-y-1">
-                  {filteredItems.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-bone transition-colors">
+                  {filteredItems.map((item) => {
+                    const outOfStock = item.quantity < 1;
+                    return (
+                    <div key={item.id}
+                      className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${outOfStock ? 'opacity-50 cursor-not-allowed' : 'hover:bg-bone cursor-pointer'}`}
+                      onClick={() => !outOfStock && addToCart(item)}
+                    >
                       <div className="min-w-0 flex-1">
                         <p className="text-body text-obsidian truncate">{item.name}</p>
-                        <p className="text-caption text-slate">{item.sku} · Stock: {item.quantity}</p>
+                        <p className="text-caption text-slate">{item.sku} · Stock: {Number(item.quantity).toFixed(1)} boxes · {item.packSize || 1} strips/box</p>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0 ml-2">
-                        <span className="text-body font-medium text-obsidian">SDG ${Number(item.price).toFixed(2)}</span>
-                        <Button size="sm" onClick={() => addToCart(item)} disabled={item.quantity < 1}>Add</Button>
-                      </div>
+                      <span className="text-body font-medium text-obsidian shrink-0 ml-2">SDG {(Number(item.price) / (item.packSize || 1)).toFixed(2)} / strip</span>
                     </div>
-                  ))}
+                    );
+                  })}
                   {filteredItems.length === 0 && <p className="text-body text-slate text-center py-4">No items found</p>}
                 </div>
               )}
@@ -218,28 +291,42 @@ export default function PharmacyPOS() {
             </CardHeader>
             <CardContent className="space-y-3">
               {cart.length === 0 && <p className="text-body text-slate text-center py-4">Cart is empty</p>}
-              {cart.map((c) => (
-                <div key={c.id} className="flex items-center justify-between pb-2 border-b border-bone last:border-0">
-                  <div className="min-w-0 flex-1">
+              {cart.map((c) => {
+                const mode = c.mode || 'box';
+                const displayQty = mode === 'box' ? Math.floor(c.quantity / c.packSize) : c.quantity;
+                const displayLabel = mode === 'box' ? (displayQty !== 1 ? 'boxes' : 'box') : (displayQty !== 1 ? 'strips' : 'strip');
+                return (
+                <div key={c.id} className="pb-3 border-b border-bone last:border-0">
+                  <div className="flex items-center justify-between">
                     <p className="text-body text-obsidian truncate">{c.name}</p>
-                    <p className="text-caption text-slate">SDG ${c.price.toFixed(2)} each</p>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0 ml-2">
-                    <select
-                      className="w-14 px-1 py-1 bg-paper border border-silver rounded text-caption"
-                      value={c.quantity}
-                      onChange={(e) => updateQty(c.id, parseInt(e.target.value))}
-                    >
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-                        <option key={n} value={n}>{n}</option>
-                      ))}
-                    </select>
-                    <button className="text-slate hover:text-red-500 dark:hover:text-red-400 touch-target p-1" onClick={() => removeFromCart(c.id)}>
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+                    <button className="text-slate hover:text-red-500 touch-target p-1" onClick={() => removeFromCart(c.id)}>
+                      <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
                     </button>
                   </div>
+                  <div className="flex gap-0 mt-2">
+                    <button
+                      className={`px-2.5 py-1 text-xs font-medium rounded-l-md border transition-colors ${mode === 'box' ? 'bg-lilac-bloom text-obsidian border-lilac-bloom z-10' : 'bg-paper text-graphite border-silver hover:bg-bone'}`}
+                      onClick={() => toggleMode(c.id, 'box')}
+                    >Box</button>
+                    <button
+                      className={`px-2.5 py-1 text-xs font-medium rounded-r-md border-l-0 border transition-colors ${mode === 'strip' ? 'bg-lilac-bloom text-obsidian border-lilac-bloom z-10' : 'bg-paper text-graphite border-silver hover:bg-bone'}`}
+                      onClick={() => toggleMode(c.id, 'strip')}
+                    >Strip</button>
+                  </div>
+                  <div className="mt-2">
+                    <StripCounter
+                      value={displayQty}
+                      min={1}
+                      label={displayLabel}
+                      onChange={(v) => updateQty(c.id, v)}
+                    />
+                  </div>
+                  <p className="text-caption text-slate mt-1">
+                    SDG ${((c.price / c.packSize) * c.quantity).toFixed(2)}
+                  </p>
                 </div>
-              ))}
+                );
+              })}
               {cart.length > 0 && (
                 <div className="pt-2 border-t border-silver">
                   <div className="flex justify-between text-body font-semibold">

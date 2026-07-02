@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useHREmployees, useHRPayroll, useHRLeaves, useUpdatePayrollStatus, useUpdateLeaveStatus, hrKeys } from '../../hooks/queries/useHR';
-import { useDepartments } from '../../hooks/queries/useAdmin';
+import { useDepartments, useAdminRoles } from '../../hooks/queries/useAdmin';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -29,6 +29,10 @@ export default function HRPage() {
   const [showPayrollModal, setShowPayrollModal] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [empForm, setEmpForm] = useState({ employeeCode: '', fullName: '', phone: '', email: '', gender: '', position: '', department: '', departmentId: '', baseSalary: 0, hireDate: '' });
+  const [createUser, setCreateUser] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
+  const [userPassword, setUserPassword] = useState('');
+  const [userRoleId, setUserRoleId] = useState('');
   const [payForm, setPayForm] = useState({ employeeId: '', period: '', grossPay: 0, deductions: 0, notes: '' });
   const [leaveForm, setLeaveForm] = useState({ employeeId: '', type: 'ANNUAL', startDate: '', endDate: '', reason: '' });
 
@@ -36,6 +40,7 @@ export default function HRPage() {
   const { data: payroll = [], isLoading: loadingPay } = useHRPayroll();
   const { data: leaves = [], isLoading: loadingLeave } = useHRLeaves();
   const { data: departments = [] } = useDepartments();
+  const { data: roles = [] } = useAdminRoles();
   const updatePayrollStatus = useUpdatePayrollStatus();
   const updateLeaveStatus = useUpdateLeaveStatus();
 
@@ -44,9 +49,13 @@ export default function HRPage() {
   const handleCreateEmployee = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/hr/employees', empForm);
+      await api.post('/hr/employees', { ...empForm, createUser, userEmail, userPassword, userRoleId });
       setShowEmpModal(false);
       setEmpForm({ employeeCode: '', fullName: '', phone: '', email: '', gender: '', position: '', department: '', departmentId: '', baseSalary: 0, hireDate: '' });
+      setCreateUser(false);
+      setUserEmail('');
+      setUserPassword('');
+      setUserRoleId('');
       queryClient.invalidateQueries({ queryKey: hrKeys.employees });
     } catch (err) {
       alert(err.message || 'Failed to create employee');
@@ -211,7 +220,7 @@ export default function HRPage() {
           <div>
             <label className="text-sm font-medium text-graphite">Gender</label>
             <select value={empForm.gender} onChange={(e) => setEmpForm({ ...empForm, gender: e.target.value })}
-              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
+              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
               <option value="">-- Select --</option>
               <option value="MALE">Male</option>
               <option value="FEMALE">Female</option>
@@ -220,7 +229,7 @@ export default function HRPage() {
           <div>
             <label className="text-sm font-medium text-graphite">Position *</label>
             <select required value={empForm.position} onChange={(e) => setEmpForm({ ...empForm, position: e.target.value })}
-              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
+              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
               <option value="">-- Select Position --</option>
               {POSITIONS.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
@@ -232,13 +241,41 @@ export default function HRPage() {
               const dept = departments.find(d => d.id === deptId);
               setEmpForm({ ...empForm, departmentId: deptId, department: dept?.name || '' });
             }}
-              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
+              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
               <option value="">-- Select Department --</option>
               {departments.map((d) => <option key={d.id} value={d.id}>{d.name} ({d.type})</option>)}
             </select>
           </div>
           <Input label="Base Salary" type="number" min="0" step="0.01" value={empForm.baseSalary} onChange={(e) => setEmpForm({ ...empForm, baseSalary: parseFloat(e.target.value) || 0 })} />
           <Input label="Hire Date" type="date" required value={empForm.hireDate} onChange={(e) => setEmpForm({ ...empForm, hireDate: e.target.value })} />
+
+          <div className="flex items-center gap-2 pt-2">
+            <input type="checkbox" id="createUser" checked={createUser}
+              onChange={(e) => {
+                setCreateUser(e.target.checked);
+                if (e.target.checked && empForm.email) setUserEmail(empForm.email);
+              }}
+              className="w-4 h-4 rounded border-silver text-lilac-bloom focus:ring-lilac-bloom" />
+            <label htmlFor="createUser" className="text-sm font-medium text-graphite cursor-pointer">Create Login Account</label>
+          </div>
+
+          {createUser && (
+            <div className="space-y-4 pl-2 border-l-2 border-lilac-bloom/30">
+              <Input label="Login Email" type="email" required value={userEmail}
+                onChange={(e) => setUserEmail(e.target.value)} />
+              <Input label="Password" type="password" required value={userPassword}
+                onChange={(e) => setUserPassword(e.target.value)} />
+              <div>
+                <label className="text-sm font-medium text-graphite">Role *</label>
+                <select required value={userRoleId} onChange={(e) => setUserRoleId(e.target.value)}
+                  className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
+                  <option value="">-- Select Role --</option>
+                  {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="secondary" onClick={() => setShowEmpModal(false)} className="flex-1">Cancel</Button>
             <Button type="submit" className="flex-1">Create</Button>
@@ -251,7 +288,7 @@ export default function HRPage() {
           <div>
             <label className="text-sm font-medium text-graphite">Employee</label>
             <select required value={payForm.employeeId} onChange={(e) => setPayForm({ ...payForm, employeeId: e.target.value })}
-              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
+              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
               <option value="">Select employee</option>
               {employees.map((e) => <option key={e.id} value={e.id}>{e.fullName} ({e.employeeCode})</option>)}
             </select>
@@ -272,7 +309,7 @@ export default function HRPage() {
           <div>
             <label className="text-sm font-medium text-graphite">Employee</label>
             <select required value={leaveForm.employeeId} onChange={(e) => setLeaveForm({ ...leaveForm, employeeId: e.target.value })}
-              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
+              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
               <option value="">Select employee</option>
               {employees.map((e) => <option key={e.id} value={e.id}>{e.fullName}</option>)}
             </select>
@@ -280,7 +317,7 @@ export default function HRPage() {
           <div>
             <label className="text-sm font-medium text-graphite">Leave Type</label>
             <select required value={leaveForm.type} onChange={(e) => setLeaveForm({ ...leaveForm, type: e.target.value })}
-              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
+              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
               <option value="ANNUAL">Annual</option>
               <option value="SICK">Sick</option>
               <option value="PERSONAL">Personal</option>

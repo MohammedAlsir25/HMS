@@ -61,6 +61,21 @@
   --radius-3xl-3: 42px;
   --radius-full: 48px;
 
+  /* Shadcn color tokens */
+  --color-primary: var(--color-lilac-bloom);
+  --color-primary-foreground: var(--color-obsidian);
+  --color-background: var(--color-paper);
+  --color-foreground: var(--color-obsidian);
+  --color-accent: var(--color-bone);
+  --color-accent-foreground: var(--color-obsidian);
+  --color-input: var(--color-silver);
+  --color-ring: var(--color-lilac-bloom);
+  --color-border: var(--color-silver);
+  --color-secondary: var(--color-bone);
+  --color-secondary-foreground: var(--color-graphite);
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+
   /* Shadows */
   --shadow-md: rgba(0, 0, 0, 0.04) 0px 8px 16px 0px;
   --shadow-subtle: rgba(16, 24, 40, 0.05) 0px 1px 2px 0px;

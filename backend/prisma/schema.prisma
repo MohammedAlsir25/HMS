@@ -113,6 +113,10 @@ model User {
   assignedOrders   DiagnosticOrder[] @relation("OrderAssignee")
   enteredResults   DiagnosticOrderTest[] @relation("ResultEnterer")
   createdInvoices  SupplierInvoice[]
+  createdRequisitions Requisition[] @relation("RequisitionCreator")
+  createdPurchaseOrders PurchaseOrder[] @relation("POCreator")
+  approvedPurchaseOrders PurchaseOrder[] @relation("POApprover")
+  notifications Notification[]
 
   @@map("users")
 }
@@ -177,6 +181,8 @@ model Department {
   employees   Employee[]
   expenses     Expense[]
   transactions Transaction[]
+  costCenter   CostCenter?
+  requisitions Requisition[]
 
   @@map("departments")
 }
@@ -209,6 +215,7 @@ model Expense {
   department   Department? @relation(fields: [departmentId], references: [id])
 
   supplierInvoice SupplierInvoice?
+  purchaseOrders PurchaseOrder[]
 
   @@map("expenses")
 }
@@ -263,7 +270,8 @@ model Appointment {
   status    AppointmentStatus @default(WAITING)
   priority  Int               @default(0)
   visitType VisitType?        @default(NEW_VISIT)
-  notes     String?
+  notes       String?
+  scheduledAt  DateTime?
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
 
@@ -420,21 +428,24 @@ model Surgery {
 }
 
 model InventoryItem {
-  id          String  @id @default(uuid())
+  id          String   @id @default(uuid())
   name        String
   nameAr      String?
-  sku         String  @unique
+  sku         String   @unique
   category    String
-  quantity    Int     @default(0)
-  price       Decimal @default(0)
+  quantity    Decimal  @default(0)
+  packSize    Int      @default(1) @map("pack_size")
+  price       Decimal  @default(0)
   costPrice   Decimal? @default(0)
-  minStock    Int     @default(0)
+  minStock    Int      @default(0)
   expiryDate  DateTime?
-  isActive    Boolean @default(true)
+  isActive    Boolean  @default(true)
 
   locations   InventoryLocation[]
   transactions InventoryTransaction[]
   supplierInvoiceItems SupplierInvoiceItem[]
+  purchaseOrderItems PurchaseOrderItem[]
+  requisitionItems RequisitionItem[]
 
   @@map("inventory_items")
 }
@@ -453,7 +464,7 @@ model InventoryLocation {
 model InventoryTransaction {
   id       String   @id @default(uuid())
   type     String
-  quantity Int
+  quantity Decimal
   unitCost Decimal?
   notes    String?
   createdAt DateTime @default(now())
@@ -748,8 +759,24 @@ enum PaymentStatus {
   Pending
 }
 
+model AccountsPayable {
+  id            String        @id @default(uuid())
+  creditor      String
+  description   String
+  amount        Decimal
+  amountPaid    Decimal       @default(0)
+  paymentStatus PaymentStatus @default(Pending)
+  dueDate       DateTime?
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@map("accounts_payable")
+}
+
 model Supplier {
   id             String   @id @default(uuid())
+  category       String
   name           String
   contactPerson  String?
   phone          String?
@@ -757,6 +784,7 @@ model Supplier {
   createdAt      DateTime @default(now())
 
   invoices SupplierInvoice[]
+  purchaseOrders PurchaseOrder[]
 
   @@map("suppliers")
 }
@@ -797,4 +825,153 @@ model SupplierInvoiceItem {
   item      InventoryItem   @relation(fields: [itemId], references: [id])
 
   @@map("supplier_invoice_items")
+}
+
+model CostCenter {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  isActive    Boolean  @default(true)
+
+  departmentId String @unique
+  department   Department @relation(fields: [departmentId], references: [id])
+
+  purchaseOrders PurchaseOrder[]
+
+  @@map("cost_centers")
+}
+
+model Requisition {
+  id            String   @id @default(uuid())
+  requestNumber String?
+  status        String   @default("DRAFT")
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  requestedById String
+  requestedBy   User       @relation("RequisitionCreator", fields: [requestedById], references: [id])
+  departmentId  String
+  department    Department @relation(fields: [departmentId], references: [id])
+
+  items RequisitionItem[]
+
+  @@map("requisitions")
+}
+
+model RequisitionItem {
+  id          String @id @default(uuid())
+  description String
+  quantity    Int
+  notes       String?
+
+  itemId String?
+  item   InventoryItem? @relation(fields: [itemId], references: [id])
+
+  requisitionId String
+  requisition   Requisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+
+  @@map("requisition_items")
+}
+
+model PurchaseOrder {
+  id                String   @id @default(uuid())
+  orderNumber       String?
+  status            String   @default("DRAFT")
+  rejectionReason   String?
+  departmentType    String
+  expenseType       String
+  invoiceTotal      Decimal
+  amountPaid        Decimal  @default(0)
+  paymentStatus     PaymentStatus @default(Pending)
+  notes             String?
+  receivedAt        DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  approvalTier      Int?
+  approvedById      String?
+  approvedBy        User?    @relation("POApprover", fields: [approvedById], references: [id])
+  approvedAt        DateTime?
+
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  createdById String
+  createdBy   User     @relation("POCreator", fields: [createdById], references: [id])
+
+  costCenterId String?
+  costCenter   CostCenter? @relation(fields: [costCenterId], references: [id])
+
+  items PurchaseOrderItem[]
+
+  expenseId String? @unique
+  expense   Expense? @relation(fields: [expenseId], references: [id])
+  assetId   String? @unique
+  asset     FixedAsset? @relation(fields: [assetId], references: [id])
+
+  cogsAccountId       String?
+  labFeePaid          Decimal?
+  installationFreight Decimal?
+  usefulLifeYears     Int?
+
+  requisitionIds String[] @default([])
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id               String  @id @default(uuid())
+  description      String?
+  quantity         Int     @default(1)
+  quantityReceived Int     @default(0)
+  unitCost         Decimal
+  totalLineCost    Decimal
+
+  itemId String?
+  item   InventoryItem? @relation(fields: [itemId], references: [id])
+
+  orderId String
+  order   PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("purchase_order_items")
+}
+
+model FixedAsset {
+  id                 String   @id @default(uuid())
+  name               String
+  assetType          String
+  acquisitionCost    Decimal
+  installationCost   Decimal? @default(0)
+  totalCost          Decimal
+  usefulLifeYears    Int
+  salvageValue       Decimal? @default(0)
+  depreciationMethod String  @default("straight-line")
+  monthlyDepreciation Decimal
+  accumulatedDepreciation Decimal @default(0)
+  bookValue           Decimal
+  purchaseDate       DateTime
+  location           String?
+  serialNumber       String?
+  notes              String?
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  purchaseOrder PurchaseOrder?
+
+  @@map("fixed_assets")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  actionUrl String?
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
 }

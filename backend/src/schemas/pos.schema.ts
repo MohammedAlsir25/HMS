@@ -6,7 +6,7 @@ export const posTransactSchema = z.object({
   type: z.enum(['PHARMACY', 'OPTICS']),
   items: z.array(z.object({
     id: z.string().min(1),
-    quantity: z.number().int().positive().optional().default(1),
+    quantity: z.number().positive().optional().default(1),
     name: z.string().optional(),
   })).min(1, 'items array is required'),
   paymentMethod: paymentMethods,

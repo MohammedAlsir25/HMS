@@ -24,7 +24,7 @@ export function Modal({ open, onClose, title, children, className = '' }) {
     >
       <div
         className={`bg-paper border border-silver rounded-3xl shadow-md w-full max-w-lg max-h-[85vh]
-          overflow-y-auto animate-in fade-in zoom-in-95 duration-200 ${className}`}
+          overflow-y-auto hide-scrollbar animate-in fade-in zoom-in-95 duration-200 ${className}`}
       >
         {title && (
           <div className="flex items-center justify-between px-6 pt-6 pb-2">

@@ -160,6 +160,17 @@ router.get('/:slug/stats', authenticate, requirePermission(PERMISSIONS.CLINICAL_
   });
 }));
 
+router.get('/:slug/doctors', authenticate, asyncHandler(async (req, res) => {
+  const clinic = await prisma.clinic.findUnique({ where: { slug: req.params.slug } });
+  if (!clinic) throw new NotFoundError('Clinic not found');
+  const doctors = await prisma.user.findMany({
+    where: { clinicId: clinic.id, isActive: true, role: { name: { contains: 'doctor', mode: 'insensitive' } } },
+    select: { id: true, fullName: true },
+    orderBy: { fullName: 'asc' },
+  });
+  res.json(doctors);
+}));
+
 router.get('/:slug/medications', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), asyncHandler(async (req, res) => {
   const { search } = req.query as Record<string, string>;
   const where: Record<string, unknown> = { isActive: true, category: { contains: 'medication', mode: 'insensitive' as const } };

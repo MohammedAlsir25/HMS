@@ -9,7 +9,7 @@ import prisma from '../../../lib/prisma.js';
 const router = Router();
 
 router.post('/', authenticate, requirePermission(PERMISSIONS.PHARMACY_WRITE), asyncHandler(async (req, res) => {
-  const { name, nameAr, sku, price, costPrice, initialQuantity, minStock, expiryDate } = req.body;
+  const { name, nameAr, sku, price, costPrice, initialQuantity, minStock, expiryDate, packSize } = req.body;
   if (!name || !sku) throw new ValidationError('Name and SKU are required');
   const existing = await prisma.inventoryItem.findUnique({ where: { sku } });
   if (existing) throw new ConflictError('Item with this SKU already exists');
@@ -17,6 +17,7 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.PHARMACY_WRITE), as
     data: {
       name, nameAr, sku, category: 'pharmacy', quantity: initialQuantity || 0,
       price: price || 0, costPrice: costPrice || 0, minStock: minStock || 0,
+      packSize: packSize || 1,
       expiryDate: expiryDate ? new Date(expiryDate) : null,
     },
   });
@@ -43,7 +44,7 @@ router.post('/:id/adjust', authenticate, requirePermission(PERMISSIONS.PHARMACY_
   if (!quantity || quantity < 1) throw new ValidationError('quantity must be a positive integer');
   const item = await prisma.inventoryItem.findFirst({ where: { id, category: 'pharmacy' } });
   if (!item) throw new NotFoundError('Item not found');
-  const qty = type === 'IN' ? -(quantity as number) : (quantity as number);
+  const qty = type === 'IN' ? (quantity as number) : -(quantity as number);
   await prisma.inventoryTransaction.create({
     data: { type: type as never, quantity: qty, notes: (notes as string) || null, itemId: id },
   });
@@ -56,7 +57,7 @@ router.post('/:id/adjust', authenticate, requirePermission(PERMISSIONS.PHARMACY_
 
 router.put('/:id', authenticate, requirePermission(PERMISSIONS.PHARMACY_WRITE), asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { name, nameAr, sku, price, costPrice, minStock, expiryDate } = req.body;
+  const { name, nameAr, sku, price, costPrice, minStock, expiryDate, packSize } = req.body;
   const existing = await prisma.inventoryItem.findFirst({ where: { id, category: 'pharmacy' } });
   if (!existing) throw new NotFoundError('Item not found');
   if (sku && sku !== existing.sku) {
@@ -70,6 +71,7 @@ router.put('/:id', authenticate, requirePermission(PERMISSIONS.PHARMACY_WRITE), 
       price: price !== undefined ? parseFloat(price) : undefined,
       costPrice: costPrice !== undefined ? parseFloat(costPrice) : undefined,
       minStock: minStock !== undefined ? parseInt(minStock) : undefined,
+      packSize: packSize !== undefined ? parseInt(packSize) : undefined,
       expiryDate: expiryDate !== undefined ? (expiryDate ? new Date(expiryDate) : null) : undefined,
     },
   });

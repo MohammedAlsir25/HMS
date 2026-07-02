@@ -67,6 +67,7 @@ export default function PharmacyProducts() {
     costPrice: "",
     initialQuantity: "",
     minStock: "",
+    packSize: "1",
     expiryDate: "",
   });
 
@@ -102,7 +103,7 @@ export default function PharmacyProducts() {
 
   const openCreate = () => {
     setEditItem(null);
-    setForm({ name: "", sku: "", price: "", costPrice: "", initialQuantity: "", minStock: "", expiryDate: "" });
+    setForm({ name: "", sku: "", price: "", costPrice: "", initialQuantity: "", minStock: "", packSize: "1", expiryDate: "" });
     setShowModal(true);
   };
 
@@ -115,6 +116,7 @@ export default function PharmacyProducts() {
       costPrice: item.costPrice ? String(item.costPrice) : "",
       initialQuantity: "",
       minStock: item.minStock ? String(item.minStock) : "",
+      packSize: item.packSize ? String(item.packSize) : "1",
       expiryDate: item.expiryDate ? item.expiryDate.slice(0, 10) : "",
     });
     setShowModal(true);
@@ -129,6 +131,7 @@ export default function PharmacyProducts() {
         price: form.price ? parseFloat(form.price) : 0,
         costPrice: form.costPrice ? parseFloat(form.costPrice) : 0,
         minStock: form.minStock ? parseInt(form.minStock) : 0,
+        packSize: parseInt(form.packSize) || 1,
         expiryDate: form.expiryDate || null,
       };
       if (editItem) {
@@ -139,7 +142,7 @@ export default function PharmacyProducts() {
       }
       setShowModal(false);
       setEditItem(null);
-      setForm({ name: "", sku: "", price: "", costPrice: "", initialQuantity: "", minStock: "", expiryDate: "" });
+      setForm({ name: "", sku: "", price: "", costPrice: "", initialQuantity: "", minStock: "", packSize: "1", expiryDate: "" });
       setLoading(true);
       loadItems();
       loadAlerts();
@@ -187,17 +190,27 @@ export default function PharmacyProducts() {
     { key: "sku", label: t("pharmacyProducts.colSku") },
     { key: "name", label: t("pharmacyProducts.colName") },
     {
+      key: "packSize",
+      label: "Pack",
+      render: (row) => `${row.packSize || 1} strips/box`,
+    },
+    {
       key: "quantity",
       label: t("pharmacyProducts.colQty"),
       render: (row) => (
         <span className={row.quantity <= row.minStock ? "text-red-500 dark:text-red-400 font-semibold" : ""}>
-          {row.quantity}
+          {Number(row.quantity).toFixed(1)}
         </span>
       ),
     },
-    { key: "price", label: "Selling Price", render: (row) => `SDG ${Number(row.price).toFixed(2)}` },
+    { key: "price", label: "Price", render: (row) => `SDG ${Number(row.price).toFixed(2)}` },
+    {
+      key: "pricePerStrip",
+      label: "Price/Strip",
+      render: (row) => `SDG ${(Number(row.price) / (row.packSize || 1)).toFixed(2)}`,
+    },
     { key: "costPrice", label: "Unit Cost", render: (row) => `SDG ${Number(row.costPrice).toFixed(2)}` },
-    { key: "totalValue", label: "Total Value", render: (row) => `SDG ${(Number(row.costPrice) * row.quantity).toFixed(2)}` },
+    { key: "totalValue", label: "Total Value", render: (row) => `SDG ${(Number(row.costPrice) * Number(row.quantity)).toFixed(2)}` },
     { key: "minStock", label: t("pharmacyProducts.colMinStock") },
     {
       key: "expiryDate",
@@ -287,8 +300,9 @@ export default function PharmacyProducts() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input label={t("pharmacyProducts.formName")} required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <Input label={t("pharmacyProducts.formSku")} required value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
-          <Input label="Selling Price" type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
-          <Input label="Unit Cost" type="number" min="0" step="0.01" value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: e.target.value })} />
+          <Input label="Price (per box)" type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+          <Input label="Strips per box" type="number" min="1" step="1" value={form.packSize} onChange={(e) => setForm({ ...form, packSize: e.target.value })} />
+          <Input label="Unit Cost (per box)" type="number" min="0" step="0.01" value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: e.target.value })} />
           {!editItem && <Input label={t("pharmacyProducts.formInitialQty")} type="number" min="0" value={form.initialQuantity} onChange={(e) => setForm({ ...form, initialQuantity: e.target.value })} />}
           <Input label={t("pharmacyProducts.formMinStock")} type="number" min="0" value={form.minStock} onChange={(e) => setForm({ ...form, minStock: e.target.value })} />
           <Input label={t("pharmacyProducts.formExpiryDate")} type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} />

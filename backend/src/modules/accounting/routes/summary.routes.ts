@@ -90,7 +90,11 @@ router.get('/revenue-by-department', authenticate, requirePermission(PERMISSIONS
   if (startDate || endDate) {
     where.createdAt = {} as Record<string, unknown>;
     if (startDate) (where.createdAt as Record<string, unknown>).gte = new Date(startDate);
-    if (endDate) (where.createdAt as Record<string, unknown>).lte = new Date(endDate);
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      (where.createdAt as Record<string, unknown>).lte = end;
+    }
   }
   const transactions = await prisma.transaction.findMany({
     where,
@@ -113,13 +117,21 @@ router.get('/pnl', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_READ),
   if (startDate || endDate) {
     dateFilter.createdAt = {} as Record<string, unknown>;
     if (startDate) (dateFilter.createdAt as Record<string, unknown>).gte = new Date(startDate);
-    if (endDate) (dateFilter.createdAt as Record<string, unknown>).lte = new Date(endDate);
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      (dateFilter.createdAt as Record<string, unknown>).lte = end;
+    }
   }
   const expenseDateFilter: Record<string, unknown> = {};
   if (startDate || endDate) {
     expenseDateFilter.date = {} as Record<string, unknown>;
     if (startDate) (expenseDateFilter.date as Record<string, unknown>).gte = new Date(startDate);
-    if (endDate) (expenseDateFilter.date as Record<string, unknown>).lte = new Date(endDate);
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      (expenseDateFilter.date as Record<string, unknown>).lte = end;
+    }
   }
   const [txGroups, expenseGroups, departments] = await Promise.all([
     prisma.transaction.groupBy({

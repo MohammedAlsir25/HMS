@@ -8,7 +8,7 @@ import { ValidationError, NotFoundError, ForbiddenError } from '../../../utils/e
 import { auditMiddleware } from '../../../middleware/auditLog.js';
 import { PERMISSIONS } from '../../../middleware/rbac.js';
 import prisma from '../../../lib/prisma.js';
-import { resolveClinic, nextToken } from '../reception.utils.js';
+import { resolveClinic, nextToken, generateMRN } from '../reception.utils.js';
 
 const router = Router();
 
@@ -58,18 +58,36 @@ router.post('/check-in', authenticate, requirePermission(PERMISSIONS.APPOINTMENT
         cashierId: req.user!.id,
         departmentId: department ? department.id : null,
       },
+      include: { cashier: { select: { id: true, fullName: true } } },
     });
   }
   res.status(201).json({ appointment, transaction });
 }));
 
 router.post('/reservations', authenticate, requirePermission(PERMISSIONS.APPOINTMENT_WRITE), asyncHandler(async (req, res) => {
-  const { patientId, clinicId, notes } = req.body;
-  if (!patientId || !clinicId) throw new ValidationError('patientId and clinicId are required');
-  const patient = await prisma.patient.findUnique({ where: { id: patientId } });
-  if (!patient) throw new NotFoundError('Patient not found');
+  const { patientId, clinicId, doctorId, scheduledAt, fullName, phone, notes } = req.body;
+  if (!clinicId) throw new ValidationError('clinicId is required');
+  if (!patientId && !fullName) throw new ValidationError('patientId or fullName is required');
   const clinic = await resolveClinic(clinicId);
   if (!clinic) throw new NotFoundError('Clinic not found');
+  let patient;
+  if (patientId) {
+    patient = await prisma.patient.findUnique({ where: { id: patientId } });
+    if (!patient) throw new NotFoundError('Patient not found');
+  } else {
+    patient = await prisma.patient.create({
+      data: {
+        fullName,
+        phone: phone || null,
+        mrn: generateMRN(),
+        createdBy: { connect: { id: req.user!.id } },
+      },
+    });
+  }
+  if (doctorId) {
+    const doctor = await prisma.user.findFirst({ where: { id: doctorId, clinicId: clinic.id, isActive: true } });
+    if (!doctor) throw new ValidationError('Doctor not found or not assigned to this clinic');
+  }
   const token = await nextToken(clinic.id);
   const appointment = await prisma.appointment.create({
     data: {
@@ -77,13 +95,21 @@ router.post('/reservations', authenticate, requirePermission(PERMISSIONS.APPOINT
       type: 'RESERVATION',
       status: 'RESERVED',
       priority: 0,
+      scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
       notes: notes || null,
-      patientId,
+      patientId: patient.id,
       clinicId: clinic.id,
-      doctorId: req.user!.id,
+      doctorId: doctorId || req.user!.id,
     },
-    include: { patient: { select: { fullName: true, mrn: true, nationalId: true } } },
+    include: { patient: { select: { fullName: true, mrn: true, nationalId: true, phone: true } }, doctor: { select: { fullName: true } }, clinic: { select: { name: true } } },
   });
+  if (patient.phone) {
+    console.log(`[SMS] To ${patient.phone}: Appointment at ${appointment.clinic.name} with Dr. ${(appointment as any).doctor.fullName} on ${appointment.scheduledAt?.toISOString() || 'soon'}`);
+  }
+  try {
+    const { NotificationService } = await import('../../procurement/services/NotificationService.js');
+    await NotificationService.notify(req.user!.id, 'New Reservation', `Reservation created for ${patient.fullName} at ${clinic.name}`);
+  } catch {}
   res.status(201).json(appointment);
 }));
 

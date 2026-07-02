@@ -33,3 +33,11 @@ export function useClinicStats(slug) {
     enabled: !!slug,
   });
 }
+
+export function useClinicDoctors(slug) {
+  return useQuery({
+    queryKey: ['clinics', slug, 'doctors'],
+    queryFn: () => api.get(`/clinics/${slug}/doctors`),
+    enabled: !!slug,
+  });
+}

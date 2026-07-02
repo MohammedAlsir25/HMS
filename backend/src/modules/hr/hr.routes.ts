@@ -3,6 +3,7 @@ import { authenticate, requirePermission } from '../../middleware/auth.js';
 import { asyncHandler } from '../../middleware/errorHandler.js';
 import { ValidationError, NotFoundError, ConflictError } from '../../utils/errors.js';
 import { PERMISSIONS } from '../../middleware/rbac.js';
+import bcrypt from 'bcryptjs';
 
 const router = Router();
 import prisma from '../../lib/prisma.js';
@@ -28,16 +29,40 @@ router.get('/employees', authenticate, requirePermission(PERMISSIONS.HR_READ), a
 }));
 
 router.post('/employees', authenticate, requirePermission(PERMISSIONS.HR_WRITE), asyncHandler(async (req, res) => {
-  const { employeeCode, fullName, phone, email, gender, position, department, departmentId, baseSalary, hireDate, userId } = req.body;
+  const { employeeCode, fullName, phone, email, gender, position, department, departmentId, baseSalary, hireDate, createUser, userEmail, userPassword, userRoleId } = req.body;
   if (!employeeCode || !fullName || !position || !hireDate) {
     throw new ValidationError('Employee code, name, position, and hire date are required');
   }
   const existing = await prisma.employee.findUnique({ where: { employeeCode } });
   if (existing) throw new ConflictError('Employee code already exists');
-  const employee = await prisma.employee.create({
-    data: { employeeCode, fullName, phone, email, gender, position, department, departmentId: departmentId || null, baseSalary: baseSalary || 0, hireDate: new Date(hireDate), userId },
-    include: { dept: { select: { id: true, name: true, slug: true, type: true } } },
-  });
+
+  if (createUser) {
+    if (!userEmail || !userPassword || !userRoleId) {
+      throw new ValidationError('Email, password, and role are required when creating a login account');
+    }
+    const existingUser = await prisma.user.findUnique({ where: { email: userEmail } });
+    if (existingUser) throw new ConflictError('Email already in use');
+  }
+
+  let employee;
+  if (createUser) {
+    const passwordHash = await bcrypt.hash(userPassword, 12);
+    employee = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: { email: userEmail, passwordHash, fullName, phone, roleId: userRoleId },
+      });
+      return tx.employee.create({
+        data: { employeeCode, fullName, phone, email, gender, position, department, departmentId: departmentId || null, baseSalary: baseSalary || 0, hireDate: new Date(hireDate), userId: user.id },
+        include: { dept: { select: { id: true, name: true, slug: true, type: true } }, user: { select: { id: true, email: true } } },
+      });
+    });
+  } else {
+    employee = await prisma.employee.create({
+      data: { employeeCode, fullName, phone, email, gender, position, department, departmentId: departmentId || null, baseSalary: baseSalary || 0, hireDate: new Date(hireDate) },
+      include: { dept: { select: { id: true, name: true, slug: true, type: true } } },
+    });
+  }
+
   res.status(201).json(employee);
 }));
 

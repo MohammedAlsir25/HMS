@@ -21,7 +21,11 @@ router.get('/', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_READ), as
   if (startDate || endDate) {
     where.date = {} as Record<string, unknown>;
     if (startDate) (where.date as Record<string, unknown>).gte = new Date(startDate);
-    if (endDate) (where.date as Record<string, unknown>).lte = new Date(endDate);
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      (where.date as Record<string, unknown>).lte = end;
+    }
   }
   const [expenses, totalCount] = await Promise.all([
     prisma.expense.findMany({

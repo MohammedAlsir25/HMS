@@ -20,7 +20,7 @@ router.get('/alerts', authenticate, asyncHandler(async (req, res) => {
   const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   const alerts: { lowStock: Array<Record<string, unknown>>; expired: Array<Record<string, unknown>>; expiringSoon: Array<Record<string, unknown>> } = { lowStock: [], expired: [], expiringSoon: [] };
   for (const item of items) {
-    if (item.quantity <= item.minStock) alerts.lowStock.push(item);
+    if (Number(item.quantity) <= item.minStock) alerts.lowStock.push(item);
     if (item.expiryDate) {
       if (new Date(item.expiryDate) < now) alerts.expired.push(item);
       else if (new Date(item.expiryDate) <= in30Days) alerts.expiringSoon.push(item);
@@ -108,9 +108,12 @@ router.post('/transact', authenticate, requirePermission(PERMISSIONS.PHARMACY_WR
     const item2 = item as { id: string; quantity?: number; name?: string };
     const dbItem = await prisma.inventoryItem.findUnique({ where: { id: item2.id } });
     const unitCost = Number(dbItem?.costPrice) || 0;
-    const qty = item2.quantity || 1;
-    totalCogs += unitCost * qty;
-    inventoryTxData.push({ item: item2, unitCost, qty });
+    const stripQty = item2.quantity || 1;
+    const packSize = dbItem?.packSize || 1;
+    // Convert strips to box-equivalent for inventory deduction
+    const boxQty = stripQty / packSize;
+    totalCogs += unitCost * boxQty;
+    inventoryTxData.push({ item: item2, unitCost, qty: boxQty });
   }
 
   const transaction = await prisma.transaction.create({
@@ -140,7 +143,13 @@ router.post('/transact', authenticate, requirePermission(PERMISSIONS.PHARMACY_WR
     });
   }
 
-  res.status(201).json({ transaction, shift });
+  const full = await prisma.transaction.findUnique({
+    where: { id: transaction.id },
+    include: {
+      cashier: { select: { id: true, fullName: true } },
+    },
+  });
+  res.status(201).json({ transaction: full, shift });
 }));
 
 export default router;

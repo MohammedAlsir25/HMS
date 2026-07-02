@@ -5,6 +5,7 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { api } from '../../lib/api';
+import ReservationFormModal from './ReservationFormModal';
 
 export default function ReservationsPanel({ clinics }) {
   const { t } = useTranslation();
@@ -12,6 +13,7 @@ export default function ReservationsPanel({ clinics }) {
   const [searchQ, setSearchQ] = useState('');
   const [clinicFilter, setClinicFilter] = useState('');
   const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
 
   const fetchReservations = async () => {
     setLoading(true);
@@ -41,24 +43,28 @@ export default function ReservationsPanel({ clinics }) {
         <CardTitle>{t('reception.reservations')}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="flex gap-2 mb-4">
-          <div className="flex-1">
-            <Input
-              placeholder={t('reception.searchReservation')}
-              value={searchQ}
-              onChange={(e) => setSearchQ(e.target.value)}
-            />
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex gap-2 flex-1">
+            <div className="flex-1">
+              <Input
+                placeholder={t('reception.searchReservation')}
+                value={searchQ}
+                onChange={(e) => setSearchQ(e.target.value)}
+              />
+            </div>
+            <select
+              value={clinicFilter}
+              onChange={(e) => setClinicFilter(e.target.value)}
+              className="rounded-lg border border-silver bg-white px-3 py-2 text-sm"
+            >
+              <option value="">{t('reception.allClinics')}</option>
+              {clinics.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <Button variant="secondary" onClick={fetchReservations} size="sm">{t('common.search')}</Button>
           </div>
-          <select
-            value={clinicFilter}
-            onChange={(e) => setClinicFilter(e.target.value)}
-            className="rounded-lg border border-silver bg-white px-3 py-2 text-sm"
-          >
-            <option value="">{t('reception.allClinics')}</option>
-            {clinics.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <Button variant="secondary" onClick={fetchReservations} size="sm">{t('common.search')}</Button>
+          <Button variant="primary" size="sm" onClick={() => setShowForm(true)} className="ml-2 whitespace-nowrap">+ New</Button>
         </div>
+        <ReservationFormModal open={showForm} onClose={() => setShowForm(false)} clinics={clinics} onCreated={fetchReservations} />
         {loading ? (
           <p className="text-sm text-graphite">{t('common.loading')}</p>
         ) : reservations.length === 0 ? (

@@ -23,7 +23,7 @@ router.get('/items', authenticate, requirePermission(PERMISSIONS.WAREHOUSE_READ)
 
 router.get('/items/low-stock', authenticate, requirePermission(PERMISSIONS.WAREHOUSE_READ), asyncHandler(async (_req, res) => {
   const items = await prisma.inventoryItem.findMany({ where: { isActive: true } });
-  const lowStock = items.filter((i) => i.quantity <= i.minStock).sort((a, b) => a.quantity - b.quantity);
+  const lowStock = items.filter((i) => Number(i.quantity) <= i.minStock).sort((a, b) => Number(a.quantity) - Number(b.quantity));
   res.json(lowStock);
 }));
 
@@ -74,7 +74,7 @@ router.post('/transactions', authenticate, requirePermission(PERMISSIONS.WAREHOU
   if (!itemId || !type || !quantity) throw new ValidationError('Item ID, type, and quantity are required');
   const item = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
   if (!item) throw new NotFoundError('Item not found');
-  const newQty = type === 'IN' ? item.quantity + quantity : item.quantity - quantity;
+  const newQty = type === 'IN' ? Number(item.quantity) + quantity : Number(item.quantity) - quantity;
   if (newQty < 0) throw new ValidationError('Insufficient stock');
   const [transaction] = await prisma.$transaction([
     prisma.inventoryTransaction.create({ data: { itemId, type, quantity, notes } }),

@@ -2,13 +2,14 @@ import { useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../lib/api';
-import { useAccountingSummary, useRevenueByDay, useRevenueByType, useAccountingTransactions, useExpenses, usePnL, accountingKeys } from '../../hooks/queries/useAccounting';
+import { useAccountingSummary, useRevenueByDay, useRevenueByType, useAccountingTransactions, useExpenses, usePnL, useDebts, usePayDebt, useCreateDebt, accountingKeys } from '../../hooks/queries/useAccounting';
 import { useDepartments } from '../../hooks/queries/useAdmin';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Table } from '../../components/ui/Table';
+import { printReceipt } from '../../lib/printReceipt';
 
 const TYPE_ICONS = {
   RECEPTION: '🩺',
@@ -33,7 +34,7 @@ function BarChart({ data, labelKey, valueKey, color = 'bg-lilac-bloom', maxBarHe
         return (
           <div key={d[labelKey]} className="flex-1 flex flex-col items-center justify-end h-full">
             <div
-              title={`${d[labelKey]}: AED ${Number(d[valueKey]).toFixed(2)}`}
+              title={`${d[labelKey]}: SDG ${Number(d[valueKey]).toFixed(2)}`}
               className={`w-full rounded-t ${color} transition-all duration-300 hover:opacity-80`}
               style={{ height: `${Math.max(pct, 2)}px` }}
             />
@@ -50,7 +51,7 @@ function BarChart({ data, labelKey, valueKey, color = 'bg-lilac-bloom', maxBarHe
 }
 
 function formatCurrency(v) {
-  return `AED ${Number(v).toFixed(2)}`;
+  return `SDG ${Number(v).toFixed(2)}`;
 }
 
 function getTodayStr() {
@@ -79,6 +80,10 @@ function ExpenseForm({ expense, departments, onSave, onCancel, saving }) {
     e.preventDefault();
     if (!form.amount || parseFloat(form.amount) <= 0 || !form.category || !form.description) {
       alert('Amount, category, and description are required');
+      return;
+    }
+    if (!form.departmentId) {
+      alert('Please select a department');
       return;
     }
     onSave({ ...form, amount: parseFloat(form.amount) });
@@ -164,15 +169,28 @@ export default function AccountingPage() {
   const [editingExpense, setEditingExpense] = useState(null);
   const [expenseSaving, setExpenseSaving] = useState(false);
 
+  const [payingDebt, setPayingDebt] = useState(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [paySaving, setPaySaving] = useState(false);
+  const [showAddDebt, setShowAddDebt] = useState(false);
+  const [newDebt, setNewDebt] = useState({ creditor: '', description: '', amount: '', dueDate: '', notes: '' });
+  const [debtSaving, setDebtSaving] = useState(false);
+
   const { data: summary, isLoading: loading } = useAccountingSummary();
   const { data: departments } = useDepartments();
   const { data: revenueByDay = [] } = useRevenueByDay(`days=30`);
   const { data: revenueByType = [] } = useRevenueByType(`from=${get30DaysAgo()}&to=${getTodayStr()}`);
   const { data: pnlData } = usePnL(`startDate=${get30DaysAgo()}&endDate=${getTodayStr()}`);
 
+  const { data: debtsData } = useDebts();
+  const payDebtMutation = usePayDebt();
+  const createDebtMutation = useCreateDebt();
+  const debts = debtsData?.debts || [];
+  const debtSummary = debtsData?.summary || { totalDebt: 0, totalUnpaid: 0, bySource: { pharmacy: { total: 0, unpaid: 0 }, optics: { total: 0, unpaid: 0 }, hospital: { total: 0, unpaid: 0 } } };
+
   const expenseParams = buildParams({ ...expenseFilters, limit: '200' });
   const txParams = buildParams(txFilters);
-  const { data: expensesData = { expenses: [], totalCount: 0 } } = useExpenses(expenseFilters.category || expenseFilters.departmentId || expenseFilters.startDate ? expenseParams : `limit=200`);
+  const { data: expensesData = { expenses: [], totalCount: 0 } } = useExpenses(expenseParams);
   const expenses = expensesData.expenses ?? [];
   const expensesTotal = expensesData.totalCount ?? 0;
   const { data: txResponse = { transactions: [], totalCount: 0 }, isLoading: txLoading } = useAccountingTransactions(
@@ -180,7 +198,7 @@ export default function AccountingPage() {
   );
 
   const handleFilterChange = (field, value) => {
-    setTxFilters((prev) => ({ ...prev, [field]: value, offset: field === 'limit' ? 0 : prev.offset }));
+    setTxFilters((prev) => ({ ...prev, [field]: value, offset: 0 }));
   };
 
   const totalPages = Math.ceil(txResponse.totalCount / parseInt(txFilters.limit));
@@ -262,7 +280,7 @@ export default function AccountingPage() {
     }
   };
 
-  const invalidateExpenses = () => queryClient.invalidateQueries({ queryKey: accountingKeys.expenses(expenseFilters.category || expenseFilters.departmentId || expenseFilters.startDate ? expenseParams : `limit=200`) });
+  const invalidateExpenses = () => queryClient.invalidateQueries({ queryKey: accountingKeys.expenses(expenseParams) });
 
   const handleExpenseSave = async (formData) => {
     setExpenseSaving(true);
@@ -295,66 +313,66 @@ export default function AccountingPage() {
   const txColumns = [
     {
       key: 'createdAt', header: t('accounting.date', 'Date'),
-      render: (v, r) => (
-        <button className="text-left hover:text-lilac-bloom transition-colors" onClick={() => setShowTxModal(r)}>
-          {new Date(v).toLocaleString()}
+      render: (row) => (
+        <button className="text-left hover:text-lilac-bloom transition-colors" onClick={() => setShowTxModal(row)}>
+          {new Date(row.createdAt).toLocaleString()}
         </button>
       ),
     },
     {
       key: 'type', header: t('accounting.type', 'Type'),
-      render: (v) => (
-        <Badge className={TYPE_COLORS[v] || ''}>
-          {TYPE_ICONS[v] || ''} {v}
+      render: (row) => (
+        <Badge className={TYPE_COLORS[row.type] || ''}>
+          {TYPE_ICONS[row.type] || ''} {row.type}
         </Badge>
       ),
     },
     {
       key: 'paymentMethod', header: t('accounting.method', 'Method'),
-      render: (v) => <Badge variant="info">{v}</Badge>,
+      render: (row) => <Badge variant="info">{row.paymentMethod}</Badge>,
     },
     {
       key: 'amount', header: t('accounting.amount', 'Amount'),
-      render: (v) => <span className="font-semibold">{formatCurrency(v)}</span>,
+      render: (row) => <span className="font-semibold">{formatCurrency(row.amount)}</span>,
     },
     { key: 'description', header: t('accounting.description', 'Description') },
     {
       key: 'department', header: 'Department',
-      render: (v) => v?.name || '-',
+      render: (row) => row.department?.name || '-',
     },
     {
       key: 'cashier', header: t('accounting.cashier', 'Cashier'),
-      render: (v) => v?.fullName || '-',
+      render: (row) => row.cashier?.fullName || '-',
     },
   ];
 
   const expenseColumns = [
     {
       key: 'date', header: 'Date',
-      render: (v, r) => (
-        <button className="text-left hover:text-lilac-bloom transition-colors" onClick={() => { setEditingExpense(r); setShowExpenseForm(true); }}>
-          {new Date(v).toLocaleDateString()}
+      render: (row) => (
+        <button className="text-left hover:text-lilac-bloom transition-colors" onClick={() => { setEditingExpense(row); setShowExpenseForm(true); }}>
+          {new Date(row.date).toLocaleDateString()}
         </button>
       ),
     },
-    { key: 'category', header: 'Category', render: (v) => <Badge variant="info">{v}</Badge> },
+    { key: 'category', header: 'Category', render: (row) => <Badge variant="info">{row.category}</Badge> },
     { key: 'description', header: 'Description' },
     {
       key: 'amount', header: 'Amount',
-      render: (v) => <span className="font-semibold text-red-600 dark:text-red-400">{formatCurrency(v)}</span>,
+      render: (row) => <span className="font-semibold text-red-600 dark:text-red-400">{formatCurrency(row.amount)}</span>,
     },
     { key: 'paidTo', header: 'Paid To' },
-    { key: 'paymentMethod', header: 'Payment', render: (v) => v ? <Badge>{v}</Badge> : '-' },
+    { key: 'paymentMethod', header: 'Payment', render: (row) => row.paymentMethod ? <Badge>{row.paymentMethod}</Badge> : '-' },
     {
       key: 'department', header: 'Department',
-      render: (v) => v?.name || '-',
+      render: (row) => row.department?.name || '-',
     },
     {
       key: 'id', header: '',
-      render: (v, r) => (
+      render: (row) => (
         <div className="flex gap-1">
-          <Button variant="ghost" size="sm" onClick={() => { setEditingExpense(r); setShowExpenseForm(true); }}>Edit</Button>
-          <Button variant="ghost" size="sm" onClick={() => handleExpenseDelete(v)} className="text-red-500 dark:text-red-400">Del</Button>
+          <Button variant="ghost" size="sm" onClick={() => { setEditingExpense(row); setShowExpenseForm(true); }}>Edit</Button>
+          <Button variant="ghost" size="sm" onClick={() => handleExpenseDelete(row.id)} className="text-red-500 dark:text-red-400">Del</Button>
         </div>
       ),
     },
@@ -384,6 +402,7 @@ export default function AccountingPage() {
         <Button variant={tab === 'overview' ? 'primary' : 'secondary'} size="sm" onClick={() => setTab('overview')}>Overview</Button>
         <Button variant={tab === 'transactions' ? 'primary' : 'secondary'} size="sm" onClick={() => setTab('transactions')}>Transactions</Button>
         <Button variant={tab === 'expenses' ? 'primary' : 'secondary'} size="sm" onClick={() => setTab('expenses')}>Expenses</Button>
+        <Button variant={tab === 'debts' ? 'primary' : 'secondary'} size="sm" onClick={() => setTab('debts')}>Debt</Button>
       </div>
 
       {tab === 'overview' && (
@@ -506,18 +525,18 @@ export default function AccountingPage() {
                     {pnlData.departments?.length > 0 && (
                       <Table
                         columns={[
-                          { key: 'department', header: 'Department', render: (v) => v?.name || 'Uncategorized' },
-                          { key: 'revenue', header: t('accounting.revenue'), render: (v) => formatCurrency(v) },
-                          { key: 'cogs', header: t('accounting.cogsShort'), render: (v) => <span className="text-orange-600 dark:text-orange-400">{formatCurrency(v)}</span> },
-                          { key: 'grossProfit', header: t('accounting.grossProfitShort'), render: (v, r) => (
-                            <span className={v >= 0 ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-red-600 dark:text-red-400 font-semibold'}>
-                              {formatCurrency(v)}
+                          { key: 'department', header: 'Department', render: (row) => row.department?.name || 'Uncategorized' },
+                          { key: 'revenue', header: t('accounting.revenue'), render: (row) => formatCurrency(row.revenue) },
+                          { key: 'cogs', header: t('accounting.cogsShort'), render: (row) => <span className="text-orange-600 dark:text-orange-400">{formatCurrency(row.cogs)}</span> },
+                          { key: 'grossProfit', header: t('accounting.grossProfitShort'), render: (row) => (
+                            <span className={row.grossProfit >= 0 ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-red-600 dark:text-red-400 font-semibold'}>
+                              {formatCurrency(row.grossProfit)}
                             </span>
                           )},
-                          { key: 'expense', header: t('accounting.expense'), render: (v) => <span className="text-red-600 dark:text-red-400">{formatCurrency(v)}</span> },
-                          { key: 'net', header: t('accounting.netIncomeShort'), render: (v, r) => (
-                            <span className={v >= 0 ? 'text-green-600 dark:text-green-400 font-semibold' : 'text-red-600 dark:text-red-400 font-semibold'}>
-                              {formatCurrency(v)}
+                          { key: 'expense', header: t('accounting.expense'), render: (row) => <span className="text-red-600 dark:text-red-400">{formatCurrency(row.expense)}</span> },
+                          { key: 'net', header: t('accounting.netIncomeShort'), render: (row) => (
+                            <span className={row.net >= 0 ? 'text-green-600 dark:text-green-400 font-semibold' : 'text-red-600 dark:text-red-400 font-semibold'}>
+                              {formatCurrency(row.net)}
                             </span>
                           )},
                         ]}
@@ -695,7 +714,20 @@ export default function AccountingPage() {
                   <p className="text-body text-obsidian">{showTxModal.description || '-'}</p>
                 </div>
                   </div>
-                  <div className="mt-6 flex justify-end">
+                  <div className="mt-6 flex justify-end gap-2">
+                    <Button variant="primary" onClick={async () => {
+                      let tx = showTxModal;
+                      try {
+                        tx = await api.get(`/accounting/transactions/${showTxModal.id}`);
+                      } catch { /* use modal data if fetch fails */ }
+                      const items = (tx.inventoryTransactions || []).map((it) => ({
+                        name: it.item?.name || '',
+                        quantity: Math.abs(Number(it.quantity)),
+                        price: Math.abs(Number(it.unitCost || 0)),
+                        total: Math.abs(Number(it.quantity) * Number(it.unitCost || 0)),
+                      }));
+                      printReceipt({ title: `${tx.type} Receipt`, transaction: tx, items });
+                    }}>Print Receipt</Button>
                     <Button variant="ghost" onClick={() => setShowTxModal(null)}>{t('accounting.close', 'Close')}</Button>
                   </div>
                 </div>
@@ -814,6 +846,163 @@ export default function AccountingPage() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {tab === 'debts' && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card><CardContent className="p-4">
+              <p className="text-caption text-slate">Total Debt</p>
+              <p className="text-heading-sm font-semibold text-obsidian">{formatCurrency(debtSummary.totalDebt)}</p>
+            </CardContent></Card>
+            <Card><CardContent className="p-4">
+              <p className="text-caption text-slate">Unpaid Balance</p>
+              <p className="text-heading-sm font-semibold text-red-600 dark:text-red-400">{formatCurrency(debtSummary.totalUnpaid)}</p>
+            </CardContent></Card>
+            <Card><CardContent className="p-4">
+              <p className="text-caption text-slate">Pharmacy Unpaid</p>
+              <p className="text-heading-sm font-semibold text-obsidian">{formatCurrency(debtSummary.bySource.pharmacy.unpaid)}</p>
+            </CardContent></Card>
+            <Card><CardContent className="p-4">
+              <p className="text-caption text-slate">Optics Unpaid</p>
+              <p className="text-heading-sm font-semibold text-obsidian">{formatCurrency(debtSummary.bySource.optics.unpaid)}</p>
+            </CardContent></Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <CardTitle>Debts ({debts.length})</CardTitle>
+                <Button variant="primary" size="sm" onClick={() => setShowAddDebt(true)}>+ Add Hospital Debt</Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {debts.length === 0 ? (
+                <p className="text-body text-slate text-center py-4">No outstanding debts</p>
+              ) : (
+                <Table columns={[
+                  { key: 'source', header: 'Source', render: (row) => {
+                    const icons = { pharmacy: '💊', optics: '👓', hospital: '🏢' };
+                    const colors = { pharmacy: 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200', optics: 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200', hospital: 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' };
+                    return <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[row.source] || ''}`}>{icons[row.source] || ''} {row.source}</span>;
+                  }},
+                  { key: 'creditor', header: 'Creditor', render: (row) => <span className="font-medium text-obsidian">{row.creditor}</span> },
+                  { key: 'invoiceNumber', header: 'Invoice Ref', render: (row) => row.invoiceNumber || <span className="text-slate">—</span> },
+                  { key: 'invoiceTotal', header: 'Total', render: (row) => formatCurrency(row.invoiceTotal) },
+                  { key: 'amountPaid', header: 'Paid', render: (row) => <span className="text-green-600 dark:text-green-400">{formatCurrency(row.amountPaid)}</span> },
+                  { key: 'balance', header: 'Unpaid', render: (row) => <span className="font-semibold text-red-600 dark:text-red-400">{formatCurrency(row.balance)}</span> },
+                  { key: 'status', header: 'Status', render: (row) => {
+                    const cls = row.status === 'PaidInFull' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' : row.status === 'PartialPayment' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200' : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200';
+                    const lbl = row.status === 'PaidInFull' ? 'Paid in Full' : row.status === 'PartialPayment' ? 'Partial' : 'Pending';
+                    return <span className={`px-2 py-0.5 rounded text-xs font-medium ${cls}`}>{lbl}</span>;
+                  }},
+                  { key: 'id', header: '', render: (row) => (
+                    row.balance > 0 ? (
+                      <Button variant="ghost" size="sm" onClick={() => { setPayingDebt(row); setPayAmount(''); }}>Pay Now</Button>
+                    ) : null
+                  )},
+                ]} data={debts} />
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {payingDebt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-obsidian/50" onClick={() => setPayingDebt(null)}>
+          <div className="bg-paper rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-obsidian">Record Payment</h3>
+                <button onClick={() => setPayingDebt(null)} className="text-slate hover:text-obsidian touch-target">&times;</button>
+              </div>
+              <div className="bg-bone rounded-lg p-3 mb-4 text-sm space-y-1">
+                <div className="flex justify-between"><span className="text-slate">Creditor:</span><span className="text-obsidian font-medium">{payingDebt.creditor}</span></div>
+                <div className="flex justify-between"><span className="text-slate">Balance:</span><span className="text-obsidian font-semibold text-red-600 dark:text-red-400">{formatCurrency(payingDebt.balance)}</span></div>
+                {payingDebt.invoiceNumber && <div className="flex justify-between"><span className="text-slate">Invoice:</span><span className="text-obsidian">{payingDebt.invoiceNumber}</span></div>}
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-graphite block mb-1">Amount to Pay (SDG)</label>
+                  <Input type="number" min="0" step="0.01" value={payAmount}
+                    onChange={(e) => setPayAmount(e.target.value)} placeholder="0.00" />
+                </div>
+              </div>
+              <div className="mt-6 flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => setPayingDebt(null)}>Cancel</Button>
+                <Button variant="primary" onClick={async () => {
+                  if (!payAmount || parseFloat(payAmount) <= 0) { alert('Enter a valid amount'); return; }
+                  setPaySaving(true);
+                  try {
+                    await payDebtMutation.mutateAsync({ id: payingDebt.id, amount: parseFloat(payAmount) });
+                    setPayingDebt(null);
+                    setPayAmount('');
+                  } catch (err) { alert(err.message || 'Failed to record payment'); }
+                  setPaySaving(false);
+                }} disabled={paySaving}>
+                  {paySaving ? 'Recording...' : 'Confirm Payment'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddDebt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-obsidian/50" onClick={() => { setShowAddDebt(false); setNewDebt({ creditor: '', description: '', amount: '', dueDate: '', notes: '' }); }}>
+          <div className="bg-paper rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-obsidian">Add Hospital Debt</h3>
+                <button onClick={() => { setShowAddDebt(false); setNewDebt({ creditor: '', description: '', amount: '', dueDate: '', notes: '' }); }} className="text-slate hover:text-obsidian touch-target">&times;</button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-graphite block mb-1">Creditor *</label>
+                  <Input type="text" value={newDebt.creditor} onChange={(e) => setNewDebt((p) => ({ ...p, creditor: e.target.value }))} placeholder="Name of who we owe" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-graphite block mb-1">Description *</label>
+                  <Input type="text" value={newDebt.description} onChange={(e) => setNewDebt((p) => ({ ...p, description: e.target.value }))} placeholder="e.g. June electricity bill" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-graphite block mb-1">Total Amount *</label>
+                  <Input type="number" min="0" step="0.01" value={newDebt.amount} onChange={(e) => setNewDebt((p) => ({ ...p, amount: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-graphite block mb-1">Due Date</label>
+                  <Input type="date" value={newDebt.dueDate} onChange={(e) => setNewDebt((p) => ({ ...p, dueDate: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-graphite block mb-1">Notes</label>
+                  <textarea value={newDebt.notes} onChange={(e) => setNewDebt((p) => ({ ...p, notes: e.target.value }))} rows={2}
+                    className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom" />
+                </div>
+              </div>
+              <div className="mt-6 flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => { setShowAddDebt(false); setNewDebt({ creditor: '', description: '', amount: '', dueDate: '', notes: '' }); }}>Cancel</Button>
+                <Button variant="primary" onClick={async () => {
+                  if (!newDebt.creditor || !newDebt.description || !newDebt.amount || parseFloat(newDebt.amount) <= 0) { alert('Creditor, description, and amount are required'); return; }
+                  setDebtSaving(true);
+                  try {
+                    await createDebtMutation.mutateAsync({
+                      creditor: newDebt.creditor,
+                      description: newDebt.description,
+                      amount: parseFloat(newDebt.amount),
+                      dueDate: newDebt.dueDate || undefined,
+                      notes: newDebt.notes || undefined,
+                    });
+                    setShowAddDebt(false);
+                    setNewDebt({ creditor: '', description: '', amount: '', dueDate: '', notes: '' });
+                  } catch (err) { alert(err.message || 'Failed to create debt'); }
+                  setDebtSaving(false);
+                }} disabled={debtSaving}>
+                  {debtSaving ? 'Creating...' : 'Create Debt'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {showExpenseForm && (

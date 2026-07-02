@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import { DEFAULT_ROLES } from '../src/middleware/rbac.js';
+import { DEFAULT_ROLES } from '../dist/middleware/rbac.js';
 
 const prisma = new PrismaClient();
 
@@ -117,6 +117,28 @@ async function main() {
       passwordHash,
       fullName: 'Optician',
       roleId: roles.OPTICIAN.id,
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: 'procurement@aljawarih.sd' },
+    update: {},
+    create: {
+      email: 'procurement@aljawarih.sd',
+      passwordHash,
+      fullName: 'Procurement Manager',
+      roleId: roles.PROCUREMENT_MANAGER.id,
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: 'cfo@aljawarih.sd' },
+    update: {},
+    create: {
+      email: 'cfo@aljawarih.sd',
+      passwordHash,
+      fullName: 'CFO User',
+      roleId: roles.CFO.id,
     },
   });
 
@@ -515,6 +537,7 @@ async function main() {
     { slug: 'finance-dept', name: 'Finance', type: 'FINANCE', clinicId: null },
     { slug: 'it-dept', name: 'IT', type: 'IT', clinicId: null },
     { slug: 'nursing-dept', name: 'Nursing', type: 'NURSING', clinicId: null },
+    { slug: 'hospital-dept', name: 'Hospital Operations', type: 'OTHER', clinicId: null },
   ];
 
   for (const dept of departments) {
@@ -528,6 +551,42 @@ async function main() {
   console.log(`Seeded ${labTests.length} lab tests.`);
   console.log(`Seeded ${icd10Codes.length} ICD-10 codes.`);
   console.log(`Seeded ${departments.length} departments.`);
+
+  // Seed cost centers (one per department)
+  const allDepts = await prisma.department.findMany();
+  const costCenters = [
+    { code: 'CC-MED', name: 'Medicine Clinic Cost Center', deptSlug: 'medicine-dept' },
+    { code: 'CC-ENT', name: 'ENT Clinic Cost Center', deptSlug: 'ent-dept' },
+    { code: 'CC-DEN', name: 'Dental Clinic Cost Center', deptSlug: 'dental-dept' },
+    { code: 'CC-RET', name: 'Retina Clinic Cost Center', deptSlug: 'retina-dept' },
+    { code: 'CC-GLA', name: 'Glaucoma Clinic Cost Center', deptSlug: 'glaucoma-dept' },
+    { code: 'CC-ORB', name: 'Orbit Clinic Cost Center', deptSlug: 'orbit-dept' },
+    { code: 'CC-PED', name: 'Pediatrics Ophthalmology Cost Center', deptSlug: 'peds-ophth-dept' },
+    { code: 'CC-GOP', name: 'General Ophthalmology Cost Center', deptSlug: 'gen-ophth-dept' },
+    { code: 'CC-OPT', name: 'Optometry Clinic Cost Center', deptSlug: 'optometry-dept' },
+    { code: 'CC-PHA', name: 'Pharmacy Cost Center', deptSlug: 'pharmacy-dept' },
+    { code: 'CC-OCS', name: 'Optics Cost Center', deptSlug: 'optics-dept' },
+    { code: 'CC-LAB', name: 'Laboratory Cost Center', deptSlug: 'lab-dept' },
+    { code: 'CC-SRG', name: 'Surgery Cost Center', deptSlug: 'surgery-dept' },
+    { code: 'CC-ADM', name: 'Administration Cost Center', deptSlug: 'admin-dept' },
+    { code: 'CC-HR', name: 'Human Resources Cost Center', deptSlug: 'hr-dept' },
+    { code: 'CC-FIN', name: 'Finance Cost Center', deptSlug: 'finance-dept' },
+    { code: 'CC-IT', name: 'IT Cost Center', deptSlug: 'it-dept' },
+    { code: 'CC-NUR', name: 'Nursing Cost Center', deptSlug: 'nursing-dept' },
+    { code: 'CC-HOS', name: 'Hospital Operations Cost Center', deptSlug: 'hospital-dept' },
+  ];
+
+  for (const cc of costCenters) {
+    const dept = allDepts.find(d => d.slug === cc.deptSlug);
+    if (!dept) continue;
+    await prisma.costCenter.upsert({
+      where: { code: cc.code },
+      update: { name: cc.name, departmentId: dept.id },
+      create: { code: cc.code, name: cc.name, departmentId: dept.id },
+    });
+  }
+
+  console.log(`Seeded ${costCenters.length} cost centers.`);
   console.log('Seed complete.');
 }
 

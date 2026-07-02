@@ -17,10 +17,11 @@ import PharmacyProducts from '../features/pos/PharmacyProducts';
 import OpticsPOS from '../features/pos/OpticsPOS';
 import OpticsProducts from '../features/pos/OpticsProducts';
 import LabDashboard from '../features/lab/LabDashboard';
-import InventoryPage from '../features/inventory/InventoryPage';
+import InventoryPOS from '../features/pos/InventoryPOS';
 import AccountingPage from '../features/accounting/AccountingPage';
 import AdminPage from '../features/admin/AdminPage';
 import HRPage from '../features/hr/HRPage';
+import ProcurementPage from '../features/procurement/ProcurementPage';
 import MedicineDashboard from '../features/clinics/MedicineDashboard';
 import ENTDashboard from '../features/clinics/ENTDashboard';
 import DentalDashboard from '../features/clinics/DentalDashboard';
@@ -71,10 +72,11 @@ export default function App() {
               <Route path="/optics" element={<ProtectedRoute><OpticsPOS /></ProtectedRoute>} />
               <Route path="/optics/products" element={<ProtectedRoute><OpticsProducts /></ProtectedRoute>} />
               <Route path="/lab" element={<ProtectedRoute><LabDashboard /></ProtectedRoute>} />
-              <Route path="/inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
+              <Route path="/inventory" element={<ProtectedRoute><InventoryPOS /></ProtectedRoute>} />
               <Route path="/accounting" element={<ProtectedRoute><AccountingPage /></ProtectedRoute>} />
               <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
               <Route path="/hr" element={<ProtectedRoute><HRPage /></ProtectedRoute>} />
+              <Route path="/procurement" element={<ProtectedRoute><ProcurementPage /></ProtectedRoute>} />
               <Route path="/clinic/medicine" element={<ProtectedRoute><MedicineDashboard /></ProtectedRoute>} />
               <Route path="/clinic/ent" element={<ProtectedRoute><ENTDashboard /></ProtectedRoute>} />
               <Route path="/clinic/dental" element={<ProtectedRoute><DentalDashboard /></ProtectedRoute>} />

@@ -42,7 +42,7 @@ router.post('/:id/adjust', authenticate, requirePermission(PERMISSIONS.OPTICS_WR
   if (!quantity || quantity < 1) throw new ValidationError('quantity must be a positive integer');
   const item = await prisma.inventoryItem.findFirst({ where: { id, category: 'optics' } });
   if (!item) throw new NotFoundError('Item not found');
-  const qty = type === 'IN' ? -(quantity as number) : (quantity as number);
+  const qty = type === 'IN' ? (quantity as number) : -(quantity as number);
   await prisma.inventoryTransaction.create({
     data: { type: type as never, quantity: qty, notes: (notes as string) || null, itemId: id },
   });

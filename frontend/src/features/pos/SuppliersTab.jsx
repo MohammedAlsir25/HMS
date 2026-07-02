@@ -6,9 +6,9 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 
-export default function SuppliersTab() {
+export default function SuppliersTab({ category }) {
   const { t } = useTranslation();
-  const { data: suppliers = [], isLoading } = useSuppliers();
+  const { data: suppliers = [], isLoading } = useSuppliers(category);
   const createSupplier = useCreateSupplier();
   const updateSupplier = useUpdateSupplier();
   const deleteSupplier = useDeleteSupplier();
@@ -39,7 +39,7 @@ export default function SuppliersTab() {
       if (editItem) {
         await updateSupplier.mutateAsync({ id: editItem.id, ...form });
       } else {
-        await createSupplier.mutateAsync(form);
+        await createSupplier.mutateAsync({ ...form, category });
       }
       setShowModal(false);
       setEditItem(null);

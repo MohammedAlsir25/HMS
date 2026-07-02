@@ -192,7 +192,7 @@ export default function OpticsProducts() {
         </span>
       ),
     },
-    { key: "price", label: "Selling Price", render: (row) => `SDG ${Number(row.price).toFixed(2)}` },
+    { key: "price", label: "Price", render: (row) => `SDG ${Number(row.price).toFixed(2)}` },
     { key: "costPrice", label: "Unit Cost", render: (row) => `SDG ${Number(row.costPrice).toFixed(2)}` },
     { key: "totalValue", label: "Total Value", render: (row) => `SDG ${(Number(row.costPrice) * row.quantity).toFixed(2)}` },
     { key: "minStock", label: t("opticsProducts.colMinStock") },
@@ -272,7 +272,7 @@ export default function OpticsProducts() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input label={t("opticsProducts.formName")} required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <Input label={t("opticsProducts.formSku")} required value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
-          <Input label="Selling Price" type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+          <Input label="Price" type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
           <Input label="Unit Cost" type="number" min="0" step="0.01" value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: e.target.value })} />
           {!editItem && <Input label={t("opticsProducts.formInitialQty")} type="number" min="0" value={form.initialQuantity} onChange={(e) => setForm({ ...form, initialQuantity: e.target.value })} />}
           <Input label={t("opticsProducts.formMinStock")} type="number" min="0" value={form.minStock} onChange={(e) => setForm({ ...form, minStock: e.target.value })} />

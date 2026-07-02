@@ -8,19 +8,40 @@ import prisma from '../../../lib/prisma.js';
 
 const router = Router({ mergeParams: true });
 
-const VALID_CATEGORIES = ['pharmacy', 'optics'];
+const VALID_CATEGORIES = ['pharmacy', 'optics', 'hospital'];
 const VALID_STATUSES = ['PaidInFull', 'PartialPayment', 'Pending'];
 
 function validateCategory(category: string) {
   if (!VALID_CATEGORIES.includes(category)) throw new ValidationError('Invalid category');
 }
 
+const getNextRef = (category: string) => {
+  const prefix = category === 'pharmacy' ? 'PH' : category === 'optics' ? 'OP' : 'HO';
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+  return { prefix, dateStr };
+};
+
+router.get('/next-ref', authenticate, asyncHandler(async (req, res) => {
+  const category = req.params.category!;
+  validateCategory(category);
+  const { prefix, dateStr } = getNextRef(category);
+  const last = await prisma.supplierInvoice.findFirst({
+    where: { invoiceNumber: { startsWith: `${prefix}-${dateStr}-` }, category },
+    orderBy: { createdAt: 'desc' },
+  });
+  const nextNum = last
+    ? String(parseInt(last.invoiceNumber!.slice(-3), 10) + 1).padStart(3, '0')
+    : '001';
+  res.json({ ref: `${prefix}-${dateStr}-${nextNum}` });
+}));
+
 router.get('/', authenticate, asyncHandler(async (req, res) => {
   const category = req.params.category!;
   validateCategory(category);
   const invoices = await prisma.supplierInvoice.findMany({
     where: { category },
-    include: { supplier: true, items: { include: { item: true } } },
+    include: { supplier: true, items: { include: { item: true } }, createdBy: { select: { fullName: true } } },
     orderBy: { receivedAt: 'desc' },
   });
   res.json(invoices);
@@ -72,7 +93,7 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.PHARMACY_WRITE), as
   for (const item of invoiceItems) {
     const dbItem = await prisma.inventoryItem.findUnique({ where: { id: item.itemId } });
     if (!dbItem) continue;
-    const existingQty = dbItem.quantity;
+    const existingQty = Number(dbItem.quantity);
     const existingCost = Number(dbItem.costPrice) || 0;
     const receivedQty = item.quantityReceived;
     const receivedUnitCost = Number(item.unitCost);
@@ -100,15 +121,15 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.PHARMACY_WRITE), as
   }
 
   const paidAmount = Number(amountPaid) || 0;
-  if (paidAmount > 0) {
+  if (category !== 'hospital') {
     const deptSlug = category === 'pharmacy' ? 'pharmacy-dept' : 'optics-dept';
     const department = await prisma.department.findUnique({ where: { slug: deptSlug } });
     if (department) {
       const expense = await prisma.expense.create({
         data: {
-          amount: paidAmount,
+          amount: Number(invoiceTotal),
           category: 'SUPPLIES',
-          description: `Supplier delivery for invoice ${invoiceNumber || invoice.id}`,
+          description: `Supplier delivery ${invoiceNumber || invoice.id} — ${paidAmount.toLocaleString()} SDG paid of ${Number(invoiceTotal).toLocaleString()} SDG`,
           paidTo: supplier.name,
           departmentId: department.id,
         },
@@ -122,7 +143,7 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.PHARMACY_WRITE), as
 
   const fullInvoice = await prisma.supplierInvoice.findUnique({
     where: { id: invoice.id },
-    include: { items: { include: { item: true } }, supplier: true, expense: true },
+    include: { items: { include: { item: true } }, supplier: true, expense: true, createdBy: { select: { fullName: true } } },
   });
   res.status(201).json(fullInvoice);
 }));
@@ -133,7 +154,7 @@ router.get('/:id', authenticate, asyncHandler(async (req, res) => {
   validateCategory(category);
   const invoice = await prisma.supplierInvoice.findFirst({
     where: { id, category },
-    include: { supplier: true, items: { include: { item: true } } },
+    include: { supplier: true, items: { include: { item: true } }, createdBy: { select: { fullName: true } } },
   });
   if (!invoice) throw new NotFoundError('Invoice not found');
   res.json(invoice);
@@ -154,29 +175,31 @@ router.put('/:id/payment', authenticate, requirePermission(PERMISSIONS.PHARMACY_
   });
 
   const newAmountPaid = amountPaid !== undefined ? Number(amountPaid) : Number(existing.amountPaid);
-  if (existing.expenseId) {
-    await prisma.expense.update({
-      where: { id: existing.expenseId },
-      data: { amount: newAmountPaid },
-    });
-  } else if (newAmountPaid > 0) {
-    const deptSlug = existing.category === 'pharmacy' ? 'pharmacy-dept' : 'optics-dept';
-    const department = await prisma.department.findUnique({ where: { slug: deptSlug } });
-    if (department) {
-      const supplier = await prisma.supplier.findUnique({ where: { id: existing.supplierId } });
-      const expense = await prisma.expense.create({
-        data: {
-          amount: newAmountPaid,
-          category: 'SUPPLIES',
-          description: `Supplier delivery for invoice ${existing.invoiceNumber || existing.id}`,
-          paidTo: supplier?.name,
-          departmentId: department.id,
-        },
+  if (existing.category !== 'hospital') {
+    if (existing.expenseId) {
+      await prisma.expense.update({
+        where: { id: existing.expenseId },
+        data: { amount: newAmountPaid },
       });
-      await prisma.supplierInvoice.update({
-        where: { id: existing.id },
-        data: { expenseId: expense.id },
-      });
+    } else if (newAmountPaid > 0) {
+      const deptSlug = existing.category === 'pharmacy' ? 'pharmacy-dept' : 'optics-dept';
+      const department = await prisma.department.findUnique({ where: { slug: deptSlug } });
+      if (department) {
+        const supplier = await prisma.supplier.findUnique({ where: { id: existing.supplierId } });
+        const expense = await prisma.expense.create({
+          data: {
+            amount: newAmountPaid,
+            category: 'SUPPLIES',
+            description: `Supplier delivery for invoice ${existing.invoiceNumber || existing.id}`,
+            paidTo: supplier?.name,
+            departmentId: department.id,
+          },
+        });
+        await prisma.supplierInvoice.update({
+          where: { id: existing.id },
+          data: { expenseId: expense.id },
+        });
+      }
     }
   }
 

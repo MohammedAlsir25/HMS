@@ -5,10 +5,11 @@ export const supplierKeys = {
   all: ['suppliers'],
 };
 
-export function useSuppliers() {
+export function useSuppliers(category) {
+  const params = category ? `?category=${category}` : '';
   return useQuery({
-    queryKey: supplierKeys.all,
-    queryFn: () => api.get('/pos/suppliers'),
+    queryKey: [...supplierKeys.all, category].filter(Boolean),
+    queryFn: () => api.get(`/pos/suppliers${params}`),
   });
 }
 

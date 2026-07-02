@@ -25,4 +25,13 @@ export const PERMISSIONS_LIST = [
   { key: 'diagnostics:write', label: 'Perform Lab Work' },
   { key: 'diagnostics:results', label: 'Enter Lab Results' },
   { key: 'diagnostics:catalog', label: 'Manage Test Catalog' },
+  { key: 'inventory:read', label: 'View Inventory Dashboard' },
+  { key: 'inventory:write', label: 'Manage Inventory' },
+  { key: 'purchase:read', label: 'View Purchases' },
+  { key: 'purchase:write', label: 'Manage Purchases' },
+  { key: 'approval:read', label: 'View Approvals' },
+  { key: 'approval:write', label: 'Approve/Reject' },
+  { key: 'asset:read', label: 'View Fixed Assets' },
+  { key: 'asset:write', label: 'Manage Fixed Assets' },
+  { key: 'notification:read', label: 'View Notifications' },
 ];

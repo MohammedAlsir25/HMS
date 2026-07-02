@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticate, requirePermission } from '../../../middleware/auth.js';
 import { asyncHandler } from '../../../middleware/errorHandler.js';
-import { ValidationError } from '../../../utils/errors.js';
+import { ValidationError, NotFoundError } from '../../../utils/errors.js';
 import { PERMISSIONS } from '../../../middleware/rbac.js';
 import prisma from '../../../lib/prisma.js';
 
@@ -19,7 +19,11 @@ router.get('/', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_READ), as
   if (startDate || endDate) {
     where.createdAt = {} as Record<string, unknown>;
     if (startDate) (where.createdAt as Record<string, unknown>).gte = new Date(startDate);
-    if (endDate) (where.createdAt as Record<string, unknown>).lte = new Date(endDate);
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      (where.createdAt as Record<string, unknown>).lte = end;
+    }
   }
   const [transactions, totalCount] = await Promise.all([
     prisma.transaction.findMany({
@@ -35,6 +39,21 @@ router.get('/', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_READ), as
     prisma.transaction.count({ where }),
   ]);
   res.json({ transactions, totalCount });
+}));
+
+router.get('/:id', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_READ), asyncHandler(async (req, res) => {
+  const tx = await prisma.transaction.findUnique({
+    where: { id: req.params.id },
+    include: {
+      cashier: { select: { id: true, fullName: true } },
+      department: { select: { id: true, name: true, slug: true } },
+      inventoryTransactions: {
+        include: { item: { select: { id: true, name: true, packSize: true } } },
+      },
+    },
+  });
+  if (!tx) throw new NotFoundError('Transaction not found');
+  res.json(tx);
 }));
 
 router.post('/', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_WRITE), asyncHandler(async (req, res) => {
