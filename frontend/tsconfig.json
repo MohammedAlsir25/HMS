@@ -18,7 +18,6 @@
     "allowJs": true,
     "noEmit": true,
     "types": ["vitest/globals"],
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
