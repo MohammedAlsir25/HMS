@@ -47,7 +47,7 @@ export default function SettingsContent() {
   const { theme, setTheme, language, setLanguage, hasSeenOnboarding, setHasSeenOnboarding } = useUIStore();
   const fileInputRef = useRef(null);
 
-  const isNative = typeof window !== 'undefined' && (window.__TAURI__ || window.Capacitor?.isNative);
+  const isNative = typeof window !== 'undefined' && (window.__TAURI_INTERNALS__ || window.Capacitor?.isNative);
 
   const handleAvatarUpload = async (e) => {
     const file = e.target.files?.[0];

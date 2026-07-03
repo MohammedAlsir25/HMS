@@ -5,7 +5,7 @@ import { useUIStore } from '../../stores/uiStore';
 import { getTour } from '../../lib/tours';
 
 function isNativePlatform() {
-  return typeof window !== 'undefined' && (window.__TAURI__ || window.Capacitor?.isNative);
+  return typeof window !== 'undefined' && (window.__TAURI_INTERNALS__ || window.Capacitor?.isNative);
 }
 
 export default function TourManager() {

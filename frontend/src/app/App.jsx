@@ -35,7 +35,7 @@ import GenOphthDashboard from '../features/clinics/GenOphthDashboard';
 import OptometryDashboard from '../features/clinics/OptometryDashboard';
 
 function isNativePlatform() {
-  return typeof window !== 'undefined' && (window.__TAURI__ || window.Capacitor?.isNative);
+  return typeof window !== 'undefined' && (window.__TAURI_INTERNALS__ || window.Capacitor?.isNative);
 }
 
 function ProtectedRoute({ children }) {

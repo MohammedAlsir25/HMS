@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from './Button';
 
 function isTauri() {
-  return typeof window !== 'undefined' && window.__TAURI__;
+  return typeof window !== 'undefined' && window.__TAURI_INTERNALS__;
 }
 
 export default function UpdateManager() {
