@@ -22,6 +22,7 @@ import departmentsRoutes from './modules/departments/departments.routes.js';
 import patientsRoutes from './modules/patients/patients.routes.js';
 import appointmentsRoutes from './modules/appointments/appointments.routes.js';
 import procurementRoutes from './modules/procurement/procurement.routes.js';
+import syncRoutes from './modules/sync/sync.routes.js';
 
 const app = express();
 
@@ -68,6 +69,7 @@ app.use('/api/departments', departmentsRoutes);
 app.use('/api/patients', patientsRoutes);
 app.use('/api/appointments', appointmentsRoutes);
 app.use('/api/procurement', procurementRoutes);
+app.use('/api/sync', syncRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ message: 'Route not found' });

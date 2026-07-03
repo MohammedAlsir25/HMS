@@ -5,13 +5,7 @@ function isTauri() {
   return typeof window !== 'undefined' && window.__TAURI__;
 }
 
-async function tauriUpdater() {
-  const { check } = await import('@tauri-apps/plugin-updater');
-  const { relaunch } = await import('@tauri-apps/api/process');
-  return { check, relaunch };
-}
-
-export default function UpdateManager({ alwaysShow = false }) {
+export default function UpdateManager() {
   const [tauri, setTauri] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(null);
   const [checking, setChecking] = useState(false);
@@ -29,7 +23,7 @@ export default function UpdateManager({ alwaysShow = false }) {
     setError('');
     setUpdateAvailable(null);
     try {
-      const { check } = await tauriUpdater();
+      const { check } = await import('@tauri-apps/plugin-updater');
       const update = await check();
       if (update) {
         setUpdateAvailable(update);
@@ -37,7 +31,9 @@ export default function UpdateManager({ alwaysShow = false }) {
         setUpdateAvailable(null);
       }
     } catch (err) {
-      setError(err.message || 'Failed to check for updates');
+      if (err.code !== 'ERR_MODULE_NOT_FOUND') {
+        setError(err.message || 'Failed to check for updates');
+      }
     }
     setChecking(false);
   }, []);
@@ -47,25 +43,28 @@ export default function UpdateManager({ alwaysShow = false }) {
     setInstalling(true);
     setError('');
     try {
-      const { check, relaunch } = await tauriUpdater();
+      const { check } = await import('@tauri-apps/plugin-updater');
+      const { restart } = await import('@tauri-apps/plugin-process');
       const update = await check();
       if (!update) { setInstalling(false); return; }
       await update.downloadAndInstall((event) => {
-        if (event.event === 'DownloadProgress') {
-          const total = event.data.contentLength || 1;
-          const downloaded = event.data.chunkLength || 0;
-          setProgress((prev) => Math.min(prev + (downloaded / total) * 100, 99));
+        if (event.event === 'Progress') {
+          const total = event.data.chunkLength;
+          setProgress((prev) => Math.min(prev + 1, 99));
+        }
+        if (event.event === 'Started' && event.data.contentLength) {
+          setProgress(5);
         }
       });
       setProgress(100);
-      await relaunch();
+      await restart();
     } catch (err) {
       setError(err.message || 'Installation failed');
       setInstalling(false);
     }
   }, [updateAvailable]);
 
-  if (!tauri && !alwaysShow) return null;
+  if (!tauri) return null;
 
   return (
     <div className="bg-paper border border-silver rounded-xl p-4 space-y-3">

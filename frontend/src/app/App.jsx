@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from '../stores/authStore';
@@ -32,8 +33,17 @@ import PedsOphthDashboard from '../features/clinics/PedsOphthDashboard';
 import GenOphthDashboard from '../features/clinics/GenOphthDashboard';
 import OptometryDashboard from '../features/clinics/OptometryDashboard';
 
+function isNativePlatform() {
+  return typeof window !== 'undefined' && (window.__TAURI__ || window.Capacitor?.isNative);
+}
+
 function ProtectedRoute({ children }) {
   const token = useAuthStore((s) => s.token);
+  useEffect(() => {
+    if (token && isNativePlatform()) {
+      import('../lib/sync/syncEngine').then(({ syncEngine }) => syncEngine.init());
+    }
+  }, [token]);
   if (!token) return <Navigate to="/login" replace />;
   return <AppShell><ErrorBoundary>{children}</ErrorBoundary></AppShell>;
 }

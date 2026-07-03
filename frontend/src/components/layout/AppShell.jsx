@@ -4,6 +4,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import StaggeredMenu from './StaggeredMenu';
 import UserProfileDropdown from './UserProfileDropdown';
+import SyncStatusBadge from './SyncStatusBadge';
 import SettingsModal from '../../features/settings/SettingsModal';
 
 function NotificationBell() {
@@ -117,6 +118,7 @@ export default function AppShell({ children }) {
           </div>
           <div className="ml-auto flex items-center gap-2">
             <NotificationBell />
+            <SyncStatusBadge />
             <UserProfileDropdown onSettings={() => setSettingsOpen(true)} />
           </div>
         </div>

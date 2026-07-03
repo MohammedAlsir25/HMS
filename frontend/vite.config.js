@@ -6,6 +6,16 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   base: './',
   plugins: [react(), tailwindcss()],
+  build: {
+    rollupOptions: {
+      external: [
+        '@tauri-apps/api/core',
+        '@tauri-apps/plugin-process',
+        '@tauri-apps/plugin-updater',
+        '@tauri-apps/plugin-opener',
+      ],
+    },
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
