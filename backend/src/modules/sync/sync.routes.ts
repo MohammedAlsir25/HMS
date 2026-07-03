@@ -110,9 +110,7 @@ router.get('/pull', authenticate, asyncHandler(async (req, res) => {
   if (!since) throw new ValidationError('since query parameter is required');
 
   const sinceDate = since;
-  const changes: Record<string, unknown[]> = {};
-
-  for (const table of ALL_MODELS) {
+  const queries = ALL_MODELS.map(async (table) => {
     const tbl = tableName(table);
     const col = hasCamelCaseUpdatedAt(table) ? 'updatedAt' : 'updated_at';
     try {
@@ -120,10 +118,16 @@ router.get('/pull', authenticate, asyncHandler(async (req, res) => {
         `SELECT * FROM "${tbl}" WHERE "${col}" >= $1::timestamptz`,
         sinceDate,
       );
-      if (Array.isArray(rows) && rows.length > 0) changes[table] = rows;
+      return { table, rows: Array.isArray(rows) ? rows : [] };
     } catch {
-      // skip tables that fail
+      return { table, rows: [] };
     }
+  });
+
+  const results = await Promise.all(queries);
+  const changes: Record<string, unknown[]> = {};
+  for (const { table, rows } of results) {
+    if (rows.length > 0) changes[table] = rows;
   }
 
   res.json({ changes, timestamp: new Date().toISOString() });
@@ -142,22 +146,27 @@ router.post('/push', authenticate, asyncHandler(async (req, res) => {
     const tbl = tableName(table);
     try {
       if (action === 'create') {
-        const columns = Object.keys(data).map(k => `"${k}"`).join(', ');
-        const placeholders = Object.keys(data).map((_, i) => `$${i + 1}`).join(', ');
-        const values = [...Object.values(data), recordId];
+        const safeData = { ...data };
+        const now = new Date();
+        if (!safeData.updated_at && !safeData.updatedAt) safeData.updated_at = now;
+        if (!safeData.created_at && !safeData.createdAt) safeData.created_at = now;
+        const cols = ['"id"', ...Object.keys(safeData).map(k => `"${k}"`)];
+        const vals = [`$${1}`, ...Object.keys(safeData).map((_, i) => `$${i + 2}`)];
+        const updates = Object.keys(safeData)
+          .map((k) => `"${k}" = EXCLUDED."${k}"`)
+          .join(', ');
         const rows = await prisma.$queryRawUnsafe(
-          `INSERT INTO "${tbl}" ("id", ${columns}) VALUES ($1, ${placeholders}) RETURNING *`,
-          recordId, ...values,
+          `INSERT INTO "${tbl}" (${cols.join(', ')}) VALUES (${vals.join(', ')}) ON CONFLICT ("id") DO UPDATE SET ${updates} RETURNING *`,
+          recordId, ...Object.values(safeData),
         );
         results.push({ recordId, status: 'applied', serverData: rows });
       } else if (action === 'update') {
-        const updates = Object.keys(data)
+        const setClauses = Object.keys(data)
           .filter(k => k !== 'id')
-          .map((k, i) => `"${k}" = $${i + 2}`).join(', ');
-        const values = Object.entries(data).filter(([k]) => k !== 'id').map(([, v]) => v);
+          .map((k, i) => `"${k}" = $${i + 2}`);
         const rows = await prisma.$queryRawUnsafe(
-          `UPDATE "${tbl}" SET ${updates} WHERE "id" = $1 RETURNING *`,
-          recordId, ...values,
+          `UPDATE "${tbl}" SET ${setClauses.join(', ')} WHERE "id" = $1 RETURNING *`,
+          recordId, ...Object.entries(data).filter(([k]) => k !== 'id').map(([, v]) => v),
         );
         results.push({ recordId, status: 'applied', serverData: rows });
       } else if (action === 'delete') {
