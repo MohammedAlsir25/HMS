@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicotran/tauri-config-schema/main/schema.json",
-  "productName": "Al Jawarih Hospital",
+  "productName": "ALJawarih Hospital",
   "version": "1.0.0",
   "identifier": "com.aljawarih.hospital",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Al Jawarih Hospital",
+        "title": "ALJawarih Hospital",
         "width": 1280,
         "height": 800,
         "resizable": true,

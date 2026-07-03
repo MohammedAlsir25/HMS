@@ -1,11 +1,14 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import StaggeredMenu from './StaggeredMenu';
 import UserProfileDropdown from './UserProfileDropdown';
 import SyncStatusBadge from './SyncStatusBadge';
 import SettingsModal from '../../features/settings/SettingsModal';
+import WelcomeToast from '../ui/WelcomeToast';
+import TourManager from '../ui/TourManager';
+import GradientText from '../ui/GradientText';
 
 function NotificationBell() {
   const [notifications, setNotifications] = useState([]);
@@ -77,6 +80,8 @@ function NotificationBell() {
 
 export default function AppShell({ children }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isDashboard = location.pathname === '/dashboard';
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const user = useAuthStore((s) => s.user);
@@ -87,7 +92,8 @@ export default function AppShell({ children }) {
   }, []);
 
   return (
-    <div className="relative min-h-screen">
+    <div className="relative h-dvh flex flex-col">
+      <WelcomeToast />
       {isAdmin && <StaggeredMenu position="left" isFixed isOpen={menuOpen} onToggle={toggleMenu} />}
 
       <header className="sticky top-0 z-20 bg-paper/90 backdrop-blur-sm border-b border-silver/50">
@@ -108,16 +114,27 @@ export default function AppShell({ children }) {
               </svg>
             </button>
           )}
-          <div className="flex-1 flex justify-center">
+          <div className="flex-1 flex items-center justify-center gap-2">
             <img
               src="/logo.png"
               alt="Al Jawarih"
               className={`h-9 w-auto transition-opacity duration-200 cursor-pointer ${isAdmin && menuOpen ? 'invisible' : ''}`}
               onClick={() => navigate('/dashboard')}
             />
+            {isDashboard && (
+              <GradientText
+                colors={["#B497CF", "#5227FF", "#FF9FFC", "#5227FF", "#B497CF"]}
+                animationSpeed={4}
+                showBorder={false}
+                className="text-heading-xs font-semibold hidden md:flex m-0"
+              >
+                Al Jawarih Hospital
+              </GradientText>
+            )}
           </div>
           <div className="ml-auto flex items-center gap-2">
             <NotificationBell />
+            <TourManager />
             <SyncStatusBadge />
             <UserProfileDropdown onSettings={() => setSettingsOpen(true)} />
           </div>
@@ -125,13 +142,11 @@ export default function AppShell({ children }) {
       </header>
 
       <main
-        className="min-h-screen p-4 md:p-6 lg:p-8"
+        className="flex-1 p-4 md:p-6 lg:p-8 flex flex-col overflow-y-auto"
         style={{ scrollBehavior: 'smooth' }}
       >
-        <div className="mx-auto" style={{ maxWidth: '1440px' }}>
-          <div className="flex-1 min-w-0">
-            {children}
-          </div>
+        <div className="mx-auto w-full flex-1 flex flex-col" style={{ maxWidth: '1440px' }}>
+          {children}
         </div>
       </main>
 

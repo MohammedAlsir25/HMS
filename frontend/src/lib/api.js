@@ -1,6 +1,9 @@
 import { useAuthStore } from '../stores/authStore';
 
-const BASE_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
+const isNative = typeof window !== 'undefined' && (window.__TAURI__ || window.Capacitor?.isNative);
+const BASE_URL = isNative
+  ? 'https://al-jawahir-hospital-production.up.railway.app/api'
+  : (import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api');
 
 function isNativePlatform() {
   return typeof window !== 'undefined' && (window.__TAURI__ || window.Capacitor?.isNative);

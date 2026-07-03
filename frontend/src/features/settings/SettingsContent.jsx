@@ -5,7 +5,6 @@ import { useUIStore } from '../../stores/uiStore';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Avatar } from '../../components/ui/Avatar';
 import UpdateManager from '../../components/ui/UpdateManager';
 import i18n from '../../lib/i18n';
 
@@ -45,8 +44,10 @@ export default function SettingsContent() {
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
   const logout = useAuthStore((s) => s.logout);
-  const { theme, setTheme, language, setLanguage } = useUIStore();
+  const { theme, setTheme, language, setLanguage, hasSeenOnboarding, setHasSeenOnboarding } = useUIStore();
   const fileInputRef = useRef(null);
+
+  const isNative = typeof window !== 'undefined' && (window.__TAURI__ || window.Capacitor?.isNative);
 
   const handleAvatarUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -61,27 +62,53 @@ export default function SettingsContent() {
 
   return (
     <div className="space-y-6">
-      <Section title={t('settings.profile')}>
-        <div className="flex items-center gap-4">
-          <Avatar src={user?.avatarUrl} name={user?.fullName} size="xl" />
-          <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleAvatarUpload}
-            />
-            <Button size="sm" variant="secondary" onClick={() => fileInputRef.current?.click()}>
-              {t('settings.uploadPhoto')}
-            </Button>
-            <p className="text-caption text-slate mt-1">{t('settings.photoHint')}</p>
+      <div className="bg-white dark:bg-zinc-900 rounded-3xl shadow-lg dark:shadow-2xl dark:shadow-black/80 overflow-hidden">
+        <div className="relative overflow-hidden">
+          {user?.avatarUrl ? (
+            <img src={user.avatarUrl} alt={user.fullName} className="w-full aspect-square object-cover max-h-[320px]" />
+          ) : (
+            <div className="w-full aspect-square max-h-[320px] bg-bone dark:bg-zinc-800 flex items-center justify-center">
+              <span className="text-6xl font-medium text-graphite dark:text-zinc-400">
+                {user?.fullName?.charAt(0) || '?'}
+              </span>
+            </div>
+          )}
+          <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+          <div className="absolute bottom-4 left-4">
+            <h2 className="text-xl font-semibold text-white drop-shadow-lg">{user?.fullName || 'User'}</h2>
+            <p className="text-sm text-white/80 drop-shadow">{user?.email}</p>
           </div>
         </div>
-        <Input label={t('settings.fullName')} value={user?.fullName || ''} readOnly />
-        <Input label={t('settings.email')} value={user?.email || ''} readOnly />
-        <Input label={t('settings.role')} value={user?.role || ''} readOnly />
-      </Section>
+
+        <div className="p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {user?.avatarUrl ? (
+              <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-gray-200 dark:ring-zinc-700">
+                <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
+              </div>
+            ) : (
+              <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-gray-200 dark:ring-zinc-700 bg-bone dark:bg-zinc-800 flex items-center justify-center">
+                <span className="text-sm font-medium text-graphite dark:text-zinc-400">{user?.fullName?.charAt(0) || '?'}</span>
+              </div>
+            )}
+            <div>
+              <div className="text-sm font-medium text-obsidian dark:text-zinc-200">{user?.role || 'N/A'}</div>
+              <div className="text-xs text-slate dark:text-zinc-500">{user?.email}</div>
+            </div>
+          </div>
+
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="bg-gray-900 dark:bg-zinc-800 text-white dark:text-zinc-100 rounded-lg px-5 py-2.5 text-sm font-medium
+                       transition-all duration-500 ease-out transform hover:scale-105
+                       hover:bg-gray-800 dark:hover:bg-zinc-700
+                       active:scale-95 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-black/50"
+          >
+            Edit Profile
+          </button>
+        </div>
+      </div>
 
       <Section title={t('settings.appearance')}>
         <ToggleGroup
@@ -114,6 +141,15 @@ export default function SettingsContent() {
         <Input label={t('settings.confirmPassword')} type="password" placeholder={t('settings.confirmPasswordPlaceholder')} />
         <Button variant="secondary" disabled>{t('settings.updatePassword')}</Button>
       </Section>
+
+      {isNative && (
+        <Section title="Tour Guide">
+          <p className="text-body text-slate">Reset the guided tour to show again on your next dashboard visit.</p>
+          <Button variant="secondary" onClick={() => setHasSeenOnboarding(false)}>
+            Reset Tour
+          </Button>
+        </Section>
+      )}
 
       <UpdateManager />
     </div>

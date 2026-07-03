@@ -4,12 +4,8 @@ export async function loginAs(page, email, password) {
   await page.fill('input[type="email"]', email);
   await page.fill('input[type="password"]', password);
   await page.click('button[type="submit"]');
-  // After login, wait for main UI to render (navigates via React Router, not browser nav)
-  if (email.includes('reception')) {
-    await page.waitForSelector('text=Welcome', { timeout: 30000 });
-  } else {
-    await page.waitForURL(/\/clinic\//, { timeout: 30000 });
-  }
+  // After login, wait for AppShell header logo (proves main UI rendered)
+  await page.waitForSelector('img[alt="Al Jawarih"]', { timeout: 30000 });
   await page.waitForTimeout(500);
 }
 

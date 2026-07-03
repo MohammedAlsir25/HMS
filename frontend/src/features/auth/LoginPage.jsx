@@ -82,9 +82,6 @@ export default function LoginPage() {
           </form>
         </Card>
 
-        <p className="text-center text-caption text-slate mt-6">
-          Demo accounts: admin@aljawarih.sd / reception@aljawarih.sd / doctor.medicine@aljawarih.sd — password: password123
-        </p>
       </div>
     </div>
   );

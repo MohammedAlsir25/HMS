@@ -2,11 +2,12 @@ const DB_NAME = 'al-jawarih';
 const META_STORE = '_meta';
 const storeNames = new Set();
 let dbPromise = null;
+let DB_VERSION = 1;
 
 function openDb() {
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, 1);
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = () => {
         const db = req.result;
         if (!db.objectStoreNames.contains(META_STORE)) {
@@ -30,6 +31,7 @@ function addStoreIfMissing(name, db) {
   db.close();
   dbPromise = null;
   storeNames.add(name);
+  DB_VERSION++;
   return openDb();
 }
 
@@ -40,7 +42,7 @@ export const localDb = {
   async do(table, method, ...args) {
     let db = await openDb();
     db = await addStoreIfMissing(table, db);
-    const tx = db.transaction(table, args[0] === 'putMany' || args[0] === 'put' || args[0] === 'delete' || args[0] === 'clear' || args[0] === 'setMeta' ? 'readwrite' : 'readonly');
+    const tx = db.transaction(table, method === 'putMany' || method === 'put' || method === 'delete' || method === 'clear' ? 'readwrite' : 'readonly');
     const store = tx.objectStore(table);
     return new Promise((resolve, reject) => {
       let req;

@@ -14,7 +14,6 @@ const ROLE_ROUTES = {
   'Lab Admin': '/lab',
   'Inventory Manager': '/inventory',
   'Procurement Manager': '/procurement',
-  'Super Admin': '/admin',
 };
 
 const navItems = [
@@ -53,21 +52,17 @@ export default function DashboardRedirect() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-heading-sm font-semibold text-obsidian">Welcome, {user?.fullName?.split(' ')[0] || 'User'}</h1>
-        <p className="text-body text-slate mt-1">Select a section to get started</p>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+    <div className="max-w-[1440px] mx-auto flex-1 flex items-center" data-tour="dashboard">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5 w-full">
         {navItems.map(({ label, link, icon }) => (
           <Link
             key={link}
             to={link}
-            className="flex flex-col items-center gap-2 p-4 rounded-xl border border-silver hover:border-lilac-bloom bg-paper hover:bg-lilac-bloom/5 transition-all duration-200 touch-target group"
+            data-tour={label.toLowerCase().replace(/\s+/g, '-')}
+            className="flex flex-col items-center gap-2 p-5 rounded-xl border border-silver hover:border-lilac-bloom bg-paper hover:bg-lilac-bloom/5 transition-all duration-200 touch-target group"
           >
-            <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-bone group-hover:bg-lilac-bloom/10 transition-colors">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-graphite group-hover:text-lilac-bloom transition-colors">
+            <div className="w-10 h-10 rounded-lg bg-bone group-hover:bg-lilac-bloom/10 transition-colors p-2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full text-graphite group-hover:text-lilac-bloom transition-colors">
                 <path d={icon} />
               </svg>
             </div>

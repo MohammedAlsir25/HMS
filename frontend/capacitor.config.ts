@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'sd.aljawarih.hospital',
-  appName: 'Al Jawarih',
+  appName: 'ALJawarih Hospital',
   webDir: 'dist',
   server: {
     androidScheme: 'http',

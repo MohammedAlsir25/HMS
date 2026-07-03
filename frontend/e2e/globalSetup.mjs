@@ -39,6 +39,6 @@ export default async function globalSetup() {
     return;
   }
   console.log('\n[globalSetup] Reseeding database...');
-  execSync('npx prisma db push --skip-generate && npm run prisma:seed', { cwd: backendDir, stdio: 'inherit', timeout: 300000 });
+  execSync('npx prisma db push --skip-generate && npx tsx prisma/seed.js', { cwd: backendDir, stdio: 'inherit', timeout: 300000 });
   console.log('[globalSetup] Database seeded.\n');
 }

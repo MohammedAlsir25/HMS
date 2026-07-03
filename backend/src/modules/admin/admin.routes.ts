@@ -35,7 +35,7 @@ router.post('/users', authenticate, requirePermission(PERMISSIONS.ADMIN_USERS), 
   if (existing) throw new ConflictError('Email already in use');
   const passwordHash = await bcrypt.hash(password, 12);
   const user = await prisma.user.create({
-    data: { email, passwordHash, fullName, phone, roleId, clinicId },
+    data: { email, passwordHash, fullName, phone, roleId, ...(clinicId ? { clinicId } : {}) },
     select: { id: true, email: true, fullName: true, phone: true, roleId: true, clinicId: true },
   });
   res.status(201).json(user);
@@ -56,7 +56,7 @@ router.get('/roles', authenticate, requirePermission(PERMISSIONS.ADMIN_RBAC), as
     include: { _count: { select: { users: true } } },
     orderBy: { name: 'asc' },
   });
-  const rolesWithCount = roles.map((r) => ({ id: r.id, name: r.name, description: r.description, permissions: r.permissions, userCount: (r as unknown as { _count: Record<string, number> })._count.users }));
+  const rolesWithCount = roles.map((r) => ({ id: r.id, name: r.name, description: r.description, permissions: Array.isArray(r.permissions) ? r.permissions : [], userCount: (r as unknown as { _count: Record<string, number> })._count.users }));
   res.json(rolesWithCount);
 }));
 
