@@ -25,6 +25,7 @@ import procurementRoutes from './modules/procurement/procurement.routes.js';
 import syncRoutes from './modules/sync/sync.routes.js';
 
 const app = express();
+app.set('trust proxy', 1);
 
 app.use(helmet());
 const capacitorOrigins = [
