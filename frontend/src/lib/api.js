@@ -1,9 +1,9 @@
 import { useAuthStore } from '../stores/authStore';
 
-const isNative = typeof window !== 'undefined' && (window.__TAURI__ || window.Capacitor?.isNative);
-const BASE_URL = isNative
-  ? 'https://al-jawahir-hospital-production.up.railway.app/api'
-  : (import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api');
+function getBaseUrl() {
+  if (isNativePlatform()) return 'https://al-jawahir-hospital-production.up.railway.app/api';
+  return import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
+}
 
 function isNativePlatform() {
   return typeof window !== 'undefined' && (window.__TAURI__ || window.Capacitor?.isNative);
@@ -82,7 +82,7 @@ class ApiClient {
     const token = useAuthStore.getState().token;
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    const doFetch = () => fetch(`${BASE_URL}${path}`, {
+    const doFetch = () => fetch(`${getBaseUrl()}${path}`, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
@@ -97,7 +97,7 @@ class ApiClient {
           const refreshed = await this.refresh();
           if (refreshed) {
             headers['Authorization'] = `Bearer ${useAuthStore.getState().token}`;
-            const retry = await fetch(`${BASE_URL}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
+            const retry = await fetch(`${getBaseUrl()}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
             if (!retry.ok) { const e = await retry.json().catch(() => ({ message: retry.statusText })); throw new Error(e.message || 'Request failed'); }
             const result = await retry.json();
             if (isRead && Array.isArray(result)) cacheGet(path, result);
@@ -140,7 +140,7 @@ class ApiClient {
     const refreshToken = useAuthStore.getState().refreshToken;
     if (!refreshToken) return false;
     try {
-      const res = await fetch(`${BASE_URL}/auth/refresh`, {
+      const res = await fetch(`${getBaseUrl()}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken }),
@@ -159,14 +159,14 @@ class ApiClient {
     const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
     try {
-      const res = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: formData, signal: opts.signal });
+      const res = await fetch(`${getBaseUrl()}${path}`, { method: 'POST', headers, body: formData, signal: opts.signal });
       if (res.status === 401) {
         const data = await res.json().catch(() => ({}));
         if (data.code === 'TOKEN_EXPIRED') {
           const refreshed = await this.refresh();
           if (refreshed) {
             headers['Authorization'] = `Bearer ${useAuthStore.getState().token}`;
-            const retry = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: formData });
+            const retry = await fetch(`${getBaseUrl()}${path}`, { method: 'POST', headers, body: formData });
             if (!retry.ok) { const e = await retry.json().catch(() => ({ message: retry.statusText })); throw new Error(e.message || 'Request failed'); }
             return retry.json();
           }

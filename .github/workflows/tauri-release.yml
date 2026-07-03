@@ -1,0 +1,87 @@
+name: Build Tauri EXE + MSI
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: frontend
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Tauri app
+        run: npx tauri build --bundles msi nsis
+
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          $json = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          echo "version=$($json.version)" >> $env:GITHUB_OUTPUT
+
+      - name: Sign EXE and generate latest.json
+        id: sign
+        shell: pwsh
+        env:
+          UPDATE_PRIVATE_KEY: ${{ secrets.UPDATE_PRIVATE_KEY }}
+        run: |
+          $ver = "${{ steps.version.outputs.version }}"
+          $exe = "src-tauri/target/release/bundle/nsis/ALJawarih Hospital_${ver}_x64-setup.exe"
+          $msi = "src-tauri/target/release/bundle/msi/ALJawarih Hospital_${ver}_x64_en-US.msi"
+
+          # Save key to temp file
+          $keyFile = "$env:TEMP\\update_key.pem"
+          [System.IO.File]::WriteAllText($keyFile, $env:UPDATE_PRIVATE_KEY)
+
+          # Generate signature
+          $sig = npx tauri signer sign -k $keyFile "`"$exe`""
+          echo "signature=$sig" >> $env:GITHUB_OUTPUT
+
+          # Create latest.json
+          $tag = "v$ver"
+          $latest = @{
+            version = $ver
+            notes = ""
+            pub_date = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
+            platforms = @{
+              "windows-x86_64" = @{
+                signature = $sig
+                url = "https://github.com/${{ github.repository }}/releases/download/$tag/ALJawarih%20Hospital_${ver}_x64-setup.exe"
+              }
+            }
+          }
+          $latest | ConvertTo-Json -Depth 10 | Set-Content src-tauri/target/release/latest.json -Encoding UTF8
+
+          Remove-Item $keyFile -Force
+
+      - name: Upload artifacts to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          files: |
+            frontend/src-tauri/target/release/bundle/nsis/*.exe
+            frontend/src-tauri/target/release/bundle/msi/*.msi
+            frontend/src-tauri/target/release/latest.json
