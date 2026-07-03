@@ -32,6 +32,8 @@ const capacitorOrigins = [
   'capacitor://localhost',
   'http://localhost',
   'ionic://localhost',
+  'tauri://localhost',
+  'https://tauri.localhost',
 ];
 app.use(cors({
   origin: (origin, cb) => {
