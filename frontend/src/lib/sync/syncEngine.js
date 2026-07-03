@@ -43,6 +43,8 @@ function getOnlineStatus() {
   return navigator.onLine;
 }
 
+let autoSyncTimer = null;
+
 export const syncEngine = {
   subscribe(fn) {
     listeners.add(fn);
@@ -57,7 +59,9 @@ export const syncEngine = {
     const alreadyDone = await localDb.getMeta(INITIAL_SYNC_KEY);
     if (alreadyDone && !force) return;
     syncPromise = this.initialSync(force);
-    return syncPromise;
+    const result = await syncPromise;
+    if (getOnlineStatus()) this.startAutoSync();
+    return result;
   },
   async initialSync(force = false) {
     const alreadyDone = !force && (await localDb.getMeta(INITIAL_SYNC_KEY));
@@ -75,10 +79,10 @@ export const syncEngine = {
       const now = new Date().toISOString();
       await localDb.setMeta(INITIAL_SYNC_KEY, now);
       await localDb.setMeta(SYNC_STATE_KEY, now);
-      syncState = { status: 'idle', lastSyncAt: now, error: null };
+      syncState = { status: 'idle', lastSyncAt: now, error: null, pendingMutations: 0 };
       notify(syncState);
     } catch (err) {
-      syncState = { status: 'error', lastSyncAt: null, error: err.message };
+      syncState = { status: 'error', lastSyncAt: null, error: err.message, pendingMutations: 0 };
       notify(syncState);
     }
   },
@@ -95,16 +99,22 @@ export const syncEngine = {
       }
       const now = res.timestamp || new Date().toISOString();
       await localDb.setMeta(SYNC_STATE_KEY, now);
-      syncState = { status: 'idle', lastSyncAt: now, error: null };
+      const pending = await localDb.getMeta(PENDING_MUTATIONS_KEY) || [];
+      syncState = { status: 'idle', lastSyncAt: now, error: null, pendingMutations: pending.length };
       notify(syncState);
     } catch (err) {
-      syncState = { status: 'error', lastSyncAt: since, error: err.message };
+      const pending = await localDb.getMeta(PENDING_MUTATIONS_KEY) || [];
+      syncState = { status: 'error', lastSyncAt: syncState.lastSyncAt, error: err.message, pendingMutations: pending.length };
       notify(syncState);
     }
   },
   async push() {
     const pending = await localDb.getMeta(PENDING_MUTATIONS_KEY);
-    if (!pending || pending.length === 0) return;
+    if (!pending || pending.length === 0) {
+      syncState = { ...syncState, pendingMutations: 0 };
+      notify(syncState);
+      return;
+    }
     syncState = { ...syncState, status: 'syncing' };
     notify(syncState);
     try {
@@ -113,10 +123,11 @@ export const syncEngine = {
       if (res.timestamp) {
         await localDb.setMeta(SYNC_STATE_KEY, res.timestamp);
       }
-      syncState = { status: 'idle', lastSyncAt: res.timestamp || new Date().toISOString(), error: null };
+      syncState = { status: 'idle', lastSyncAt: res.timestamp || new Date().toISOString(), error: null, pendingMutations: 0 };
       notify(syncState);
     } catch (err) {
-      syncState = { status: 'error', lastSyncAt: syncState.lastSyncAt, error: err.message };
+      const pending2 = await localDb.getMeta(PENDING_MUTATIONS_KEY) || [];
+      syncState = { status: 'error', lastSyncAt: syncState.lastSyncAt, error: err.message, pendingMutations: pending2.length };
       notify(syncState);
     }
   },
@@ -124,6 +135,8 @@ export const syncEngine = {
     const pending = (await localDb.getMeta(PENDING_MUTATIONS_KEY)) || [];
     pending.push(mutation);
     await localDb.setMeta(PENDING_MUTATIONS_KEY, pending);
+    syncState = { ...syncState, pendingMutations: pending.length };
+    notify(syncState);
     if (getOnlineStatus()) {
       this.push().catch(() => {});
     }
@@ -133,9 +146,26 @@ export const syncEngine = {
     await this.pull();
     await this.push();
   },
+  startAutoSync(intervalMs = 60000) {
+    this.stopAutoSync();
+    autoSyncTimer = setInterval(async () => {
+      if (!getOnlineStatus()) return;
+      try {
+        await this.pull();
+        await this.push();
+      } catch { /* silent */ }
+    }, intervalMs);
+  },
+  stopAutoSync() {
+    if (autoSyncTimer) {
+      clearInterval(autoSyncTimer);
+      autoSyncTimer = null;
+    }
+  },
   async destroy() {
+    this.stopAutoSync();
     await localDb.destroy();
-    syncState = { status: 'idle', lastSyncAt: null, error: null };
+    syncState = { status: 'idle', lastSyncAt: null, error: null, pendingMutations: 0 };
     notify(syncState);
   },
 };
