@@ -29,7 +29,7 @@ export default function LoginPage() {
       login(data.token, data.refreshToken, data.user);
       navigate('/dashboard', { replace: true });
     } catch (err) {
-      setError(t('login.connectionError'));
+      setError(err.message || t('login.connectionError'));
     } finally {
       setLoading(false);
     }

@@ -99,3 +99,12 @@ router.post('/roles/seed', authenticate, requirePermission(PERMISSIONS.ADMIN_RBA
 
 export default router;
 
+router.post('/log-error', asyncHandler(async (req, res) => {
+  const { message, stack, userId, url, userAgent } = req.body;
+  if (!message) return res.status(400).json({ message: 'message is required' });
+  await prisma.crashLog.create({
+    data: { message, stack, userId, url, userAgent },
+  });
+  res.json({ message: 'Logged' });
+}));
+

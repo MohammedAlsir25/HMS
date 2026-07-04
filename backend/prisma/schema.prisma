@@ -7,6 +7,7 @@ datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+  relationMode = "prisma"
 }
 
 model User {
@@ -40,6 +41,9 @@ model User {
   clinic                 Clinic?               @relation(fields: [clinicId], references: [id])
   role                   Role                  @relation(fields: [roleId], references: [id])
 
+  @@index([isActive])
+  @@index([roleId])
+  @@index([clinicId])
   @@map("users")
 }
 
@@ -53,6 +57,7 @@ model Role {
   is_deleted  Boolean?  @default(false)
   users       User[]
 
+  @@index([is_deleted])
   @@map("roles")
 }
 
@@ -76,6 +81,8 @@ model Clinic {
   referralsTo      Referral[]        @relation("ToClinic")
   users            User[]
 
+  @@index([isActive])
+  @@index([is_deleted])
   @@map("clinics")
 }
 
@@ -97,6 +104,9 @@ model Department {
   requisitions Requisition[]
   transactions Transaction[]
 
+  @@index([isActive])
+  @@index([is_deleted])
+  @@index([clinicId])
   @@map("departments")
 }
 
@@ -117,6 +127,9 @@ model Expense {
   purchaseOrders  PurchaseOrder?
   supplierInvoice SupplierInvoice?
 
+  @@index([date])
+  @@index([departmentId])
+  @@index([category])
   @@map("expenses")
 }
 
@@ -145,6 +158,9 @@ model Patient {
   referrals         Referral[]
   surgeries         Surgery[]
 
+  @@index([is_deleted])
+  @@index([createdAt])
+  @@index([createdById])
   @@map("patients")
 }
 
@@ -160,6 +176,8 @@ model PatientFile {
   is_deleted   Boolean? @default(false)
   patient      Patient  @relation(fields: [patientId], references: [id])
 
+  @@index([patientId])
+  @@index([is_deleted])
   @@map("patient_files")
 }
 
@@ -181,6 +199,11 @@ model Appointment {
   doctor      User              @relation(fields: [doctorId], references: [id])
   patient     Patient           @relation(fields: [patientId], references: [id])
 
+  @@index([status])
+  @@index([clinicId])
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([createdAt])
   @@map("appointments")
 }
 
@@ -193,6 +216,8 @@ model Icd10Code {
   updated_at DateTime @updatedAt @db.Timestamptz(6)
   is_deleted Boolean? @default(false)
 
+  @@index([is_deleted])
+  @@index([category])
   @@map("icd10_codes")
 }
 
@@ -212,6 +237,8 @@ model VitalSign {
   is_deleted             Boolean?       @default(false)
   clinicalRecord         ClinicalRecord @relation(fields: [clinicalRecordId], references: [id])
 
+  @@index([clinicalRecordId])
+  @@index([is_deleted])
   @@map("vital_signs")
 }
 
@@ -229,6 +256,8 @@ model Symptom {
   is_deleted       Boolean?       @default(false)
   clinicalRecord   ClinicalRecord @relation(fields: [clinicalRecordId], references: [id])
 
+  @@index([clinicalRecordId])
+  @@index([is_deleted])
   @@map("symptoms")
 }
 
@@ -246,6 +275,8 @@ model Medication {
   is_deleted       Boolean?       @default(false)
   clinicalRecord   ClinicalRecord @relation(fields: [clinicalRecordId], references: [id])
 
+  @@index([clinicalRecordId])
+  @@index([is_deleted])
   @@map("medications")
 }
 
@@ -266,6 +297,9 @@ model ClinicalRecord {
   symptoms           Symptom[]
   vitalSigns         VitalSign[]
 
+  @@index([patientId])
+  @@index([clinicId])
+  @@index([encounterDate])
   @@map("clinical_records")
 }
 
@@ -286,6 +320,10 @@ model Referral {
   patient          Patient              @relation(fields: [patientId], references: [id])
   toClinic         Clinic?              @relation("ToClinic", fields: [toClinicId], references: [id])
 
+  @@index([status])
+  @@index([fromClinicId])
+  @@index([toClinicId])
+  @@index([patientId])
   @@map("referrals")
 }
 
@@ -303,6 +341,8 @@ model ReferralMedication {
   is_deleted Boolean?  @default(false)
   referral   Referral  @relation(fields: [referralId], references: [id], onDelete: Cascade)
 
+  @@index([referralId])
+  @@index([is_deleted])
   @@map("referral_medications")
 }
 
@@ -317,6 +357,8 @@ model ReferralTest {
   test       DiagnosticTest @relation(fields: [testId], references: [id])
 
   @@unique([referralId, testId])
+  @@index([referralId])
+  @@index([testId])
   @@map("referral_tests")
 }
 
@@ -332,6 +374,9 @@ model Surgery {
   patientId String
   patient   Patient       @relation(fields: [patientId], references: [id])
 
+  @@index([status])
+  @@index([patientId])
+  @@index([startTime])
   @@map("surgeries")
 }
 
@@ -356,6 +401,9 @@ model InventoryItem {
   requisitionItems     RequisitionItem[]
   supplierInvoiceItems SupplierInvoiceItem[]
 
+  @@index([isActive])
+  @@index([is_deleted])
+  @@index([category])
   @@map("inventory_items")
 }
 
@@ -369,6 +417,8 @@ model InventoryLocation {
   is_deleted Boolean?      @default(false)
   item       InventoryItem @relation(fields: [itemId], references: [id])
 
+  @@index([itemId])
+  @@index([is_deleted])
   @@map("inventory_locations")
 }
 
@@ -384,6 +434,9 @@ model InventoryTransaction {
   is_deleted Boolean?      @default(false)
   item       InventoryItem @relation(fields: [itemId], references: [id])
 
+  @@index([itemId])
+  @@index([is_deleted])
+  @@index([createdAt])
   @@map("inventory_transactions")
 }
 
@@ -404,6 +457,13 @@ model Transaction {
   department    Department?     @relation(fields: [departmentId], references: [id])
   shift         Shift           @relation(fields: [shiftId], references: [id])
 
+  @@index([type])
+  @@index([paymentMethod])
+  @@index([shiftId])
+  @@index([cashierId])
+  @@index([departmentId])
+  @@index([is_deleted])
+  @@index([createdAt])
   @@map("transactions")
 }
 
@@ -421,6 +481,9 @@ model Shift {
   user          User          @relation(fields: [userId], references: [id])
   transactions  Transaction[]
 
+  @@index([userId])
+  @@index([is_deleted])
+  @@index([openedAt])
   @@map("shifts")
 }
 
@@ -448,6 +511,8 @@ model DiagnosticTest {
   referralTests ReferralTest[]
 
   @@unique([orderType, code])
+  @@index([isActive])
+  @@index([category])
   @@map("diagnostic_tests")
 }
 
@@ -463,6 +528,8 @@ model DiagnosticPanel {
   orders     DiagnosticOrder[]
   panelTests DiagnosticPanelTest[]
 
+  @@index([isActive])
+  @@index([is_deleted])
   @@map("diagnostic_panels")
 }
 
@@ -503,6 +570,13 @@ model DiagnosticOrder {
   referral      Referral?             @relation(fields: [referralId], references: [id])
   requestedBy   User                  @relation("OrderRequester", fields: [requestedById], references: [id])
 
+  @@index([status])
+  @@index([patientId])
+  @@index([fromClinicId])
+  @@index([assignedToId])
+  @@index([requestedById])
+  @@index([orderType])
+  @@index([createdAt])
   @@map("diagnostic_orders")
 }
 
@@ -528,6 +602,9 @@ model DiagnosticOrderTest {
   test              DiagnosticTest  @relation(fields: [testId], references: [id])
 
   @@unique([orderId, testId])
+  @@index([orderId])
+  @@index([testId])
+  @@index([is_deleted])
   @@map("diagnostic_order_tests")
 }
 
@@ -553,6 +630,8 @@ model Employee {
   leaveRequests  LeaveRequest[]
   payrollRecords PayrollRecord[]
 
+  @@index([departmentId])
+  @@index([isActive])
   @@map("employees")
 }
 
@@ -571,6 +650,10 @@ model PayrollRecord {
   is_deleted Boolean?      @default(false)
   employee   Employee      @relation(fields: [employeeId], references: [id])
 
+  @@index([employeeId])
+  @@index([period])
+  @@index([status])
+  @@index([is_deleted])
   @@map("payroll_records")
 }
 
@@ -588,6 +671,10 @@ model Attendance {
   employee   Employee         @relation(fields: [employeeId], references: [id])
 
   @@unique([employeeId, date])
+  @@index([employeeId])
+  @@index([date])
+  @@index([status])
+  @@index([is_deleted])
   @@map("attendance")
 }
 
@@ -605,6 +692,8 @@ model LeaveRequest {
   approvedBy   User?       @relation("LeaveApprover", fields: [approvedById], references: [id])
   employee     Employee    @relation(fields: [employeeId], references: [id])
 
+  @@index([employeeId])
+  @@index([status])
   @@map("leave_requests")
 }
 
@@ -621,6 +710,11 @@ model AuditLog {
   is_deleted Boolean? @default(false)
   user       User     @relation(fields: [userId], references: [id])
 
+  @@index([userId])
+  @@index([action])
+  @@index([entity])
+  @@index([entityId])
+  @@index([createdAt])
   @@map("audit_logs")
 }
 
@@ -636,6 +730,9 @@ model AccountsPayable {
   paymentStatus PaymentStatus @default(Pending)
   updatedAt     DateTime      @updatedAt
 
+  @@index([paymentStatus])
+  @@index([creditor])
+  @@index([dueDate])
   @@map("accounts_payable")
 }
 
@@ -652,6 +749,8 @@ model Supplier {
   purchaseOrders PurchaseOrder[]
   invoices       SupplierInvoice[]
 
+  @@index([is_deleted])
+  @@index([category])
   @@map("suppliers")
 }
 
@@ -675,6 +774,9 @@ model SupplierInvoice {
   expense       Expense?              @relation(fields: [expenseId], references: [id])
   supplier      Supplier              @relation(fields: [supplierId], references: [id])
 
+  @@index([supplierId])
+  @@index([paymentStatus])
+  @@index([is_deleted])
   @@map("supplier_invoices")
 }
 
@@ -691,6 +793,9 @@ model SupplierInvoiceItem {
   invoice          SupplierInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   item             InventoryItem   @relation(fields: [itemId], references: [id])
 
+  @@index([invoiceId])
+  @@index([itemId])
+  @@index([is_deleted])
   @@map("supplier_invoice_items")
 }
 
@@ -706,6 +811,9 @@ model CostCenter {
   department     Department      @relation(fields: [departmentId], references: [id])
   purchaseOrders PurchaseOrder[]
 
+  @@index([isActive])
+  @@index([is_deleted])
+  @@index([departmentId])
   @@map("cost_centers")
 }
 
@@ -722,6 +830,10 @@ model Requisition {
   department    Department        @relation(fields: [departmentId], references: [id])
   requestedBy   User              @relation("RequisitionCreator", fields: [requestedById], references: [id])
 
+  @@index([status])
+  @@index([departmentId])
+  @@index([requestedById])
+  @@index([createdAt])
   @@map("requisitions")
 }
 
@@ -738,6 +850,9 @@ model RequisitionItem {
   item          InventoryItem? @relation(fields: [itemId], references: [id])
   requisition   Requisition    @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
 
+  @@index([requisitionId])
+  @@index([itemId])
+  @@index([is_deleted])
   @@map("requisition_items")
 }
 
@@ -776,6 +891,12 @@ model PurchaseOrder {
   expense             Expense?            @relation(fields: [expenseId], references: [id])
   supplier            Supplier            @relation(fields: [supplierId], references: [id])
 
+  @@index([status])
+  @@index([supplierId])
+  @@index([createdById])
+  @@index([departmentType])
+  @@index([paymentStatus])
+  @@index([createdAt])
   @@map("purchase_orders")
 }
 
@@ -794,6 +915,9 @@ model PurchaseOrderItem {
   item             InventoryItem? @relation(fields: [itemId], references: [id])
   order            PurchaseOrder  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
+  @@index([orderId])
+  @@index([itemId])
+  @@index([is_deleted])
   @@map("purchase_order_items")
 }
 
@@ -819,6 +943,8 @@ model FixedAsset {
   updatedAt               DateTime       @updatedAt
   purchaseOrder           PurchaseOrder?
 
+  @@index([isActive])
+  @@index([assetType])
   @@map("fixed_assets")
 }
 
@@ -834,7 +960,23 @@ model Notification {
   is_deleted Boolean? @default(false)
   user       User     @relation(fields: [userId], references: [id])
 
+  @@index([userId])
+  @@index([isRead])
+  @@index([is_deleted])
   @@map("notifications")
+}
+
+model CrashLog {
+  id        String   @id @default(uuid())
+  message   String
+  stack     String?
+  userId    String?
+  url       String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("crash_logs")
 }
 
 enum ClinicType {

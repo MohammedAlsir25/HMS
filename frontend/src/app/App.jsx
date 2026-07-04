@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import 'shepherd.js/dist/css/shepherd.css';
@@ -8,31 +8,40 @@ import LiquidEther from '../background/LiquidEther';
 import AppShell from '../components/layout/AppShell';
 import ErrorBoundary from '../components/ui/ErrorBoundary';
 import LoginPage from '../features/auth/LoginPage';
-import SettingsPage from '../features/settings/SettingsPage';
-import DashboardRedirect from '../features/auth/DashboardRedirect';
-import ReceptionPage from '../features/reception/ReceptionPage';
-import WaitingRoomTV from '../features/reception/WaitingRoomTV';
-import SurgeryGantt from '../features/surgery/SurgeryGantt';
-import ReferralsPage from '../features/referral/ReferralsPage';
-import PharmacyPOS from '../features/pos/PharmacyPOS';
-import PharmacyProducts from '../features/pos/PharmacyProducts';
-import OpticsPOS from '../features/pos/OpticsPOS';
-import OpticsProducts from '../features/pos/OpticsProducts';
-import LabDashboard from '../features/lab/LabDashboard';
-import InventoryPOS from '../features/pos/InventoryPOS';
-import AccountingPage from '../features/accounting/AccountingPage';
-import AdminPage from '../features/admin/AdminPage';
-import HRPage from '../features/hr/HRPage';
-import ProcurementPage from '../features/procurement/ProcurementPage';
-import MedicineDashboard from '../features/clinics/MedicineDashboard';
-import ENTDashboard from '../features/clinics/ENTDashboard';
-import DentalDashboard from '../features/clinics/DentalDashboard';
-import RetinaDashboard from '../features/clinics/RetinaDashboard';
-import GlaucomaDashboard from '../features/clinics/GlaucomaDashboard';
-import OrbitDashboard from '../features/clinics/OrbitDashboard';
-import PedsOphthDashboard from '../features/clinics/PedsOphthDashboard';
-import GenOphthDashboard from '../features/clinics/GenOphthDashboard';
-import OptometryDashboard from '../features/clinics/OptometryDashboard';
+
+const SettingsPage = lazy(() => import('../features/settings/SettingsPage'));
+const DashboardRedirect = lazy(() => import('../features/auth/DashboardRedirect'));
+const ReceptionPage = lazy(() => import('../features/reception/ReceptionPage'));
+const WaitingRoomTV = lazy(() => import('../features/reception/WaitingRoomTV'));
+const SurgeryGantt = lazy(() => import('../features/surgery/SurgeryGantt'));
+const ReferralsPage = lazy(() => import('../features/referral/ReferralsPage'));
+const PharmacyPOS = lazy(() => import('../features/pos/PharmacyPOS'));
+const PharmacyProducts = lazy(() => import('../features/pos/PharmacyProducts'));
+const OpticsPOS = lazy(() => import('../features/pos/OpticsPOS'));
+const OpticsProducts = lazy(() => import('../features/pos/OpticsProducts'));
+const LabDashboard = lazy(() => import('../features/lab/LabDashboard'));
+const InventoryPOS = lazy(() => import('../features/pos/InventoryPOS'));
+const AccountingPage = lazy(() => import('../features/accounting/AccountingPage'));
+const AdminPage = lazy(() => import('../features/admin/AdminPage'));
+const HRPage = lazy(() => import('../features/hr/HRPage'));
+const ProcurementPage = lazy(() => import('../features/procurement/ProcurementPage'));
+const MedicineDashboard = lazy(() => import('../features/clinics/MedicineDashboard'));
+const ENTDashboard = lazy(() => import('../features/clinics/ENTDashboard'));
+const DentalDashboard = lazy(() => import('../features/clinics/DentalDashboard'));
+const RetinaDashboard = lazy(() => import('../features/clinics/RetinaDashboard'));
+const GlaucomaDashboard = lazy(() => import('../features/clinics/GlaucomaDashboard'));
+const OrbitDashboard = lazy(() => import('../features/clinics/OrbitDashboard'));
+const PedsOphthDashboard = lazy(() => import('../features/clinics/PedsOphthDashboard'));
+const GenOphthDashboard = lazy(() => import('../features/clinics/GenOphthDashboard'));
+const OptometryDashboard = lazy(() => import('../features/clinics/OptometryDashboard'));
+
+function Spinner() {
+  return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="w-8 h-8 border-2 border-lilac-bloom border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
 
 function isNativePlatform() {
   return typeof window !== 'undefined' && (window.__TAURI_INTERNALS__ || window.Capacitor?.isNative);
@@ -46,7 +55,7 @@ function ProtectedRoute({ children }) {
     }
   }, [token]);
   if (!token) return <Navigate to="/login" replace />;
-  return <AppShell><ErrorBoundary>{children}</ErrorBoundary></AppShell>;
+  return <AppShell><ErrorBoundary><Suspense fallback={<Spinner />}>{children}</Suspense></ErrorBoundary></AppShell>;
 }
 
 function PublicRoute({ children }) {

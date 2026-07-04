@@ -1,5 +1,6 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 import { useAuthStore } from '../../stores/authStore';
 import { useUIStore } from '../../stores/uiStore';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -41,6 +42,7 @@ function ToggleGroup({ label, options, value, onChange }) {
 
 export default function SettingsContent() {
   const { t } = useTranslation();
+  const [repairing, setRepairing] = useState(false);
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
   const logout = useAuthStore((s) => s.logout);
@@ -147,6 +149,15 @@ export default function SettingsContent() {
           <p className="text-body text-slate">Reset the guided tour to show again on your next dashboard visit.</p>
           <Button variant="secondary" onClick={() => setHasSeenOnboarding(false)}>
             Reset Tour
+          </Button>
+        </Section>
+      )}
+
+      {isNative && (
+        <Section title="Sync">
+          <p className="text-body text-slate">Re-download all data and reset the local database if you encounter sync issues.</p>
+          <Button variant="secondary" onClick={handleRepairSync} disabled={repairing}>
+            {repairing ? 'Repairing...' : 'Repair Sync Data'}
           </Button>
         </Section>
       )}

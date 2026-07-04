@@ -1,3 +1,4 @@
+#[cfg(debug_assertions)]
 use tauri::Manager;
 
 #[tauri::command]
@@ -11,10 +12,9 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .setup(|app| {
+        .setup(|_app| {
             #[cfg(debug_assertions)]
-            {
-                let window = app.get_webview_window("main").unwrap();
+            if let Some(window) = _app.get_webview_window("main") {
                 window.open_devtools();
             }
             Ok(())

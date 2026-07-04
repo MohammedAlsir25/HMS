@@ -6,6 +6,21 @@ import App from './app/App';
 import './styles/index.css';
 import './lib/i18n';
 
+function logError(message, stack, url, userAgent) {
+  try {
+    navigator.sendBeacon('/api/admin/log-error', JSON.stringify({ message, stack, url, userAgent }));
+  } catch { /* best-effort */ }
+}
+
+window.onerror = (msg, source, line, col, error) => {
+  logError(msg?.toString?.() || String(msg), error?.stack || `${source}:${line}:${col}`);
+};
+
+window.addEventListener('unhandledrejection', (event) => {
+  const msg = event.reason?.message || event.reason?.toString() || 'Unhandled Promise Rejection';
+  logError(msg, event.reason?.stack);
+});
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

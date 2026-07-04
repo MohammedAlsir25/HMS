@@ -168,4 +168,12 @@ export const syncEngine = {
     syncState = { status: 'idle', lastSyncAt: null, error: null, pendingMutations: 0 };
     notify(syncState);
   },
+  async repair() {
+    this.stopAutoSync();
+    await localDb.destroy();
+    syncState = { status: 'idle', lastSyncAt: null, error: null, pendingMutations: 0 };
+    notify(syncState);
+    syncPromise = null;
+    await this.init(true);
+  },
 };

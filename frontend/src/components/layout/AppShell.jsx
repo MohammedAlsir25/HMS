@@ -10,6 +10,20 @@ import WelcomeToast from '../ui/WelcomeToast';
 import TourManager from '../ui/TourManager';
 import GradientText from '../ui/GradientText';
 
+let appWindow = null;
+async function getWindow() {
+  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) return null;
+  if (!appWindow) {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+    appWindow = getCurrentWindow();
+  }
+  return appWindow;
+}
+
+function isTauri() {
+  return typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__;
+}
+
 function NotificationBell() {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -84,6 +98,7 @@ export default function AppShell({ children }) {
   const isDashboard = location.pathname === '/dashboard';
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   const user = useAuthStore((s) => s.user);
   const isAdmin = user?.role === 'Super Admin';
 
@@ -91,12 +106,51 @@ export default function AppShell({ children }) {
     setMenuOpen((prev) => (forced !== undefined ? forced : !prev));
   }, []);
 
+  const handleMinimize = useCallback(async () => {
+    const w = await getWindow();
+    if (!w) return;
+    w.minimize();
+  }, []);
+
+  const handleMaximize = useCallback(async () => {
+    const w = await getWindow();
+    if (!w) return;
+    const max = await w.isMaximized();
+    if (max) {
+      w.unmaximize();
+      setIsMaximized(false);
+    } else {
+      w.maximize();
+      setIsMaximized(true);
+    }
+  }, []);
+
+  const handleClose = useCallback(async () => {
+    const w = await getWindow();
+    if (!w) return;
+    w.close();
+  }, []);
+
+  useEffect(() => {
+    if (!isTauri()) return;
+    let unlisten;
+    (async () => {
+      const w = await getWindow();
+      setIsMaximized(await w.isMaximized());
+      const { listen } = await import('@tauri-apps/api/event');
+      unlisten = await listen('tauri://resize', async () => {
+        setIsMaximized(await w.isMaximized());
+      });
+    })();
+    return () => { if (unlisten) unlisten(); };
+  }, []);
+
   return (
     <div className="relative h-dvh flex flex-col">
       <WelcomeToast />
       {isAdmin && <StaggeredMenu position="left" isFixed isOpen={menuOpen} onToggle={toggleMenu} />}
 
-      <header className="sticky top-0 z-20 bg-paper/90 backdrop-blur-sm border-b border-silver/50">
+      <header className="sticky top-0 z-20 bg-paper/90 backdrop-blur-sm border-b border-silver/50" data-tauri-drag-region>
         <div className="mx-auto flex items-center gap-3 px-4 md:px-6 lg:px-8 py-2" style={{ maxWidth: '1440px' }}>
           {isAdmin && (
             <button
@@ -137,6 +191,23 @@ export default function AppShell({ children }) {
             <TourManager />
             <SyncStatusBadge />
             <UserProfileDropdown onSettings={() => setSettingsOpen(true)} />
+            {isTauri() && (
+            <div className="flex items-center ml-1 md:ml-2 -mr-2 md:-mr-3">
+              <button onClick={handleMinimize} className="w-[46px] h-[32px] flex items-center justify-center text-graphite hover:text-obsidian hover:bg-bone transition-colors rounded-none" type="button" aria-label="Minimize">
+                <svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor"><rect width="10" height="1" /></svg>
+              </button>
+              <button onClick={handleMaximize} className="w-[46px] h-[32px] flex items-center justify-center text-graphite hover:text-obsidian hover:bg-bone transition-colors rounded-none" type="button" aria-label={isMaximized ? 'Restore' : 'Maximize'}>
+                {isMaximized ? (
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2"><rect x="1" y="3" width="7" height="7" /><rect x="3" y="1" width="7" height="7" fill="transparent" /></svg>
+                ) : (
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2"><rect x="1" y="1" width="8" height="8" /></svg>
+                )}
+              </button>
+              <button onClick={handleClose} className="w-[46px] h-[32px] flex items-center justify-center text-graphite hover:text-white hover:bg-red-500 transition-colors rounded-none" type="button" aria-label="Close">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M1 1l8 8M9 1l-8 8" /></svg>
+              </button>
+            </div>
+            )}
           </div>
         </div>
       </header>

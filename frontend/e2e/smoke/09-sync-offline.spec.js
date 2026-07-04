@@ -3,11 +3,8 @@ import { test, expect } from '@playwright/test';
 const BASE = 'http://127.0.0.1:4001';
 
 // Activate offline-first mode (gated by isNativePlatform())
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
-    window.__TAURI__ = true;
-  });
-});
+// Sync engine is initialized manually after login via page.evaluate
+// (setting __TAURI_INTERNALS__ would make api.js target the production URL)
 
 async function loginAndSeed(page, request, email = 'reception@aljawarih.sd', password = 'password123') {
   // Login via API to get token + user
@@ -29,6 +26,18 @@ async function loginAndSeed(page, request, email = 'reception@aljawarih.sd', pas
   await page.reload({ waitUntil: 'networkidle' });
   // Wait for AppShell header to prove main UI rendered
   await page.waitForSelector('img[alt="Al Jawarih"]', { timeout: 15000 });
+
+  // Manually init sync engine (Tauri flag not set, so ProtectedRoute won't auto-init)
+  await page.waitForTimeout(2000);
+  await page.evaluate(async () => {
+    try {
+      const module = await import('/src/lib/sync/syncEngine.js');
+      await module.syncEngine.init();
+    } catch (e) {
+      console.error('syncEngine init failed:', e);
+    }
+  });
+  await page.waitForTimeout(2000);
 }
 
 async function indexedDbTableCount(page, tableName) {
@@ -135,6 +144,17 @@ test.describe('Offline-First Sync — Frontend Behavior', () => {
     await page.reload({ waitUntil: 'networkidle' });
     // Wait for AppShell header to prove main UI rendered
     await page.waitForSelector('img[alt="Al Jawarih"]', { timeout: 15000 });
+
+    // Manually init sync engine
+    await page.waitForTimeout(2000);
+    await page.evaluate(async () => {
+      try {
+        const module = await import('/src/lib/sync/syncEngine.js');
+        await module.syncEngine.init();
+      } catch (e) {
+        console.error('syncEngine init failed:', e);
+      }
+    });
 
     // Poll for initial_sync_done instead of fixed wait
     let syncDone = null;

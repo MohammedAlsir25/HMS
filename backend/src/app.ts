@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
+import rateLimit from 'express-rate-limit';
 import { config } from './config/index.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './modules/auth/auth.routes.js';
@@ -51,6 +52,24 @@ app.use(cors({
 app.use(compression({ level: 6 }));
 app.use(morgan('short'));
 app.use(express.json({ limit: '10mb' }));
+
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: config.nodeEnv === 'development' ? 500 : 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many requests. Try again later.' },
+});
+app.use('/api', globalLimiter);
+
+const syncBurstLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: config.nodeEnv === 'development' ? 2000 : 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Sync burst limit exceeded. Slow down.' },
+});
+app.use('/api/sync', syncBurstLimiter);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

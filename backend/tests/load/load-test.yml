@@ -1,0 +1,38 @@
+config:
+  target: "http://127.0.0.1:4001"
+  phases:
+    - name: "Warm up"
+      duration: 10
+      arrivalRate: 5
+    - name: "Ramp to 1000"
+      duration: 60
+      arrivalRate: 5
+      rampTo: 200
+    - name: "Sustain"
+      duration: 30
+      arrivalRate: 200
+  defaults:
+    headers:
+      Content-Type: "application/json"
+
+scenarios:
+  - name: "Health check"
+    flow:
+      - get:
+          url: "/api/health"
+
+  - name: "Login flow"
+    weight: 3
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "admin@aljawarih.sd"
+            password: "password123"
+          capture:
+            - json: "$.token"
+              as: "token"
+      - get:
+          url: "/api/users/me"
+          headers:
+            Authorization: "Bearer {{ token }}"
