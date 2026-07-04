@@ -57,7 +57,7 @@ jobs:
           [System.IO.File]::WriteAllText($keyFile, $env:UPDATE_PRIVATE_KEY)
 
           # Generate signature
-          $sig = npx tauri signer sign -k $keyFile "`"$exe`""
+          $sig = npx tauri signer sign -f $keyFile "`"$exe`""
           echo "signature=$sig" >> $env:GITHUB_OUTPUT
 
           # Create latest.json

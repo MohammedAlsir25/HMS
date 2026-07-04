@@ -50,6 +50,38 @@ export default function SettingsContent() {
   const fileInputRef = useRef(null);
 
   const isNative = typeof window !== 'undefined' && (window.__TAURI_INTERNALS__ || window.Capacitor?.isNative);
+  const isTauri = typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__;
+  const isAdmin = user?.role === 'Super Admin';
+  const [devtoolsOpen, setDevtoolsOpen] = useState(false);
+
+  const toggleDevtools = async () => {
+    try {
+      const { getCurrentWebview } = await import('@tauri-apps/api/webview');
+      const webview = getCurrentWebview();
+      if (devtoolsOpen) {
+        await webview.closeDevtools();
+      } else {
+        await webview.openDevtools();
+      }
+      setDevtoolsOpen(!devtoolsOpen);
+    } catch (e) {
+      console.error('Failed to toggle devtools:', e);
+    }
+  };
+
+  const handleRepairSync = async () => {
+    setRepairing(true);
+    try {
+      const { syncEngine } = await import('../../lib/sync/syncEngine');
+      await syncEngine.repair();
+      toast.success('Sync data repaired successfully.');
+    } catch (e) {
+      toast.error('Failed to repair sync data.');
+      console.error('Repair sync failed:', e);
+    } finally {
+      setRepairing(false);
+    }
+  };
 
   const handleAvatarUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -158,6 +190,15 @@ export default function SettingsContent() {
           <p className="text-body text-slate">Re-download all data and reset the local database if you encounter sync issues.</p>
           <Button variant="secondary" onClick={handleRepairSync} disabled={repairing}>
             {repairing ? 'Repairing...' : 'Repair Sync Data'}
+          </Button>
+        </Section>
+      )}
+
+      {isTauri && isAdmin && (
+        <Section title="Developer">
+          <p className="text-body text-slate">Toggle the WebView developer console for debugging.</p>
+          <Button variant="secondary" onClick={toggleDevtools}>
+            {devtoolsOpen ? 'Close DevTools' : 'Open DevTools'}
           </Button>
         </Section>
       )}
