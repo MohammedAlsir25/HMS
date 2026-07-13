@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { useLabOrders, useLabStats, useUpdateOrderStatus, useClaimOrder, useUnclaimOrder, useLabCheckout, labKeys } from '../../hooks/queries/useLab';
+import { useLabOrders, useLabStats, useUpdateOrderStatus, useClaimOrder, useUnclaimOrder, labKeys } from '../../hooks/queries/useLab';
 import { usePatientSearch } from '../../hooks/usePatients';
 import { api } from '../../lib/api';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { notifySuccess, notifyError } from '../../utils/notify';
 import { Table } from '../../components/ui/Table';
 import { Modal } from '../../components/ui/Modal';
 
@@ -28,6 +29,7 @@ function OrderDetailModal({ order, open, onClose, onSave }) {
   const { t } = useTranslation();
   const [results, setResults] = useState({});
   const [resultNotes, setResultNotes] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (order) {
@@ -41,6 +43,7 @@ function OrderDetailModal({ order, open, onClose, onSave }) {
   }, [order]);
 
   const handleSave = useCallback(async () => {
+    setSaving(true);
     try {
       const payload = {
         results: Object.entries(results).map(([testId, resultValue]) => ({
@@ -53,7 +56,9 @@ function OrderDetailModal({ order, open, onClose, onSave }) {
       const updated = await api.put(`/lab/orders/${order.id}/results`, payload);
       if (onSave) onSave(updated);
       onClose();
-    } catch (err) { console.error('[LabDashboard]', err); }
+      notifySuccess('Results saved');
+    } catch (err) { notifyError(err); }
+    finally { setSaving(false); }
   }, [order, results, resultNotes, onSave, onClose]);
 
   if (!order) return null;
@@ -101,7 +106,7 @@ function OrderDetailModal({ order, open, onClose, onSave }) {
         </div>
 
         <div className="flex gap-2">
-          <Button onClick={handleSave}>{t('lab.saveResults')}</Button>
+          <Button onClick={handleSave} loading={saving}>{t('lab.saveResults')}</Button>
           <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
         </div>
       </div>
@@ -178,7 +183,7 @@ function NewRequestModal({ open, onClose, onCreated }) {
       });
       if (onCreated) onCreated(order);
       onClose();
-    } catch (err) { console.error('[LabDashboard]', err); }
+    } catch (err) { notifyError(err); }
     setSubmitting(false);
   }, [selectedPatient, selectedTests, priority, clinicalNotes, onCreated, onClose]);
 
@@ -303,8 +308,8 @@ function NewRequestModal({ open, onClose, onCreated }) {
             </div>
 
             <div className="flex gap-2">
-              <Button onClick={handleSubmit} disabled={selectedTests.length === 0 || submitting}>
-                {submitting ? 'Submitting...' : `Submit (${selectedTests.length} tests)`}
+              <Button onClick={handleSubmit} loading={submitting} disabled={selectedTests.length === 0}>
+                Submit ({selectedTests.length} tests)
               </Button>
               <Button variant="secondary" onClick={() => setStep('patient')}>Change Patient</Button>
             </div>
@@ -320,6 +325,7 @@ function CatalogManager({ onRefresh }) {
   const [catalog, setCatalog] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editTest, setEditTest] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   const loadCatalog = useCallback(async () => {
     setLoading(true);
@@ -335,6 +341,7 @@ function CatalogManager({ onRefresh }) {
   useEffect(() => { loadCatalog(); }, [loadCatalog]);
 
   const handleSave = useCallback(async (test) => {
+    setSaving(true);
     try {
       if (test.id) {
         await api.put(`/lab/tests/${test.id}`, test);
@@ -344,7 +351,9 @@ function CatalogManager({ onRefresh }) {
       loadCatalog();
       if (onRefresh) onRefresh();
       setEditTest(null);
-    } catch (err) { console.error('[LabDashboard]', err); }
+      notifySuccess('Test saved');
+    } catch (err) { notifyError(err); }
+    finally { setSaving(false); }
   }, [loadCatalog, onRefresh]);
 
   if (loading) return <p className="text-caption text-slate">{t('common.loading')}</p>;
@@ -401,7 +410,7 @@ function CatalogEditModal({ test, onSave, onClose }) {
         <Input label={t('lab.refRange')} value={form.refRange || ''} onChange={(e) => setForm({ ...form, refRange: e.target.value })} />
         <Input label={t('lab.price')} type="number" value={form.price ?? ''} onChange={(e) => setForm({ ...form, price: e.target.value ? parseFloat(e.target.value) : null })} />
         <div className="flex gap-2 pt-2">
-          <Button onClick={() => onSave(form)}>Save</Button>
+          <Button onClick={() => onSave(form)} loading={saving}>Save</Button>
           <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
         </div>
       </div>
@@ -417,15 +426,11 @@ export default function LabDashboard() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showDetail, setShowDetail] = useState(false);
   const [showNewRequest, setShowNewRequest] = useState(false);
-  const [selectedForBilling, setSelectedForBilling] = useState([]);
-  const [billingPaymentMethod, setBillingPaymentMethod] = useState('CASH');
-  const [billingSubmitting, setBillingSubmitting] = useState(false);
   const [mutationError, setMutationError] = useState('');
 
   const orderParams = statusFilter !== 'ALL' ? `status=${statusFilter}` : '';
   const { data: orders = [], isLoading } = useLabOrders(orderParams);
   const { data: stats } = useLabStats();
-  const { data: billingOrders = [] } = useLabOrders(activeTab === 'billing' ? 'status=COMPLETED' : null);
   const claimOrder = useClaimOrder();
   const unclaimOrder = useUnclaimOrder();
   const updateOrderStatus = useUpdateOrderStatus();
@@ -441,34 +446,6 @@ export default function LabDashboard() {
     setShowDetail(true);
   };
 
-  const toggleBillingOrder = (orderId) => {
-    setSelectedForBilling((prev) =>
-      prev.includes(orderId) ? prev.filter((id) => id !== orderId) : [...prev, orderId]
-    );
-  };
-
-  const handleBillingCheckout = async () => {
-    if (selectedForBilling.length === 0) { alert('Select at least one order'); return; }
-    setBillingSubmitting(true);
-    try {
-      setMutationError('');
-      const result = await labCheckout.mutateAsync({
-        orderIds: selectedForBilling,
-        paymentMethod: billingPaymentMethod,
-      });
-      alert(`Invoice created: SDG ${Number(result.totalAmount).toFixed(2)} for ${result.orderCount} orders`);
-      setSelectedForBilling([]);
-    } catch (err) {
-      setMutationError(err.message || 'Checkout failed');
-    } finally {
-      setBillingSubmitting(false);
-    }
-  };
-
-  const billingTotal = billingOrders
-    .filter((o) => selectedForBilling.includes(o.id))
-    .reduce((sum, o) => sum + (o.tests || []).reduce((s, t) => s + Number(t.test?.price || 0), 0), 0);
-
   const handleSaveResults = () => {
     queryClient.invalidateQueries({ queryKey: labKeys.orders(statusFilter === 'ALL' ? '' : `status=${statusFilter}`) });
     queryClient.invalidateQueries({ queryKey: labKeys.stats });
@@ -479,7 +456,6 @@ export default function LabDashboard() {
     { key: 'catalog', label: t('lab.tab.catalog') },
     { key: 'panels', label: t('lab.tab.panels') },
     { key: 'reports', label: t('lab.tab.reports') },
-    { key: 'billing', label: 'Billing' },
   ];
 
   const filterOptions = ['ALL', 'PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
@@ -627,57 +603,6 @@ export default function LabDashboard() {
             <p className="text-body text-slate">{t('common.noData')}</p>
           </CardContent>
         </Card>
-      )}
-
-      {activeTab === 'billing' && (
-        <div className="space-y-4">
-          {selectedForBilling.length > 0 && (
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                  <div>
-                    <p className="text-body font-semibold text-obsidian">
-                      {selectedForBilling.length} orders selected
-                    </p>
-                    <p className="text-heading-sm font-bold text-obsidian">AED {billingTotal.toFixed(2)}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <select value={billingPaymentMethod} onChange={(e) => setBillingPaymentMethod(e.target.value)}
-                      className="px-3 py-2 bg-paper border border-silver rounded-lg text-sm text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
-                      <option value="CASH">CASH</option>
-                      <option value="CARD">CARD</option>
-                      <option value="INSURANCE">INSURANCE</option>
-                      <option value="BANK_TRANSFER">BANK_TRANSFER</option>
-                    </select>
-                    <Button variant="primary" onClick={handleBillingCheckout} disabled={billingSubmitting}>
-                      {billingSubmitting ? 'Processing...' : 'Create Invoice'}
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <Table
-            columns={[
-              { key: 'select', header: '', render: (r) => (
-                <input type="checkbox" checked={selectedForBilling.includes(r.id)} onChange={() => toggleBillingOrder(r.id)}
-                  className="accent-lilac-bloom" />
-              )},
-              { key: 'patient', header: 'Patient', render: (r) => r.patient?.fullName || '-' },
-              { key: 'tests', header: 'Tests', render: (r) => (r.tests || []).map((t) => t.test?.name).join(', ') || '-' },
-              { key: 'total', header: 'Total', render: (r) => {
-                const total = (r.tests || []).reduce((s, t) => s + Number(t.test?.price || 0), 0);
-                return <span className="font-semibold">SDG {total.toFixed(2)}</span>;
-              }},
-              { key: 'createdAt', header: 'Date', render: (r) => new Date(r.createdAt).toLocaleDateString() },
-            ]}
-            data={billingOrders}
-          />
-          {billingOrders.length === 0 && (
-            <p className="text-body text-slate text-center py-8">No completed orders to bill</p>
-          )}
-        </div>
       )}
 
       {showDetail && selectedOrder && (

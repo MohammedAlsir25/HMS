@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import { DEFAULT_ROLES } from '../src/middleware/rbac.js';
+import { DEFAULT_ROLES } from '../dist/middleware/rbac.js';
 
 const prisma = new PrismaClient();
 
@@ -20,19 +20,20 @@ async function main() {
     { slug: 'medicine', name: 'Medicine Clinic', type: 'MEDICINE', consultationFee: 150, followUpFee: 100 },
     { slug: 'ent', name: 'ENT Clinic', type: 'ENT', consultationFee: 200, followUpFee: 150 },
     { slug: 'dental', name: 'Dental Clinic', type: 'DENTAL', consultationFee: 250, followUpFee: 180 },
-    { slug: 'retina', name: 'Retina Clinic', type: 'RETINA', consultationFee: 300, followUpFee: 200 },
-    { slug: 'glaucoma', name: 'Glaucoma Clinic', type: 'GLAUCOMA', consultationFee: 300, followUpFee: 200 },
-    { slug: 'orbit', name: 'Orbit Clinic', type: 'ORBIT', consultationFee: 350, followUpFee: 250 },
-    { slug: 'pediatrics-ophth', name: 'Pediatrics Ophthalmology', type: 'PEDS_OPHTH', consultationFee: 250, followUpFee: 180 },
-    { slug: 'general-ophth', name: 'General Ophthalmology', type: 'GEN_OPHTH', consultationFee: 200, followUpFee: 150 },
+    { slug: 'retina', name: 'Retina Clinic', type: 'RETINA', consultationFee: 300, followUpFee: 200, optometryPreScreeningRequired: true },
+    { slug: 'glaucoma', name: 'Glaucoma Clinic', type: 'GLAUCOMA', consultationFee: 300, followUpFee: 200, optometryPreScreeningRequired: true },
+    { slug: 'orbit', name: 'Orbit Clinic', type: 'ORBIT', consultationFee: 350, followUpFee: 250, optometryPreScreeningRequired: true },
+    { slug: 'pediatrics-ophth', name: 'Pediatrics Ophthalmology', type: 'PEDS_OPHTH', consultationFee: 250, followUpFee: 180, optometryPreScreeningRequired: true },
+    { slug: 'general-ophth', name: 'General Ophthalmology', type: 'GEN_OPHTH', consultationFee: 200, followUpFee: 150, optometryPreScreeningRequired: true },
     { slug: 'optometry', name: 'Optometry Clinic', type: 'OPTOMETRY', consultationFee: 100, followUpFee: 75 },
+    { slug: 'imaging', name: 'Medical Imaging', type: 'IMAGING', consultationFee: 0, followUpFee: 0 },
   ];
   const clinics = await Promise.all(
-    clinicData.map(({ slug, name, type, consultationFee, followUpFee }) =>
+    clinicData.map(({ slug, name, type, consultationFee, followUpFee, optometryPreScreeningRequired }) =>
       prisma.clinic.upsert({
         where: { slug },
-        update: { consultationFee, followUpFee },
-        create: { name, slug, type, consultationFee, followUpFee },
+        update: { consultationFee, followUpFee, optometryPreScreeningRequired },
+        create: { name, slug, type, consultationFee, followUpFee, optometryPreScreeningRequired },
       }),
     ),
   );
@@ -60,6 +61,7 @@ async function main() {
     { email: 'doctor.peds@aljawarih.sd', name: 'Dr. Sara', clinicIdx: 6 },
     { email: 'doctor.ophth@aljawarih.sd', name: 'Dr. Khalid', clinicIdx: 7 },
     { email: 'doctor.optometry@aljawarih.sd', name: 'Dr. Mariam', clinicIdx: 8 },
+    { email: 'doctor.imaging@aljawarih.sd', name: 'Dr. Yousra', clinicIdx: 9 },
   ];
 
   for (const pair of doctorClinicPairs) {
@@ -309,7 +311,7 @@ async function main() {
     { code: 'Z79.4', name: 'Long term (current) use of insulin', category: 'Medication' },
     { code: 'Z79.82', name: 'Long term (current) use of aspirin', category: 'Medication' },
     { code: 'Z79.01', name: 'Long term (current) use of anticoagulants', category: 'Medication' },
-    { code: 'R05', name: 'Cough', category: 'Symptoms' },
+    // { code: 'R05', name: 'Cough', category: 'Symptoms' }, // duplicate of ENT entry above
     { code: 'R50.9', name: 'Fever, unspecified', category: 'Symptoms' },
     { code: 'R51', name: 'Headache', category: 'Symptoms' },
     { code: 'R10.9', name: 'Unspecified abdominal pain', category: 'Symptoms' },
@@ -587,6 +589,41 @@ async function main() {
   }
 
   console.log(`Seeded ${costCenters.length} cost centers.`);
+
+  // Seed OR roles
+  const orRoleNames = ['Surgeon', 'Assistant Surgeon', 'Anesthesiologist', 'Scrub Nurse', 'Circulating Nurse'];
+  for (const name of orRoleNames) {
+    const existing = await prisma.oRRole.findFirst({ where: { name } });
+    if (!existing) await prisma.oRRole.create({ data: { name } });
+  }
+  console.log(`Seeded ${orRoleNames.length} OR roles.`);
+
+  // Seed intraoperative event types
+  const eventTypeNames = [
+    'Patient Entered OR', 'Anesthesia Administered', 'Surgical Prep', 'Incision',
+    'Phacoemulsification', 'IOL Insertion', 'Vitrectomy', 'Laser Applied',
+    'Wound Closure', 'Dressing Applied', 'Specimen Collected', 'Medication Administered',
+    'Complication', 'Patient Exited OR', 'Recovery Started',
+  ];
+  for (const name of eventTypeNames) {
+    const existing = await prisma.intraoperativeEventType.findFirst({ where: { name } });
+    if (!existing) await prisma.intraoperativeEventType.create({ data: { name } });
+  }
+  console.log(`Seeded ${eventTypeNames.length} intraoperative event types.`);
+
+  // Seed PreOp Office user
+  await prisma.user.upsert({
+    where: { email: 'preop@aljawarih.sd' },
+    update: {},
+    create: {
+      email: 'preop@aljawarih.sd',
+      passwordHash,
+      fullName: 'PreOp Office Staff',
+      roleId: roles.PREOP_OFFICE.id,
+    },
+  });
+  console.log('Seeded PreOp Office user.');
+
   console.log('Seed complete.');
 }
 

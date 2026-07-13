@@ -12,10 +12,18 @@ router.get(
   authenticate,
   requirePermission(PERMISSIONS.PURCHASE_READ),
   asyncHandler(async (req, res) => {
-    const { status, departmentId } = req.query;
+    const { status, departmentId, q } = req.query;
     const where: Record<string, unknown> = {};
     if (status) where.status = status;
     if (departmentId) where.departmentId = departmentId;
+    if (q && (q as string).length >= 2) {
+      where.OR = [
+        { notes: { contains: q as string, mode: 'insensitive' as const } },
+        { requestNumber: { contains: q as string, mode: 'insensitive' as const } },
+        { requestedBy: { fullName: { contains: q as string, mode: 'insensitive' as const } } },
+        { department: { name: { contains: q as string, mode: 'insensitive' as const } } },
+      ];
+    }
 
     const requisitions = await prisma.requisition.findMany({
       where,

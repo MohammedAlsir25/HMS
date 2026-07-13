@@ -4,6 +4,7 @@ import { authenticate, requirePermission } from '../../../middleware/auth.js';
 import { asyncHandler } from '../../../middleware/errorHandler.js';
 import { ValidationError, NotFoundError } from '../../../utils/errors.js';
 import { PERMISSIONS } from '../../../middleware/rbac.js';
+import { auditMiddleware } from '../../../middleware/auditLog.js';
 import prisma from '../../../lib/prisma.js';
 
 const router = Router();
@@ -91,7 +92,7 @@ router.get('/:id', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_READ),
   throw new NotFoundError('Debt not found');
 }));
 
-router.post('/', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_WRITE), asyncHandler(async (req, res) => {
+router.post('/', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_WRITE), auditMiddleware('CREATE_DEBT', 'AccountsPayable'), asyncHandler(async (req, res) => {
   const { creditor, description, amount, dueDate, notes } = req.body;
   if (!creditor || !description || !amount) throw new ValidationError('creditor, description, and amount are required');
   const debt = await prisma.accountsPayable.create({
@@ -100,7 +101,7 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_WRITE), 
   res.status(201).json(debt);
 }));
 
-router.put('/:id/payment', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_WRITE), asyncHandler(async (req, res) => {
+router.put('/:id/payment', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_WRITE), auditMiddleware('PAY_DEBT', 'Debt'), asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { amount: paymentAmount } = req.body;
   if (!paymentAmount || parseFloat(paymentAmount) <= 0) throw new ValidationError('Valid payment amount is required');

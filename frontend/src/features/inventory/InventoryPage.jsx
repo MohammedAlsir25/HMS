@@ -27,6 +27,7 @@ export default function InventoryPage() {
   const [transactions, setTransactions] = useState([]);
   const [form, setForm] = useState({ name: '', sku: '', category: '', quantity: 0, price: 0, costPrice: 0, minStock: 0 });
   const [txForm, setTxForm] = useState({ type: 'IN', quantity: 1, notes: '' });
+  const [submitting, setSubmitting] = useState(false);
   const [mutationError, setMutationError] = useState('');
 
   const { data: items = [], isLoading } = useInventoryItems(search);
@@ -57,6 +58,7 @@ export default function InventoryPage() {
   const handleTransaction = async (e) => {
     e.preventDefault();
     if (!selectedItem) return;
+    setSubmitting(true);
     try {
       setMutationError('');
       await api.post('/inventory/transactions', { itemId: selectedItem.id, ...txForm });
@@ -65,6 +67,7 @@ export default function InventoryPage() {
     } catch (err) {
       setMutationError(err.message || 'Transaction failed');
     }
+    setSubmitting(false);
   };
 
   const lowStockCount = items.filter((i) => i.quantity <= i.minStock).length;
@@ -145,7 +148,7 @@ export default function InventoryPage() {
                     </select>
                     <Input type="number" label="Quantity" min="1" value={txForm.quantity} onChange={(e) => setTxForm({ ...txForm, quantity: parseInt(e.target.value) || 1 })} />
                     <Input placeholder="Notes" value={txForm.notes} onChange={(e) => setTxForm({ ...txForm, notes: e.target.value })} />
-                    <Button type="submit" variant="primary" className="w-full">Record Transaction</Button>
+                    <Button type="submit" variant="primary" className="w-full" loading={submitting}>Record Transaction</Button>
                   </form>
                 </CardContent>
               </Card>

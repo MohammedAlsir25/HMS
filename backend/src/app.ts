@@ -24,6 +24,10 @@ import patientsRoutes from './modules/patients/patients.routes.js';
 import appointmentsRoutes from './modules/appointments/appointments.routes.js';
 import procurementRoutes from './modules/procurement/procurement.routes.js';
 import syncRoutes from './modules/sync/sync.routes.js';
+import imagingRoutes from './modules/imaging/imaging.routes.js';
+import opticLabRoutes from './modules/optic-lab/optic-lab.routes.js';
+import preoperativeRoutes from './modules/preoperative/preoperative.routes.js';
+import wardsRoutes from './modules/preoperative/wards.routes.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -93,6 +97,10 @@ app.use('/api/patients', patientsRoutes);
 app.use('/api/appointments', appointmentsRoutes);
 app.use('/api/procurement', procurementRoutes);
 app.use('/api/sync', syncRoutes);
+app.use('/api/imaging', imagingRoutes);
+app.use('/api/optic-lab', opticLabRoutes);
+app.use('/api/preoperative', preoperativeRoutes);
+app.use('/api/wards', wardsRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ message: 'Route not found' });

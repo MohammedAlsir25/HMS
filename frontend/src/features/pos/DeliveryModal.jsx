@@ -6,6 +6,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { api } from '../../lib/api';
+import { notifyError } from '../../utils/notify';
 
 function buildInvoiceHtml(invoice, logoSrc = '') {
   return `<!DOCTYPE html>
@@ -160,10 +161,10 @@ export default function DeliveryModal({ open, onClose, category, onSuccess }) {
     setSupplierBalance(null);
     setErrors({});
 
-    api.get(`/pos/${category}/items`).then(setProducts).catch(() => {});
+    api.get(`/pos/${category}/items`).then(setProducts).catch((err) => notifyError(err));
     api.get(`/pos/${category}/invoices/next-ref`).then((data) => {
       setForm((prev) => ({ ...prev, invoiceNumber: data.ref }));
-    }).catch(() => {});
+    }).catch((err) => notifyError(err));
   }, [open, category]);
 
   const addLine = () => setItems((prev) => [...prev, { itemId: '', qty: '', unitCost: '' }]);

@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { useSurgeries, useUpdateSurgeryStatus } from '../../hooks/queries/useSurgery';
+import { useNavigate } from 'react-router-dom';
+import { useSurgeries, useUpdateSurgeryStatus, useCreateFollowUp, useSurgeryNotes, useCreateSurgeryNote } from '../../hooks/queries/useSurgery';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Modal } from '../../components/ui/Modal';
+import SurgeryPrintReport from './SurgeryPrintReport';
 
 const OR_ROOMS = [1, 2, 3, 4, 5];
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7);
@@ -31,11 +34,38 @@ export default function SurgeryGantt() {
   const [date, setDate] = useState(today);
   const [selectedSurgery, setSelectedSurgery] = useState(null);
 
+  const navigate = useNavigate();
   const { data: surgeries = [], isLoading } = useSurgeries(date);
+  const [followUpModal, setFollowUpModal] = useState(false);
+  const [followUpDate, setFollowUpDate] = useState('');
+  const [followUpNotes, setFollowUpNotes] = useState('');
+  const [notesModal, setNotesModal] = useState(false);
+  const [newNote, setNewNote] = useState('');
+  const [printData, setPrintData] = useState(null);
+
+  const { data: notes = [] } = useSurgeryNotes(selectedSurgery?.id);
+  const createNote = useCreateSurgeryNote();
+
   const updateStatus = useUpdateSurgeryStatus();
+  const createFollowUp = useCreateFollowUp();
 
   const handleStatusChange = (id, status) => {
     updateStatus.mutate({ id, status });
+  };
+
+  const handleScheduleFollowUp = () => {
+    if (!selectedSurgery || !followUpDate) return;
+    createFollowUp.mutate({
+      surgeryId: selectedSurgery.id,
+      scheduledAt: followUpDate,
+      notes: followUpNotes,
+    }, {
+      onSuccess: () => {
+        setFollowUpModal(false);
+        setFollowUpDate('');
+        setFollowUpNotes('');
+      },
+    });
   };
 
   const ganttStart = 7 * 60;
@@ -154,6 +184,14 @@ export default function SurgeryGantt() {
                   <p className="text-caption text-slate">End</p>
                   <p className="text-body text-obsidian">{new Date(selectedSurgery.endTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
                 </div>
+                <div>
+                  <p className="text-caption text-slate">Disposition</p>
+                  <p className="text-body font-medium text-obsidian">
+                    {selectedSurgery.disposition === 'DISCHARGE_HOME' ? 'Discharge Home' :
+                     selectedSurgery.disposition === 'ADMIT_WARD' ? 'Admit to Ward' :
+                     'To Decide'}
+                  </p>
+                </div>
                 {selectedSurgery.notes && (
                   <div className="col-span-2">
                     <p className="text-caption text-slate">Notes</p>
@@ -184,6 +222,32 @@ export default function SurgeryGantt() {
                     Advance to {nextStatus.replace('_', ' ')}
                   </Button>
                 )}
+                {selectedSurgery.status !== 'CANCELLED' && (
+                  <Button variant="secondary" onClick={() => setNotesModal(true)}>
+                    Post-Op Notes
+                  </Button>
+                )}
+                <Button variant="secondary" onClick={async () => {
+                  if (!selectedSurgery) return;
+                  try {
+                    const res = await fetch(`/api/surgeries/${selectedSurgery.id}/print`, {
+                      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+                    });
+                    setPrintData(await res.json());
+                  } catch { }
+                }}>
+                  Print Report
+                </Button>
+                {selectedSurgery.status === 'COMPLETED' && (
+                  <>
+                    <Button variant="primary" onClick={() => setFollowUpModal(true)}>
+                      Schedule Follow-up
+                    </Button>
+                    <Button onClick={() => navigate(`/surgery/${selectedSurgery.id}/discharge`)}>
+                      Discharge Summary
+                    </Button>
+                  </>
+                )}
                 {selectedSurgery.status !== 'COMPLETED' && selectedSurgery.status !== 'CANCELLED' && (
                   <Button variant="danger" onClick={() => handleStatusChange(selectedSurgery.id, 'CANCELLED')}>
                     Cancel Surgery
@@ -194,6 +258,78 @@ export default function SurgeryGantt() {
           </Card>
         </div>
       )}
+
+      <Modal open={notesModal} onClose={() => { setNotesModal(false); setNewNote(''); }} title="Post-Operative Notes">
+        <div className="space-y-4">
+          <div className="max-h-48 overflow-y-auto space-y-2">
+            {notes.length === 0 && <p className="text-caption text-slate text-center py-4">No notes yet</p>}
+            {notes.map((n) => (
+              <div key={n.id} className="rounded-lg border border-silver p-3">
+                <p className="text-body text-obsidian whitespace-pre-wrap">{n.content}</p>
+                <p className="text-caption text-slate mt-1">
+                  {n.createdBy?.fullName} &middot; {new Date(n.createdAt).toLocaleString()}
+                </p>
+              </div>
+            ))}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-graphite mb-1">Add Note</label>
+            <textarea
+              value={newNote}
+              onChange={(e) => setNewNote(e.target.value)}
+              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom resize-none"
+              rows={3}
+              placeholder="Post-operative observations, recovery notes..."
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button variant="secondary" onClick={() => { setNotesModal(false); setNewNote(''); }} className="flex-1">Close</Button>
+            <Button
+              onClick={() => {
+                if (!newNote.trim() || !selectedSurgery) return;
+                createNote.mutate({ surgeryId: selectedSurgery.id, content: newNote.trim() }, {
+                  onSuccess: () => setNewNote(''),
+                });
+              }}
+              className="flex-1"
+              loading={createNote.isPending}
+              disabled={!newNote.trim()}
+            >
+              Add Note
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {printData && <SurgeryPrintReport data={printData} onClose={() => setPrintData(null)} />}
+
+      <Modal open={followUpModal} onClose={() => setFollowUpModal(false)} title="Schedule Post-Op Follow-up">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-graphite mb-1">Follow-up Date & Time</label>
+            <input
+              type="datetime-local"
+              value={followUpDate}
+              onChange={(e) => setFollowUpDate(e.target.value)}
+              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-graphite mb-1">Notes (optional)</label>
+            <textarea
+              value={followUpNotes}
+              onChange={(e) => setFollowUpNotes(e.target.value)}
+              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom resize-none"
+              rows={3}
+              placeholder="e.g., Remove sutures, check wound healing..."
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button variant="secondary" onClick={() => setFollowUpModal(false)} className="flex-1">Cancel</Button>
+            <Button onClick={handleScheduleFollowUp} className="flex-1" loading={createFollowUp.isPending} disabled={!followUpDate}>Schedule</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

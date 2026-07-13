@@ -104,13 +104,19 @@ router.post('/transact', authenticate, requirePermission(PERMISSIONS.PHARMACY_WR
 
   let totalCogs = 0;
   const inventoryTxData = [];
+
+  const itemIds = items.map((i) => (i as { id: string }).id);
+  const dbItems = await prisma.inventoryItem.findMany({
+    where: { id: { in: itemIds } },
+  });
+  const itemMap = new Map(dbItems.map((i) => [i.id, i]));
+
   for (const item of items) {
     const item2 = item as { id: string; quantity?: number; name?: string };
-    const dbItem = await prisma.inventoryItem.findUnique({ where: { id: item2.id } });
+    const dbItem = itemMap.get(item2.id);
     const unitCost = Number(dbItem?.costPrice) || 0;
     const stripQty = item2.quantity || 1;
     const packSize = dbItem?.packSize || 1;
-    // Convert strips to box-equivalent for inventory deduction
     const boxQty = stripQty / packSize;
     totalCogs += unitCost * boxQty;
     inventoryTxData.push({ item: item2, unitCost, qty: boxQty });
@@ -124,7 +130,7 @@ router.post('/transact', authenticate, requirePermission(PERMISSIONS.PHARMACY_WR
     },
   });
 
-  for (const { item, unitCost, qty } of inventoryTxData) {
+  await Promise.all(inventoryTxData.map(async ({ item, unitCost, qty }) => {
     const item3 = item as { id: string; name?: string };
     await prisma.inventoryTransaction.create({
       data: { type: 'SALE', quantity: -qty, unitCost, notes: item3.name || null, itemId: item3.id },
@@ -133,7 +139,7 @@ router.post('/transact', authenticate, requirePermission(PERMISSIONS.PHARMACY_WR
       where: { id: item3.id },
       data: { quantity: { decrement: qty } },
     });
-  }
+  }));
 
   if (referralId) {
     const refType = type === 'PHARMACY' ? 'PHARMACY_DISPATCH' : 'OPTICS_DISPATCH';

@@ -2,13 +2,14 @@ import { useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../lib/api';
-import { useAccountingSummary, useRevenueByDay, useRevenueByType, useAccountingTransactions, useExpenses, usePnL, useDebts, usePayDebt, useCreateDebt, accountingKeys } from '../../hooks/queries/useAccounting';
+import { useAccountingSummary, useRevenueByDay, useRevenueByType, useAccountingTransactions, useExpenses, usePnL, useDebts, usePayDebt, useCreateDebt, useCurrentShift, useOpenShift, useCloseShift, useCashMovements, useCreateCashMovement, accountingKeys } from '../../hooks/queries/useAccounting';
 import { useDepartments } from '../../hooks/queries/useAdmin';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Table } from '../../components/ui/Table';
+import { CURRENCY, formatCurrency } from '../../utils/currency';
 import { printReceipt } from '../../lib/printReceipt';
 
 const TYPE_ICONS = {
@@ -48,10 +49,6 @@ function BarChart({ data, labelKey, valueKey, color = 'bg-lilac-bloom', maxBarHe
       })}
     </div>
   );
-}
-
-function formatCurrency(v) {
-  return `SDG ${Number(v).toFixed(2)}`;
 }
 
 function getTodayStr() {
@@ -177,6 +174,22 @@ export default function AccountingPage() {
   const [debtSaving, setDebtSaving] = useState(false);
   const [mutationError, setMutationError] = useState('');
 
+  const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
+  const [denominations, setDenominations] = useState([
+    { value: 500, qty: 0 },
+    { value: 200, qty: 0 },
+    { value: 100, qty: 0 },
+    { value: 50, qty: 0 },
+    { value: 20, qty: 0 },
+    { value: 10, qty: 0 },
+    { value: 5, qty: 0 },
+    { value: 1, qty: 0 },
+  ]);
+  const [showCashMovementModal, setShowCashMovementModal] = useState(false);
+  const [cmForm, setCmForm] = useState({ type: 'PICKUP', amount: '', reason: '' });
+  const [closeShiftSaving, setCloseShiftSaving] = useState(false);
+  const [cmSaving, setCmSaving] = useState(false);
+
   const { data: summary, isLoading: loading } = useAccountingSummary();
   const { data: departments } = useDepartments();
   const { data: revenueByDay = [] } = useRevenueByDay(`days=30`);
@@ -188,6 +201,12 @@ export default function AccountingPage() {
   const createDebtMutation = useCreateDebt();
   const debts = debtsData?.debts || [];
   const debtSummary = debtsData?.summary || { totalDebt: 0, totalUnpaid: 0, bySource: { pharmacy: { total: 0, unpaid: 0 }, optics: { total: 0, unpaid: 0 }, hospital: { total: 0, unpaid: 0 } } };
+
+  const { data: currentShift } = useCurrentShift();
+  const openShiftMutation = useOpenShift();
+  const closeShiftMutation = useCloseShift();
+  const { data: cashMovements = [] } = useCashMovements(currentShift?.id);
+  const createCashMovementMutation = useCreateCashMovement();
 
   const expenseParams = buildParams({ ...expenseFilters, limit: '200' });
   const txParams = buildParams(txFilters);
@@ -239,26 +258,38 @@ export default function AccountingPage() {
   const handleOpenShift = async () => {
     setMutationError('');
     try {
-      await api.post('/accounting/shifts/open', {});
-      queryClient.invalidateQueries({ queryKey: ['accounting'] });
+      await openShiftMutation.mutateAsync({});
     } catch (err) {
       setMutationError(err.message || 'Failed to open shift');
     }
   };
 
   const handleCloseShift = async () => {
-    const expected = prompt('Expected total:');
-    if (expected === null) return;
+    const actualTotal = denominations.reduce((sum, d) => sum + d.value * d.qty, 0);
+    setCloseShiftSaving(true);
     setMutationError('');
     try {
-      await api.post('/accounting/shifts/close', {
-        expectedTotal: parseFloat(expected) || 0,
-        actualTotal: parseFloat(expected) || 0,
-      });
-      queryClient.invalidateQueries({ queryKey: ['accounting'] });
+      await closeShiftMutation.mutateAsync({ expectedTotal: summary?.dailyTotal || 0, actualTotal, denominations: denominations.filter(d => d.qty > 0) });
+      setShowCloseShiftModal(false);
+      setDenominations(denominations.map(d => ({ ...d, qty: 0 })));
     } catch (err) {
       setMutationError(err.message || 'Failed to close shift');
     }
+    setCloseShiftSaving(false);
+  };
+
+  const handleCreateCashMovement = async () => {
+    if (!cmForm.amount || parseFloat(cmForm.amount) <= 0) { setMutationError('Enter a valid amount'); return; }
+    setCmSaving(true);
+    setMutationError('');
+    try {
+      await createCashMovementMutation.mutateAsync({ ...cmForm, amount: parseFloat(cmForm.amount) });
+      setShowCashMovementModal(false);
+      setCmForm({ type: 'PICKUP', amount: '', reason: '' });
+    } catch (err) {
+      setMutationError(err.message || 'Failed to record cash movement');
+    }
+    setCmSaving(false);
   };
 
   const handleAddTransaction = async () => {
@@ -422,6 +453,7 @@ export default function AccountingPage() {
         <Button variant={tab === 'transactions' ? 'primary' : 'secondary'} size="sm" onClick={() => setTab('transactions')}>Transactions</Button>
         <Button variant={tab === 'expenses' ? 'primary' : 'secondary'} size="sm" onClick={() => setTab('expenses')}>Expenses</Button>
         <Button variant={tab === 'debts' ? 'primary' : 'secondary'} size="sm" onClick={() => setTab('debts')}>Debt</Button>
+        <Button variant={tab === 'cash' ? 'primary' : 'secondary'} size="sm" onClick={() => setTab('cash')}>Cash</Button>
       </div>
 
       {tab === 'overview' && (
@@ -450,7 +482,7 @@ export default function AccountingPage() {
 
               <div className="flex items-center gap-2">
                 {summary?.openShift ? (
-                  <Button variant="secondary" size="sm" onClick={handleCloseShift}>
+                  <Button variant="secondary" size="sm" onClick={() => setShowCloseShiftModal(true)}>
                     {t('accounting.closeShift', 'Close Shift')}
                   </Button>
                 ) : (
@@ -596,6 +628,81 @@ export default function AccountingPage() {
               )}
             </>
           )}
+        </>
+      )}
+
+      {tab === 'cash' && (
+        <>
+          <div className="flex items-center gap-2 mb-4">
+            {currentShift && !currentShift.closedAt ? (
+              <>
+                <Badge variant="success">Shift Open</Badge>
+                <span className="text-body text-slate">Opened: {new Date(currentShift.openedAt).toLocaleString()}</span>
+                <span className="text-body font-medium">Transactions: {summary?.today?.count || 0}</span>
+                <Button variant="secondary" size="sm" onClick={() => setShowCloseShiftModal(true)}>Close Shift</Button>
+                <Button variant="secondary" size="sm" onClick={() => setShowCashMovementModal(true)}>Record Pickup</Button>
+              </>
+            ) : (
+              <Button variant="primary" size="sm" onClick={handleOpenShift}>Open Shift</Button>
+            )}
+          </div>
+
+          {currentShift?.closedAt && (
+            <Card className="mb-4">
+              <CardContent className="p-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  <Badge variant="secondary">Closed</Badge>
+                  <span className="text-body">Opened: {new Date(currentShift.openedAt).toLocaleString()}</span>
+                  <span className="text-body">Closed: {new Date(currentShift.closedAt).toLocaleString()}</span>
+                  <span className="text-body font-medium">Expected: {formatCurrency(currentShift.expectedTotal)}</span>
+                  <span className="text-body font-medium">Actual: {formatCurrency(currentShift.actualTotal)}</span>
+                  <span className={`text-body font-medium ${(currentShift.actualTotal || 0) >= (currentShift.expectedTotal || 0) ? 'text-green-600' : 'text-red-600'}`}>
+                    Difference: {formatCurrency((currentShift.actualTotal || 0) - (currentShift.expectedTotal || 0))}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Cash Movements</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {cashMovements.length === 0 ? (
+                <p className="text-body text-slate text-center py-4">No cash movements recorded</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-body">
+                    <thead>
+                      <tr className="border-b border-silver">
+                        <th className="text-left py-2 px-3 text-caption text-slate font-medium uppercase tracking-wider">Type</th>
+                        <th className="text-left py-2 px-3 text-caption text-slate font-medium uppercase tracking-wider">Amount</th>
+                        <th className="text-left py-2 px-3 text-caption text-slate font-medium uppercase tracking-wider">Reason</th>
+                        <th className="text-left py-2 px-3 text-caption text-slate font-medium uppercase tracking-wider">User</th>
+                        <th className="text-left py-2 px-3 text-caption text-slate font-medium uppercase tracking-wider">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cashMovements.map((cm) => (
+                        <tr key={cm.id} className="border-b border-silver hover:bg-paper/50">
+                          <td className="py-2 px-3">
+                            <Badge variant={cm.type === 'PICKUP' ? 'warning' : cm.type === 'DROP' ? 'info' : 'secondary'}>
+                              {cm.type}
+                            </Badge>
+                          </td>
+                          <td className="py-2 px-3 font-medium">{formatCurrency(cm.amount)}</td>
+                          <td className="py-2 px-3 text-slate">{cm.reason || '-'}</td>
+                          <td className="py-2 px-3 text-slate">{cm.user?.fullName || cm.userId}</td>
+                          <td className="py-2 px-3 text-slate">{new Date(cm.createdAt).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </>
       )}
 
@@ -1019,6 +1126,107 @@ export default function AccountingPage() {
                   setDebtSaving(false);
                 }} disabled={debtSaving}>
                   {debtSaving ? 'Creating...' : 'Create Debt'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCloseShiftModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-obsidian/50" onClick={() => { setShowCloseShiftModal(false); setDenominations(denominations.map(d => ({ ...d, qty: 0 }))); }}>
+          <div className="bg-paper rounded-xl shadow-2xl max-w-lg w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-obsidian">Close Shift</h3>
+                <button onClick={() => { setShowCloseShiftModal(false); setDenominations(denominations.map(d => ({ ...d, qty: 0 }))); }} className="text-slate hover:text-obsidian touch-target">&times;</button>
+              </div>
+
+              {mutationError && (
+                <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg text-sm">{mutationError}</div>
+              )}
+
+              <div className="mb-4">
+                <p className="text-body text-slate mb-1">Expected Total (from transactions)</p>
+                <p className="text-heading-sm font-semibold text-obsidian">{formatCurrency(summary?.dailyTotal || 0)}</p>
+              </div>
+
+              <p className="text-caption font-medium text-graphite mb-3">Count denominations being handed over:</p>
+              <div className="space-y-2 max-h-60 overflow-y-auto mb-4">
+                {denominations.map((d, i) => (
+                  <div key={d.value} className="flex items-center gap-3">
+                    <span className="w-16 text-body font-medium text-obsidian">{d.value} SDG</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={d.qty}
+                      onChange={(e) => {
+                        const newD = [...denominations];
+                        newD[i] = { ...d, qty: parseInt(e.target.value) || 0 };
+                        setDenominations(newD);
+                      }}
+                      className="w-24"
+                    />
+                    <span className="text-body text-slate">= {formatCurrency(d.value * d.qty)}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-bone rounded-lg mb-6">
+                <span className="text-body font-medium text-obsidian">Counted Total</span>
+                <span className="text-heading-sm font-semibold text-obsidian">{formatCurrency(denominations.reduce((s, d) => s + d.value * d.qty, 0))}</span>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => { setShowCloseShiftModal(false); setDenominations(denominations.map(d => ({ ...d, qty: 0 }))); }}>Cancel</Button>
+                <Button variant="primary" onClick={handleCloseShift} disabled={closeShiftSaving}>
+                  {closeShiftSaving ? 'Closing...' : 'Close Shift'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCashMovementModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-obsidian/50" onClick={() => { setShowCashMovementModal(false); setCmForm({ type: 'PICKUP', amount: '', reason: '' }); }}>
+          <div className="bg-paper rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-obsidian">Record Cash Movement</h3>
+                <button onClick={() => { setShowCashMovementModal(false); setCmForm({ type: 'PICKUP', amount: '', reason: '' }); }} className="text-slate hover:text-obsidian touch-target">&times;</button>
+              </div>
+
+              {mutationError && (
+                <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg text-sm">{mutationError}</div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-medium text-graphite block mb-1">Type</label>
+                  <select value={cmForm.type} onChange={(e) => setCmForm(p => ({ ...p, type: e.target.value }))}
+                    className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
+                    <option value="PICKUP">Pickup (cash removed from drawer)</option>
+                    <option value="DROP">Drop (cash added to drawer)</option>
+                    <option value="ADJUSTMENT">Adjustment</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-graphite block mb-1">Amount ({CURRENCY})</label>
+                  <Input type="number" min="0" step="0.01" value={cmForm.amount}
+                    onChange={(e) => setCmForm(p => ({ ...p, amount: e.target.value }))} placeholder="0.00" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-graphite block mb-1">Reason</label>
+                  <textarea value={cmForm.reason} onChange={(e) => setCmForm(p => ({ ...p, reason: e.target.value }))} rows={2}
+                    className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom" placeholder="Optional note" />
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => { setShowCashMovementModal(false); setCmForm({ type: 'PICKUP', amount: '', reason: '' }); }}>Cancel</Button>
+                <Button variant="primary" onClick={handleCreateCashMovement} disabled={cmSaving}>
+                  {cmSaving ? 'Recording...' : 'Record'}
                 </Button>
               </div>
             </div>

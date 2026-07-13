@@ -3,6 +3,7 @@ import { authenticate, requirePermission } from '../../../middleware/auth.js';
 import { asyncHandler } from '../../../middleware/errorHandler.js';
 import { ValidationError } from '../../../utils/errors.js';
 import { PERMISSIONS } from '../../../middleware/rbac.js';
+import { auditMiddleware } from '../../../middleware/auditLog.js';
 import { $Enums } from '@prisma/client';
 import prisma from '../../../lib/prisma.js';
 
@@ -39,7 +40,7 @@ router.get('/', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_READ), as
   res.json({ expenses, totalCount });
 }));
 
-router.post('/', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_WRITE), asyncHandler(async (req, res) => {
+router.post('/', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_WRITE), auditMiddleware('CREATE_EXPENSE', 'Expense'), asyncHandler(async (req, res) => {
   const body = req.body as Record<string, unknown>;
   const { notes, receiptUrl } = body;
   const amount = body.amount as string | undefined;
@@ -61,7 +62,7 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_WRITE), 
   res.status(201).json(expense);
 }));
 
-router.patch('/:id', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_WRITE), asyncHandler(async (req, res) => {
+router.patch('/:id', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_WRITE), auditMiddleware('UPDATE_EXPENSE', 'Expense'), asyncHandler(async (req, res) => {
   const { amount, category, description, date, paidTo, paymentMethod, notes, receiptUrl, departmentId } = req.body as Record<string, unknown>;
   const data: Record<string, unknown> = {};
   if (amount !== undefined) data.amount = parseFloat(amount as string);
@@ -81,7 +82,7 @@ router.patch('/:id', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_WRIT
   res.json(expense);
 }));
 
-router.delete('/:id', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_WRITE), asyncHandler(async (req, res) => {
+router.delete('/:id', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_WRITE), auditMiddleware('DELETE_EXPENSE', 'Expense'), asyncHandler(async (req, res) => {
   await prisma.expense.delete({ where: { id: req.params.id! } });
   res.json({ message: 'Expense deleted' });
 }));

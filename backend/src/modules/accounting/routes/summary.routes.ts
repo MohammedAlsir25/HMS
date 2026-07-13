@@ -14,11 +14,14 @@ router.get('/summary', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_RE
   startWeek.setHours(0, 0, 0, 0);
   const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const [todayTx, weekTx, monthTx, totalTx, openShift] = await Promise.all([
+  const [todayTx, weekTx, monthTx, totalAgg, openShift] = await Promise.all([
     prisma.transaction.findMany({ where: { createdAt: { gte: startToday } } }),
     prisma.transaction.findMany({ where: { createdAt: { gte: startWeek } } }),
     prisma.transaction.findMany({ where: { createdAt: { gte: startMonth } } }),
-    prisma.transaction.findMany(),
+    prisma.transaction.aggregate({
+      _sum: { amount: true, cogs: true },
+      _count: true,
+    }),
     prisma.shift.findFirst({ where: { closedAt: null }, include: { transactions: true, user: true } }),
   ]);
 
@@ -42,7 +45,12 @@ router.get('/summary', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_RE
 
   res.json({
     today: format(todayTx), week: format(weekTx), month: format(monthTx),
-    allTime: format(totalTx), openShift: openShift || null,
+    allTime: {
+      total: Number(totalAgg._sum.amount) || 0,
+      cogs: Number(totalAgg._sum.cogs) || 0,
+      grossProfit: (Number(totalAgg._sum.amount) || 0) - (Number(totalAgg._sum.cogs) || 0),
+      count: totalAgg._count,
+    }, openShift: openShift || null,
   });
 }));
 
@@ -74,12 +82,12 @@ router.get('/revenue-by-day', authenticate, requirePermission(PERMISSIONS.ACCOUN
 }));
 
 router.get('/revenue-by-type', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_READ), asyncHandler(async (_req, res) => {
-  const transactions = await prisma.transaction.findMany();
-  const typeMap: Record<string, number> = {};
-  for (const t of transactions) {
-    typeMap[t.type] = (typeMap[t.type] || 0) + Number(t.amount);
-  }
-  const result = Object.entries(typeMap).map(([type, total]) => ({ type, total }));
+  const groups = await prisma.transaction.groupBy({
+    by: ['type'],
+    _sum: { amount: true },
+    _count: true,
+  });
+  const result = groups.map((g) => ({ type: g.type, total: Number(g._sum.amount) || 0 }));
   res.json(result);
 }));
 
@@ -96,18 +104,23 @@ router.get('/revenue-by-department', authenticate, requirePermission(PERMISSIONS
       (where.createdAt as Record<string, unknown>).lte = end;
     }
   }
-  const transactions = await prisma.transaction.findMany({
-    where,
-    include: { department: { select: { id: true, name: true, slug: true } } },
-  });
-  const deptMap: Record<string, { departmentId: string | null; department: typeof transactions[0]['department']; total: number; count: number }> = {};
-  for (const t of transactions) {
-    const key = t.departmentId || 'uncategorized';
-    if (!deptMap[key]) deptMap[key] = { departmentId: t.departmentId, department: t.department, total: 0, count: 0 };
-    deptMap[key].total += Number(t.amount);
-    deptMap[key].count += 1;
-  }
-  res.json(Object.values(deptMap));
+  const [txGroups, departments] = await Promise.all([
+    prisma.transaction.groupBy({
+      by: ['departmentId'],
+      where,
+      _sum: { amount: true },
+      _count: true,
+    }),
+    prisma.department.findMany({ select: { id: true, name: true, slug: true } }),
+  ]);
+  const deptMap = new Map(departments.map((d) => [d.id, d]));
+  const result = txGroups.map((g) => ({
+    departmentId: g.departmentId,
+    department: g.departmentId ? deptMap.get(g.departmentId) || null : null,
+    total: Number(g._sum.amount) || 0,
+    count: g._count,
+  }));
+  res.json(result);
 }));
 
 router.get('/pnl', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_READ), asyncHandler(async (req, res) => {

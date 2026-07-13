@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { notifyError } from '../../utils/notify';
 import { api } from '../../lib/api';
 import { usePatientSearch } from '../../hooks/usePatients';
 
@@ -17,11 +18,15 @@ export default function CrossReferralModal({ open, onClose, fromClinicId, onCrea
   const [testCatalog, setTestCatalog] = useState([]);
   const [selectedTestIds, setSelectedTestIds] = useState([]);
   const [testSearch, setTestSearch] = useState('');
+  const [imagingScanType, setImagingScanType] = useState('A_SCAN');
+  const [imagingLaterality, setImagingLaterality] = useState('OD');
+  const [imagingClinicalInfo, setImagingClinicalInfo] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const { query: searchQuery, setQuery: setSearchQuery, results: searchResults, loading: searching, selectedPatient, selectPatient: setSelectedPatient } = usePatientSearch({ enabled: step === 'patient' });
 
   useEffect(() => {
-    if (open) api.get('/clinics').then(setClinics).catch(() => {});
+    if (open) api.get('/clinics').then(setClinics).catch((err) => notifyError(err));
   }, [open]);
 
   useEffect(() => {
@@ -35,6 +40,9 @@ export default function CrossReferralModal({ open, onClose, fromClinicId, onCrea
       setMedications([]);
       setSelectedTestIds([]);
       setTestSearch('');
+      setImagingScanType('A_SCAN');
+      setImagingLaterality('OD');
+      setImagingClinicalInfo('');
     }
   }, [open]);
 
@@ -58,7 +66,11 @@ export default function CrossReferralModal({ open, onClose, fromClinicId, onCrea
     return acc;
   }, {});
 
+  const selectedClinic = clinics.find(c => c.id === toClinicId);
+  const isImagingTarget = referralType === 'INTERNAL_CLINIC' && selectedClinic?.type === 'IMAGING';
+
   const handleCreate = useCallback(async () => {
+    setSubmitting(true);
     try {
       const body = {
         patientId: selectedPatient.id,
@@ -73,11 +85,17 @@ export default function CrossReferralModal({ open, onClose, fromClinicId, onCrea
       if (referralType === 'LAB_DISPATCH' && selectedTestIds.length > 0) {
         body.testIds = selectedTestIds;
       }
+      if (isImagingTarget) {
+        body.scanType = imagingScanType;
+        body.laterality = imagingLaterality;
+        body.clinicalInfo = imagingClinicalInfo || null;
+      }
       const referral = await api.post('/referrals', body);
       if (onCreated) onCreated(referral);
       onClose();
-    } catch (err) { console.error('[CrossReferralModal]', err); }
-  }, [selectedPatient, fromClinicId, toClinicId, referralType, notes, medications, selectedTestIds, onCreated, onClose]);
+    } catch (err) { notifyError(err); }
+    finally { setSubmitting(false); }
+  }, [selectedPatient, fromClinicId, toClinicId, referralType, notes, medications, selectedTestIds, onCreated, onClose, isImagingTarget, imagingScanType, imagingLaterality, imagingClinicalInfo]);
 
   return (
     <Modal open={open} onClose={onClose} title="Cross-Referral" className={referralType === 'LAB_DISPATCH' ? 'max-w-4xl' : ''}>
@@ -150,6 +168,60 @@ export default function CrossReferralModal({ open, onClose, fromClinicId, onCrea
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
+              </div>
+            )}
+
+            {isImagingTarget && (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium text-graphite block mb-1">Scan Type</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {[
+                      { value: 'A_SCAN', label: 'A-Scan' },
+                      { value: 'B_SCAN', label: 'B-Scan' },
+                      { value: 'OTT', label: 'OTT Scan' },
+                      { value: 'BIOMETRY', label: 'Biometry / Pachymetry' },
+                    ].map((t) => (
+                      <button key={t.value}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors touch-target
+                          ${imagingScanType === t.value ? 'bg-lilac-bloom text-obsidian' : 'bg-bone text-graphite hover:bg-silver'}`}
+                        onClick={() => setImagingScanType(t.value)}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-graphite block mb-1">Laterality</label>
+                  <div className="flex gap-2">
+                    {[
+                      { value: 'OD', label: 'Right (OD)' },
+                      { value: 'OS', label: 'Left (OS)' },
+                      { value: 'OU', label: 'Both (OU)' },
+                    ].map((l) => (
+                      <button key={l.value}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors touch-target
+                          ${imagingLaterality === l.value ? 'bg-lilac-bloom text-obsidian' : 'bg-bone text-graphite hover:bg-silver'}`}
+                        onClick={() => setImagingLaterality(l.value)}
+                      >
+                        {l.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-graphite block mb-1">Clinical Info</label>
+                  <textarea
+                    className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian
+                      focus:outline-none focus:ring-2 focus:ring-lilac-bloom min-h-[80px]"
+                    placeholder="What to scan / reason for referral..."
+                    value={imagingClinicalInfo}
+                    onChange={(e) => setImagingClinicalInfo(e.target.value)}
+                  />
+                </div>
               </div>
             )}
 
@@ -244,12 +316,12 @@ export default function CrossReferralModal({ open, onClose, fromClinicId, onCrea
             <Input label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Referral reason..." />
 
             <div className="flex gap-2 pt-2">
-              <Button onClick={handleCreate}
-                disabled={
+              <Button onClick={handleCreate} loading={submitting}
+                disabled={submitting || (
                   (referralType === 'INTERNAL_CLINIC' && !toClinicId) ||
                   (referralType === 'PHARMACY_DISPATCH' && medications.length === 0) ||
                   (referralType === 'LAB_DISPATCH' && selectedTestIds.length === 0)
-                }>
+                )}>
                 Create Referral
               </Button>
               <Button variant="secondary" onClick={() => setStep('patient')}>Change Patient</Button>

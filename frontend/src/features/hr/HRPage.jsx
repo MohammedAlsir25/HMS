@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { notifySuccess, notifyError } from '../../utils/notify';
 import { api } from '../../lib/api';
-import { useHREmployees, useHRPayroll, useHRLeaves, useUpdatePayrollStatus, useUpdateLeaveStatus, hrKeys } from '../../hooks/queries/useHR';
+import { useHREmployees, useHRPayroll, useHRLeaves, useUpdatePayrollStatus, useUpdateLeaveStatus, useHRAttendance, useUpsertAttendance, hrKeys } from '../../hooks/queries/useHR';
 import { useDepartments, useAdminRoles } from '../../hooks/queries/useAdmin';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -9,23 +10,16 @@ import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { Table } from '../../components/ui/Table';
 import { Modal } from '../../components/ui/Modal';
+import { CURRENCY } from '../../utils/currency';
 
 const POSITIONS = ['Doctor', 'Nurse', 'Technician', 'Administrator', 'Accountant', 'Receptionist', 'Pharmacist', 'Security', 'Housekeeping', 'Other'];
-
-const employeeColumns = [
-  { key: 'employeeCode', header: 'Code' },
-  { key: 'fullName', header: 'Name' },
-  { key: 'gender', header: 'Gender', render: (v) => v === 'MALE' ? 'Male' : v === 'FEMALE' ? 'Female' : '-' },
-  { key: 'position', header: 'Position' },
-  { key: 'dept', header: 'Dept', render: (v) => v?.name || '-' },
-  { key: 'baseSalary', header: 'Salary', render: (v) => `$${Number(v).toFixed(2)}` },
-  { key: 'isActive', header: 'Status', render: (v) => <Badge variant={v ? 'success' : 'danger'}>{v ? 'Active' : 'Inactive'}</Badge> },
-];
 
 export default function HRPage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState('employees');
   const [showEmpModal, setShowEmpModal] = useState(false);
+  const [showEditEmpModal, setShowEditEmpModal] = useState(false);
+  const [editEmp, setEditEmp] = useState(null);
   const [showPayrollModal, setShowPayrollModal] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [empForm, setEmpForm] = useState({ employeeCode: '', fullName: '', phone: '', email: '', gender: '', position: '', department: '', departmentId: '', baseSalary: 0, hireDate: '' });
@@ -35,16 +29,33 @@ export default function HRPage() {
   const [userRoleId, setUserRoleId] = useState('');
   const [payForm, setPayForm] = useState({ employeeId: '', period: '', grossPay: 0, deductions: 0, notes: '' });
   const [leaveForm, setLeaveForm] = useState({ employeeId: '', type: 'ANNUAL', startDate: '', endDate: '', reason: '' });
+  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().slice(0, 10));
   const [mutationLoading, setMutationLoading] = useState(false);
   const [mutationError, setMutationError] = useState('');
 
   const { data: employees = [], isLoading: loadingEmp } = useHREmployees();
   const { data: payroll = [], isLoading: loadingPay } = useHRPayroll();
   const { data: leaves = [], isLoading: loadingLeave } = useHRLeaves();
+  const { data: attendanceRecords = [] } = useHRAttendance({ date: attendanceDate });
   const { data: departments = [] } = useDepartments();
   const { data: roles = [] } = useAdminRoles();
   const updatePayrollStatus = useUpdatePayrollStatus();
   const updateLeaveStatus = useUpdateLeaveStatus();
+  const upsertAttendance = useUpsertAttendance();
+
+  const employeeColumns = [
+    { key: 'employeeCode', label: 'Code' },
+    { key: 'fullName', label: 'Name' },
+    { key: 'gender', label: 'Gender', render: (r) => r.gender === 'MALE' ? 'Male' : r.gender === 'FEMALE' ? 'Female' : '-' },
+    { key: 'position', label: 'Position' },
+    { key: 'dept', label: 'Dept', render: (r) => r.dept?.name || '-' },
+    { key: 'baseSalary', label: `Salary (${CURRENCY})`, render: (r) => `${CURRENCY} ${Number(r.baseSalary).toFixed(2)}` },
+    { key: 'isActive', label: 'Status', render: (r) => <Badge variant={r.isActive ? 'success' : 'danger'}>{r.isActive ? 'Active' : 'Inactive'}</Badge> },
+    {
+      key: 'actions', label: '',
+      render: (r) => <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setEditEmp(r); setShowEditEmpModal(true); }}>Edit</Button>,
+    },
+  ];
 
   const loading = loadingEmp || loadingPay || loadingLeave;
 
@@ -144,9 +155,10 @@ export default function HRPage() {
         </div>
       </div>
 
-      <div className="flex gap-2 border-b border-silver pb-2">
+      <div className="flex gap-2 border-b border-silver pb-2 overflow-x-auto">
         <Button variant={tab === 'employees' ? 'primary' : 'secondary'} onClick={() => setTab('employees')}>Employees</Button>
         <Button variant={tab === 'payroll' ? 'primary' : 'secondary'} onClick={() => setTab('payroll')}>Payroll</Button>
+        <Button variant={tab === 'attendance' ? 'primary' : 'secondary'} onClick={() => setTab('attendance')}>Attendance</Button>
         <Button variant={tab === 'leaves' ? 'primary' : 'secondary'} onClick={() => setTab('leaves')}>Leaves</Button>
       </div>
 
@@ -189,7 +201,7 @@ export default function HRPage() {
                   <div key={rec.id} className="p-4 border border-silver rounded-lg flex items-center justify-between">
                     <div>
                       <p className="font-medium text-obsidian">{rec.employee?.fullName || 'Unknown'} <span className="text-caption text-slate">({rec.employee?.department})</span></p>
-                      <p className="text-caption text-slate">{rec.period} — Gross: ${Number(rec.grossPay).toFixed(2)} / Net: ${Number(rec.netPay).toFixed(2)}</p>
+                      <p className="text-caption text-slate">{rec.period} — Gross: {CURRENCY} {Number(rec.grossPay).toFixed(2)} / Net: {CURRENCY} {Number(rec.netPay).toFixed(2)}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant={rec.status === 'PAID' ? 'success' : rec.status === 'DRAFT' ? 'warning' : 'danger'}>{rec.status}</Badge>
@@ -201,6 +213,103 @@ export default function HRPage() {
                 ))}
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {tab === 'attendance' && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <CardTitle>Attendance</CardTitle>
+              <Input type="date" value={attendanceDate} onChange={(e) => setAttendanceDate(e.target.value)} className="w-40" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-silver">
+                    <th className="px-3 py-2.5 text-left text-caption font-medium text-slate uppercase tracking-wide">Employee</th>
+                    <th className="px-3 py-2.5 text-left text-caption font-medium text-slate uppercase tracking-wide">Code</th>
+                    <th className="px-3 py-2.5 text-left text-caption font-medium text-slate uppercase tracking-wide">Check-In</th>
+                    <th className="px-3 py-2.5 text-left text-caption font-medium text-slate uppercase tracking-wide">Check-Out</th>
+                    <th className="px-3 py-2.5 text-left text-caption font-medium text-slate uppercase tracking-wide">Status</th>
+                    <th className="px-3 py-2.5 text-left text-caption font-medium text-slate uppercase tracking-wide">Notes</th>
+                    <th className="px-3 py-2.5 text-right text-caption font-medium text-slate uppercase tracking-wide">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {employees.map((emp) => {
+                    const att = attendanceRecords.find((r) => r.employeeId === emp.id);
+                    return (
+                      <tr key={emp.id} className="border-b border-silver/50 hover:bg-bone/30 transition-colors">
+                        <td className="px-3 py-3 text-body text-obsidian">{emp.fullName}</td>
+                        <td className="px-3 py-3 text-caption text-slate font-mono">{emp.employeeCode}</td>
+                        <td className="px-3 py-3">
+                          {att?.checkIn ? new Date(att.checkIn).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                        </td>
+                        <td className="px-3 py-3">
+                          {att?.checkOut ? new Date(att.checkOut).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                        </td>
+                        <td className="px-3 py-3">
+                          <select
+                            value={att?.status || 'PRESENT'}
+                            onChange={(e) => upsertAttendance.mutate(
+                              { employeeId: emp.id, date: attendanceDate, status: e.target.value },
+                              { onSuccess: () => notifySuccess('Attendance updated'), onError: (err) => notifyError(err) }
+                            )}
+                            className="w-full rounded-lg border border-silver bg-paper px-2 py-1.5 text-caption focus:outline-none focus:ring-2 focus:ring-lilac-bloom"
+                          >
+                            <option value="PRESENT">Present</option>
+                            <option value="ABSENT">Absent</option>
+                            <option value="LATE">Late</option>
+                            <option value="HALF_DAY">Half Day</option>
+                          </select>
+                        </td>
+                        <td className="px-3 py-3">
+                          <input
+                            defaultValue={att?.notes || ''}
+                            onBlur={(e) => upsertAttendance.mutate(
+                              { employeeId: emp.id, date: attendanceDate, notes: e.target.value || undefined },
+                              { onError: (err) => notifyError(err) }
+                            )}
+                            placeholder="Notes"
+                            className="w-full bg-transparent border-b border-transparent focus:border-lilac-bloom px-1 py-0.5 text-caption text-obsidian outline-none transition-colors"
+                          />
+                        </td>
+                        <td className="px-3 py-3 text-right">
+                          <div className="flex gap-1 justify-end">
+                            {!att?.checkIn && (
+                              <Button size="sm" onClick={() => upsertAttendance.mutate(
+                                { employeeId: emp.id, date: attendanceDate, checkIn: new Date().toISOString() },
+                                { onSuccess: () => notifySuccess(`${emp.fullName} checked in`), onError: (err) => notifyError(err) }
+                              )}>
+                                Check In
+                              </Button>
+                            )}
+                            {att?.checkIn && !att?.checkOut && (
+                              <Button size="sm" variant="secondary" onClick={() => upsertAttendance.mutate(
+                                { employeeId: emp.id, date: attendanceDate, checkOut: new Date().toISOString() },
+                                { onSuccess: () => notifySuccess(`${emp.fullName} checked out`), onError: (err) => notifyError(err) }
+                              )}>
+                                Check Out
+                              </Button>
+                            )}
+                            {att?.checkIn && att?.checkOut && (
+                              <Badge variant="success" size="sm">Done</Badge>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {employees.length === 0 && (
+                    <tr><td colSpan={7} className="text-center py-8 text-slate text-body">No employees found</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -332,7 +441,7 @@ export default function HRPage() {
           <Input label="Notes" value={payForm.notes} onChange={(e) => setPayForm({ ...payForm, notes: e.target.value })} />
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="secondary" onClick={() => setShowPayrollModal(false)} className="flex-1">Cancel</Button>
-            <Button type="submit" className="flex-1">Create</Button>
+            <Button type="submit" className="flex-1" loading={mutationLoading}>Create</Button>
           </div>
         </form>
       </Modal>
@@ -366,6 +475,73 @@ export default function HRPage() {
             <Button type="submit" className="flex-1">Submit</Button>
           </div>
         </form>
+      </Modal>
+
+      <Modal open={showEditEmpModal} onClose={() => setShowEditEmpModal(false)} title="Edit Employee">
+        {editEmp && (
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            setMutationError('');
+            setMutationLoading(true);
+            try {
+              await api.patch(`/hr/employees/${editEmp.id}`, {
+                fullName: editEmp.fullName,
+                phone: editEmp.phone,
+                email: editEmp.email,
+                gender: editEmp.gender,
+                position: editEmp.position,
+                departmentId: editEmp.departmentId,
+                baseSalary: editEmp.baseSalary,
+                isActive: editEmp.isActive,
+              });
+              setShowEditEmpModal(false);
+              queryClient.invalidateQueries({ queryKey: hrKeys.employees });
+              notifySuccess('Employee updated');
+            } catch (err) {
+              setMutationError(err.message || 'Failed to update employee');
+            } finally {
+              setMutationLoading(false);
+            }
+          }} className="space-y-4">
+            <Input label="Full Name" required value={editEmp.fullName} onChange={(e) => setEditEmp({ ...editEmp, fullName: e.target.value })} />
+            <Input label="Phone" value={editEmp.phone || ''} onChange={(e) => setEditEmp({ ...editEmp, phone: e.target.value })} />
+            <Input label="Email" type="email" value={editEmp.email || ''} onChange={(e) => setEditEmp({ ...editEmp, email: e.target.value })} />
+            <div>
+              <label className="text-sm font-medium text-graphite">Gender</label>
+              <select value={editEmp.gender || ''} onChange={(e) => setEditEmp({ ...editEmp, gender: e.target.value })}
+                className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
+                <option value="">--</option>
+                <option value="MALE">Male</option>
+                <option value="FEMALE">Female</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-graphite">Position</label>
+              <select required value={editEmp.position} onChange={(e) => setEditEmp({ ...editEmp, position: e.target.value })}
+                className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
+                {POSITIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-graphite">Department</label>
+              <select value={editEmp.departmentId || ''} onChange={(e) => setEditEmp({ ...editEmp, departmentId: e.target.value })}
+                className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom mt-1">
+                <option value="">-- Select Department --</option>
+                {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </div>
+            <Input label="Base Salary" type="number" min="0" step="0.01" value={editEmp.baseSalary} onChange={(e) => setEditEmp({ ...editEmp, baseSalary: parseFloat(e.target.value) || 0 })} />
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="editIsActive" checked={editEmp.isActive} onChange={(e) => setEditEmp({ ...editEmp, isActive: e.target.checked })}
+                className="w-4 h-4 rounded border-silver text-lilac-bloom focus:ring-lilac-bloom" />
+              <label htmlFor="editIsActive" className="text-sm font-medium text-graphite cursor-pointer">Active</label>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button type="button" variant="secondary" onClick={() => setShowEditEmpModal(false)} className="flex-1">Cancel</Button>
+              <Button type="submit" className="flex-1" loading={mutationLoading}>Save</Button>
+            </div>
+          </form>
+        )}
       </Modal>
     </div>
   );

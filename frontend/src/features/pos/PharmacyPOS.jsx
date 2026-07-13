@@ -322,7 +322,7 @@ export default function PharmacyPOS() {
                     />
                   </div>
                   <p className="text-caption text-slate mt-1">
-                    SDG ${((c.price / c.packSize) * c.quantity).toFixed(2)}
+                    SDG {((c.price / c.packSize) * c.quantity).toFixed(2)}
                   </p>
                 </div>
                 );
@@ -331,7 +331,7 @@ export default function PharmacyPOS() {
                 <div className="pt-2 border-t border-silver">
                   <div className="flex justify-between text-body font-semibold">
                     <span>Total</span>
-                    <span>SDG ${total.toFixed(2)}</span>
+                    <span>SDG {total.toFixed(2)}</span>
                   </div>
                 </div>
               )}

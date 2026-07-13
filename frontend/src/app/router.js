@@ -8,6 +8,7 @@ export const CLINIC_ROUTES = {
   'pediatrics-ophth': '/clinic/pediatrics-ophth',
   'general-ophth': '/clinic/general-ophth',
   optometry: '/clinic/optometry',
+  imaging: '/clinic/imaging',
 };
 
 export const CLINIC_LABELS = {
@@ -20,6 +21,7 @@ export const CLINIC_LABELS = {
   'pediatrics-ophth': 'Pediatrics Ophthalmology',
   'general-ophth': 'General Ophthalmology',
   optometry: 'Optometry Clinic',
+  imaging: 'Medical Imaging',
 };
 
 export const CLINIC_ICONS = {
@@ -32,6 +34,7 @@ export const CLINIC_ICONS = {
   'pediatrics-ophth': 'eye',
   'general-ophth': 'eye',
   optometry: 'eye',
+  imaging: 'camera',
 };
 
 export const LAB_ROUTE = '/lab';

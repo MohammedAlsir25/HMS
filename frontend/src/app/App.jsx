@@ -14,6 +14,10 @@ const DashboardRedirect = lazy(() => import('../features/auth/DashboardRedirect'
 const ReceptionPage = lazy(() => import('../features/reception/ReceptionPage'));
 const WaitingRoomTV = lazy(() => import('../features/reception/WaitingRoomTV'));
 const SurgeryGantt = lazy(() => import('../features/surgery/SurgeryGantt'));
+const SurgeryScheduler = lazy(() => import('../features/surgery/SurgeryScheduler'));
+const SurgeryDashboard = lazy(() => import('../features/surgery/SurgeryDashboard'));
+const DischargeSummaryPage = lazy(() => import('../features/surgery/DischargeSummary'));
+const PreoperativePage = lazy(() => import('../features/preoperative/PreoperativePage'));
 const ReferralsPage = lazy(() => import('../features/referral/ReferralsPage'));
 const PharmacyPOS = lazy(() => import('../features/pos/PharmacyPOS'));
 const PharmacyProducts = lazy(() => import('../features/pos/PharmacyProducts'));
@@ -22,6 +26,8 @@ const OpticsProducts = lazy(() => import('../features/pos/OpticsProducts'));
 const LabDashboard = lazy(() => import('../features/lab/LabDashboard'));
 const InventoryPOS = lazy(() => import('../features/pos/InventoryPOS'));
 const AccountingPage = lazy(() => import('../features/accounting/AccountingPage'));
+const WardsPage = lazy(() => import('../features/wards/WardsPage'));
+const InpatientPage = lazy(() => import('../features/wards/InpatientPage'));
 const AdminPage = lazy(() => import('../features/admin/AdminPage'));
 const HRPage = lazy(() => import('../features/hr/HRPage'));
 const ProcurementPage = lazy(() => import('../features/procurement/ProcurementPage'));
@@ -34,6 +40,12 @@ const OrbitDashboard = lazy(() => import('../features/clinics/OrbitDashboard'));
 const PedsOphthDashboard = lazy(() => import('../features/clinics/PedsOphthDashboard'));
 const GenOphthDashboard = lazy(() => import('../features/clinics/GenOphthDashboard'));
 const OptometryDashboard = lazy(() => import('../features/clinics/OptometryDashboard'));
+const ImagingDashboard = lazy(() => import('../features/clinics/ImagingDashboard'));
+const OpticLabDashboard = lazy(() => import('../features/optic-lab/OpticLabDashboard'));
+const HospitalOverview = lazy(() => import('../features/dashboard/HospitalOverview'));
+const PatientListPage = lazy(() => import('../features/patients/PatientListPage'));
+const PatientDetailPage = lazy(() => import('../features/patients/PatientDetailPage'));
+const ReportsPage = lazy(() => import('../features/reports/ReportsPage'));
 
 function Spinner() {
   return (
@@ -85,7 +97,13 @@ export default function App() {
               <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
               <Route path="/reception" element={<ProtectedRoute><ReceptionPage /></ProtectedRoute>} />
               <Route path="/waiting-room" element={<WaitingRoomTV />} />
+              <Route path="/preoperative" element={<ProtectedRoute><PreoperativePage /></ProtectedRoute>} />
+              <Route path="/wards" element={<ProtectedRoute><WardsPage /></ProtectedRoute>} />
+              <Route path="/inpatient" element={<ProtectedRoute><InpatientPage /></ProtectedRoute>} />
               <Route path="/surgery" element={<ProtectedRoute><SurgeryGantt /></ProtectedRoute>} />
+              <Route path="/surgery/schedule" element={<ProtectedRoute><SurgeryScheduler /></ProtectedRoute>} />
+              <Route path="/surgery/dashboard" element={<ProtectedRoute><SurgeryDashboard /></ProtectedRoute>} />
+              <Route path="/surgery/:surgeryId/discharge" element={<ProtectedRoute><DischargeSummaryPage /></ProtectedRoute>} />
               <Route path="/referrals" element={<ProtectedRoute><ReferralsPage /></ProtectedRoute>} />
               <Route path="/pharmacy" element={<ProtectedRoute><PharmacyPOS /></ProtectedRoute>} />
               <Route path="/pharmacy/products" element={<ProtectedRoute><PharmacyProducts /></ProtectedRoute>} />
@@ -106,6 +124,12 @@ export default function App() {
               <Route path="/clinic/pediatrics-ophth" element={<ProtectedRoute><PedsOphthDashboard /></ProtectedRoute>} />
               <Route path="/clinic/general-ophth" element={<ProtectedRoute><GenOphthDashboard /></ProtectedRoute>} />
               <Route path="/clinic/optometry" element={<ProtectedRoute><OptometryDashboard /></ProtectedRoute>} />
+              <Route path="/clinic/imaging" element={<ProtectedRoute><ImagingDashboard /></ProtectedRoute>} />
+              <Route path="/optic-lab" element={<ProtectedRoute><OpticLabDashboard /></ProtectedRoute>} />
+              <Route path="/overview" element={<ProtectedRoute><HospitalOverview /></ProtectedRoute>} />
+              <Route path="/patients" element={<ProtectedRoute><PatientListPage /></ProtectedRoute>} />
+              <Route path="/patients/:id" element={<ProtectedRoute><PatientDetailPage /></ProtectedRoute>} />
+              <Route path="/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </BrowserRouter>

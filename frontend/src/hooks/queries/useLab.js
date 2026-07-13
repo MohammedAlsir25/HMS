@@ -65,7 +65,7 @@ export function useUpdateOrderStatus() {
 export function useSubmitResults() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, results }) => api.post(`/lab/orders/${id}/results`, { results }),
+    mutationFn: ({ id, results }) => api.put(`/lab/orders/${id}/results`, { results }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: labKeys.orders }),
   });
 }

@@ -33,10 +33,13 @@ router.get('/queue/stats', authenticate, requirePermission(PERMISSIONS.APPOINTME
 router.get('/queue/:clinicId', authenticate, requirePermission(PERMISSIONS.APPOINTMENT_READ), asyncHandler(async (req, res) => {
   const clinic = await resolveClinic(req.params.clinicId!);
   if (!clinic) throw new NotFoundError('Clinic not found');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const appointments = await prisma.appointment.findMany({
     where: {
       clinicId: clinic.id,
       status: { in: ['WAITING', 'CALLED', 'IN_PROGRESS'] },
+      createdAt: { gte: today },
     },
     include: { patient: { select: { fullName: true, mrn: true, dateOfBirth: true, phone: true, notes: true } } },
     orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],

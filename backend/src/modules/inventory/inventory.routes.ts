@@ -22,9 +22,10 @@ router.get('/items', authenticate, requirePermission(PERMISSIONS.WAREHOUSE_READ)
 }));
 
 router.get('/items/low-stock', authenticate, requirePermission(PERMISSIONS.WAREHOUSE_READ), asyncHandler(async (_req, res) => {
-  const items = await prisma.inventoryItem.findMany({ where: { isActive: true } });
-  const lowStock = items.filter((i) => Number(i.quantity) <= i.minStock).sort((a, b) => Number(a.quantity) - Number(b.quantity));
-  res.json(lowStock);
+  const items = await prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
+    `SELECT * FROM "public"."inventory_items" WHERE "is_active" = true AND "quantity"::numeric <= "min_stock" ORDER BY "quantity"::numeric ASC`,
+  );
+  res.json(items);
 }));
 
 router.get('/items/:id', authenticate, requirePermission(PERMISSIONS.WAREHOUSE_READ), asyncHandler(async (req, res) => {

@@ -9,13 +9,19 @@ import { api } from '../../lib/api';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
+import { notifyError, notifySuccess } from '../../utils/notify';
 import { Badge } from '../../components/ui/Badge';
+import { CURRENCY } from '../../utils/currency';
 import { printReceipt } from '../../lib/printReceipt';
+import { useCurrentShift, useCreateCashMovement } from '../../hooks/queries/useAccounting';
 import NewPatientForm from './NewPatientForm';
 import ReservationsPanel from './ReservationsPanel';
 import FileUploader from './FileUploader';
+import FollowUpsPanel from './FollowUpsPanel';
+import ReceptionLabPayments from './ReceptionLabPayments';
 
-const TABS = ['newPatient', 'reservations', 'queue'];
+const TABS = ['newPatient', 'reservations', 'queue', 'followUps', 'labPayments'];
 
 const statusConfig = {
   WAITING: { label: 'Waiting', variant: 'warning' },
@@ -44,6 +50,25 @@ export default function ReceptionPage() {
   const [queueClinicFilter, setQueueClinicFilter] = useState('');
   const [queueSearch, setQueueSearch] = useState('');
   const [lastReceipt, setLastReceipt] = useState(null);
+  const [optometryRoutingMsg, setOptometryRoutingMsg] = useState(null);
+  const [showPickupModal, setShowPickupModal] = useState(false);
+  const [pickupAmount, setPickupAmount] = useState('');
+  const [pickupReason, setPickupReason] = useState('');
+
+  const { data: shiftData } = useCurrentShift();
+  const createMovement = useCreateCashMovement();
+  const openShift = shiftData?.id && !shiftData.closedAt ? shiftData : null;
+
+  const handleRecordPickup = async () => {
+    if (!pickupAmount || !openShift) return;
+    try {
+      await createMovement.mutateAsync({ shiftId: openShift.id, type: 'PICKUP', amount: parseFloat(pickupAmount), reason: pickupReason || null });
+      notifySuccess('Pickup recorded');
+      setShowPickupModal(false);
+      setPickupAmount('');
+      setPickupReason('');
+    } catch (err) { notifyError(err); }
+  };
 
   const { data: clinics = [] } = useClinics();
   const activeClinic = queueClinicFilter || selectedClinic;
@@ -80,11 +105,14 @@ export default function ReceptionPage() {
           clinicName: clinic?.name || '',
         });
       }
+      if (result.optometryRouting) {
+        setOptometryRoutingMsg(`Patient ${selectedPatient.fullName} routed to Optometry for pre-screening before ${result.targetClinic.name} (Token #${String(result.appointment.token).padStart(3, '0')})`);
+      }
       setSelectedPatient(null);
       setCollectPayment(false);
       setPaymentMethod('CASH');
       setSearchQuery('');
-    } catch (err) { console.error('[ReceptionPage]', err); }
+    } catch (err) { notifyError(err); }
   };
 
   const handleStatusChange = (id, status) => {
@@ -123,6 +151,31 @@ export default function ReceptionPage() {
         </div>
       </div>
 
+      {openShift && (
+        <div className="flex items-center justify-between bg-bone border border-silver rounded-lg px-4 py-2">
+          <div className="flex items-center gap-3">
+            <Badge variant="success">Shift Active</Badge>
+            <span className="text-caption text-graphite">since {new Date(openShift.openedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+            <span className="text-caption text-slate">{openShift.transactions?.length || 0} transactions</span>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => setShowPickupModal(true)}>Record Pickup</Button>
+        </div>
+      )}
+
+      {showPickupModal && (
+        <Modal open={showPickupModal} onClose={() => setShowPickupModal(false)}>
+          <div className="space-y-4 p-4">
+            <h2 className="text-subheading font-semibold text-obsidian">Record Cash Pickup</h2>
+            <Input label="Amount (SDG)" type="number" step="0.01" min="0" value={pickupAmount} onChange={(e) => setPickupAmount(e.target.value)} />
+            <Input label="Reason" value={pickupReason} onChange={(e) => setPickupReason(e.target.value)} placeholder="e.g. Manager collected for deposit" />
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setShowPickupModal(false)}>Cancel</Button>
+              <Button onClick={handleRecordPickup} loading={createMovement.isPending} disabled={!pickupAmount}>Record Pickup</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {lastReceipt && (
         <div className="bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-700 rounded-lg p-4 flex items-center justify-between gap-4">
           <div>
@@ -141,6 +194,16 @@ export default function ReceptionPage() {
             }}>Print Receipt</Button>
             <Button variant="ghost" size="sm" onClick={() => setLastReceipt(null)}>&times;</Button>
           </div>
+        </div>
+      )}
+
+      {optometryRoutingMsg && (
+        <div className="bg-amber-50 dark:bg-amber-900 border border-amber-200 dark:border-amber-700 rounded-lg p-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">Optometry Pre-Screening</p>
+            <p className="text-caption text-amber-600 dark:text-amber-400">{optometryRoutingMsg}</p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => setOptometryRoutingMsg(null)}>&times;</Button>
         </div>
       )}
 
@@ -216,7 +279,7 @@ export default function ReceptionPage() {
                       className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian
                         focus:outline-none focus:ring-2 focus:ring-lilac-bloom focus:border-transparent"
                       value={selectedClinic}
-                      onChange={(e) => setSelectedClinic(e.target.value)}
+                      onChange={(e) => { setSelectedClinic(e.target.value); setOptometryRoutingMsg(null); }}
                     >
                       <option value="">{t('reception.selectClinic')}</option>
                       {clinics.map((c) => (
@@ -224,6 +287,19 @@ export default function ReceptionPage() {
                       ))}
                     </select>
                 </div>
+                {(() => {
+                  const c = clinics.find((x) => x.id === selectedClinic);
+                  if (c?.optometryPreScreeningRequired) {
+                    return (
+                      <div className="p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg">
+                        <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                          This clinic requires optometry pre-screening. The patient will be registered for Optometry first.
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
                 {(() => {
                   const c = clinics.find((x) => x.id === selectedClinic);
                   const fee = appointmentType === 'RESERVATION' ? null : (c?.consultationFee);
@@ -235,7 +311,7 @@ export default function ReceptionPage() {
                         <label htmlFor="collectPaymentExisting" className="text-sm text-graphite">{t('reception.collectPayment')}</label>
                       </div>
                       <p className="text-sm text-graphite">
-                        {t('reception.consultationFee')}: <span className="font-semibold text-obsidian">{Number(fee).toFixed(2)} AED</span>
+                        {t('reception.consultationFee')}: <span className="font-semibold text-obsidian">{CURRENCY} {Number(fee).toFixed(2)}</span>
                       </p>
                       {collectPayment && (
                         <div>
@@ -251,9 +327,9 @@ export default function ReceptionPage() {
                     </div>
                   );
                 })()}
-                <Button className="w-full" disabled={!selectedClinic} onClick={handleCheckIn}>
-                  {t('reception.checkIn')} — {appointmentType === 'WALKIN' ? t('reception.walkin') : t('reception.reservation')}
-                </Button>
+          <Button className="w-full" disabled={!selectedClinic || checkIn.isPending} onClick={handleCheckIn} loading={checkIn.isPending}>
+            {t('reception.checkIn')} — {appointmentType === 'WALKIN' ? t('reception.walkin') : t('reception.reservation')}
+          </Button>
               </Card>
             )}
 
@@ -274,6 +350,10 @@ export default function ReceptionPage() {
       )}
 
       {tab === 'reservations' && <ReservationsPanel clinics={clinics} />}
+
+      {tab === 'followUps' && <FollowUpsPanel clinics={clinics} />}
+
+      {tab === 'labPayments' && <ReceptionLabPayments />}
 
       {tab === 'queue' && (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

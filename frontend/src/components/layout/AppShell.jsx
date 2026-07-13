@@ -8,6 +8,7 @@ import SyncStatusBadge from './SyncStatusBadge';
 import SettingsModal from '../../features/settings/SettingsModal';
 import WelcomeToast from '../ui/WelcomeToast';
 import TourManager from '../ui/TourManager';
+import UpdateManager from '../ui/UpdateManager';
 import GradientText from '../ui/GradientText';
 
 let appWindow = null;
@@ -150,8 +151,8 @@ export default function AppShell({ children }) {
       <WelcomeToast />
       {isAdmin && <StaggeredMenu position="left" isFixed isOpen={menuOpen} onToggle={toggleMenu} />}
 
-      <header className="sticky top-0 z-20 bg-paper/90 backdrop-blur-sm border-b border-silver/50" data-tauri-drag-region>
-        <div className="mx-auto flex items-center gap-3 px-4 md:px-6 lg:px-8 py-2" style={{ maxWidth: '1440px' }}>
+      <header className="sticky top-0 z-20 bg-paper/90 backdrop-blur-sm border-b border-silver/50 pt-1" data-tauri-drag-region>
+        <div className="mx-auto flex items-center gap-3 px-4 md:px-6 lg:px-8 py-2" style={{ maxWidth: '1440px' }} data-tauri-drag-region="">
           {isAdmin && (
             <button
               onClick={toggleMenu}
@@ -211,6 +212,8 @@ export default function AppShell({ children }) {
           </div>
         </div>
       </header>
+
+      <UpdateManager compact />
 
       <main
         className="flex-1 p-4 md:p-6 lg:p-8 flex flex-col overflow-y-auto"

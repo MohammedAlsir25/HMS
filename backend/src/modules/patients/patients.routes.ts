@@ -5,7 +5,8 @@ import { authenticate, requirePermission } from '../../middleware/auth.js';
 import { asyncHandler } from '../../middleware/errorHandler.js';
 import { validate } from '../../middleware/validate.js';
 import { createPatientSchema } from '../../schemas/reception.schema.js';
-import { ValidationError, NotFoundError, ConflictError } from '../../utils/errors.js';
+import { updatePatientSchema } from '../../schemas/patients.schema.js';
+import { ValidationError, NotFoundError } from '../../utils/errors.js';
 import { PERMISSIONS } from '../../middleware/rbac.js';
 import { Prisma, $Enums } from '@prisma/client';
 
@@ -16,8 +17,9 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype === 'application/pdf') cb(null, true);
-    else cb(new Error('Only PDF files are allowed'));
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only PDF and image files (JPEG, PNG, WebP) are allowed'));
   },
 });
 
@@ -28,17 +30,29 @@ function generateMRN() {
 }
 
 router.get('/search', authenticate, requirePermission(PERMISSIONS.PATIENT_READ), asyncHandler(async (req: Request, res: Response) => {
-  const { q } = req.query as Record<string, string>;
+  const { q, clinicSlug } = req.query as Record<string, string>;
   if (!q || q.length < 2) return res.json([]);
+  const where: Record<string, unknown> = {
+    OR: [
+      { fullName: { contains: q, mode: 'insensitive' as const } },
+      { mrn: { contains: q, mode: 'insensitive' as const } },
+      { phone: { contains: q } },
+      { nationalId: { contains: q } },
+    ],
+  };
+  if (clinicSlug) {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    where.appointments = {
+      some: {
+        clinic: { slug: clinicSlug },
+        status: { in: ['WAITING', 'CALLED', 'IN_PROGRESS'] },
+        createdAt: { gte: todayStart },
+      },
+    };
+  }
   const patients = await prisma.patient.findMany({
-    where: {
-      OR: [
-        { fullName: { contains: q, mode: 'insensitive' as const } },
-        { mrn: { contains: q, mode: 'insensitive' as const } },
-        { phone: { contains: q } },
-        { nationalId: { contains: q } },
-      ],
-    },
+    where: where as Prisma.PatientWhereInput,
     take: 20,
     orderBy: { createdAt: 'desc' },
   });
@@ -46,19 +60,13 @@ router.get('/search', authenticate, requirePermission(PERMISSIONS.PATIENT_READ),
 }));
 
 router.post('/', authenticate, requirePermission(PERMISSIONS.PATIENT_CREATE), validate(createPatientSchema), asyncHandler(async (req: Request, res: Response) => {
-  const { fullName, phone, nationalId, email, dateOfBirth, gender, diabetesType, address, notes } = req.body as Record<string, unknown>;
-  if (nationalId) {
-    const existing = await prisma.patient.findUnique({ where: { nationalId: nationalId as string } });
-    if (existing) throw new ConflictError('Patient with this national ID already exists');
-  }
+  const { fullName, phone, dateOfBirth, gender, diabetesType, address, notes } = req.body as Record<string, unknown>;
   const mrn = generateMRN();
   const patient = await prisma.patient.create({
     data: {
       mrn,
       fullName: fullName as string,
-      phone: (phone as string) || null,
-      nationalId: (nationalId as string) || null,
-      email: (email as string) || null,
+      phone: phone as string,
       dateOfBirth: dateOfBirth ? new Date(dateOfBirth as string) : null,
       gender: (gender as string) || null,
       diabetesType: (diabetesType as $Enums.DiabetesType) || 'NONE',
@@ -108,6 +116,75 @@ router.get('/files/:id/download', authenticate, requirePermission(PERMISSIONS.PA
   const { data, error } = await supabase.storage.from(bucket).createSignedUrl(file.storedPath, 3600);
   if (error || !data) throw new NotFoundError('Failed to generate download link');
   res.redirect(data.signedUrl);
+}));
+
+router.get('/', authenticate, requirePermission(PERMISSIONS.PATIENT_READ), asyncHandler(async (req: Request, res: Response) => {
+  const { q, page: pageStr, limit: limitStr, sortBy, sortOrder } = req.query as Record<string, string | undefined>;
+  const page = Math.max(1, parseInt(pageStr || '') || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(limitStr || '') || 20));
+  const skip = (page - 1) * limit;
+  const allowedSort = ['fullName', 'mrn', 'createdAt', 'phone'] as const;
+  type SortField = (typeof allowedSort)[number];
+  const orderField: SortField = allowedSort.includes(sortBy as SortField) ? (sortBy as SortField) : 'createdAt';
+  const orderDir = sortOrder === 'asc' ? 'asc' as const : 'desc' as const;
+  const where: Prisma.PatientWhereInput = {};
+  if (q && q.length >= 2) {
+    where.OR = [
+      { fullName: { contains: q, mode: 'insensitive' as const } },
+      { mrn: { contains: q, mode: 'insensitive' as const } },
+      { phone: { contains: q } },
+      { nationalId: { contains: q } },
+    ];
+  }
+  const [patients, total] = await Promise.all([
+    prisma.patient.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { [orderField]: orderDir },
+    }),
+    prisma.patient.count({ where }),
+  ]);
+  res.json({ patients, total, page, limit, totalPages: Math.ceil(total / limit) });
+}));
+
+router.get('/:id', authenticate, requirePermission(PERMISSIONS.PATIENT_READ), asyncHandler(async (req: Request, res: Response) => {
+  const patient = await prisma.patient.findUnique({
+    where: { id: req.params.id },
+    include: {
+      createdBy: { select: { id: true, fullName: true } },
+      appointments: { take: 10, orderBy: { createdAt: 'desc' }, include: { clinic: { select: { name: true, slug: true } } } },
+      clinicalRecords: { take: 10, orderBy: { createdAt: 'desc' } },
+      files: { orderBy: { createdAt: 'desc' } },
+      surgeries: { orderBy: { createdAt: 'desc' } },
+      transactions: { take: 10, orderBy: { createdAt: 'desc' } },
+      beds: { where: { dischargedAt: null }, include: { ward: { select: { name: true } } } },
+      referrals: { orderBy: { createdAt: 'desc' } },
+      preoperativeRequests: { orderBy: { createdAt: 'desc' } },
+    },
+  });
+  if (!patient) throw new NotFoundError('Patient not found');
+  res.json(patient);
+}));
+
+router.patch('/:id', authenticate, requirePermission(PERMISSIONS.PATIENT_UPDATE), validate(updatePatientSchema), asyncHandler(async (req: Request, res: Response) => {
+  const { fullName, phone, nationalId, email, dateOfBirth, gender, chronicConditions, address, notes, diabetesType } = req.body as Record<string, unknown>;
+  const data: Record<string, unknown> = {};
+  if (fullName !== undefined) data.fullName = fullName;
+  if (phone !== undefined) data.phone = phone;
+  if (nationalId !== undefined) data.nationalId = nationalId;
+  if (email !== undefined) data.email = email;
+  if (dateOfBirth !== undefined) data.dateOfBirth = new Date(dateOfBirth as string);
+  if (gender !== undefined) data.gender = gender;
+  if (chronicConditions !== undefined) data.chronicConditions = chronicConditions;
+  if (address !== undefined) data.address = address;
+  if (notes !== undefined) data.notes = notes;
+  if (diabetesType !== undefined) data.diabetesType = diabetesType;
+  const patient = await prisma.patient.update({
+    where: { id: req.params.id },
+    data: data as Prisma.PatientUpdateInput,
+  });
+  res.json(patient);
 }));
 
 export default router;

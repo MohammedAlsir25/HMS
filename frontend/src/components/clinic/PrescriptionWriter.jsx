@@ -53,24 +53,26 @@ export default function PrescriptionWriter({ medications = [], onChange, clinicS
               value={med.duration}
               onChange={(e) => updateMedication(idx, 'duration', e.target.value)}
             />
-            <select
-              value={med.route}
-              onChange={(e) => updateMedication(idx, 'route', e.target.value)}
-              className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom"
-            >
-              <option value="oral">Oral</option>
-              <option value="topical">Topical</option>
-              <option value="intravenous">IV</option>
-              <option value="intramuscular">IM</option>
-              <option value="subcutaneous">Subcutaneous</option>
-              <option value="inhalation">Inhalation</option>
-            </select>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-graphite">Route</label>
+              <select
+                value={med.route}
+                onChange={(e) => updateMedication(idx, 'route', e.target.value)}
+                className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom"
+              >
+                <option value="oral">Oral</option>
+                <option value="topical">Topical</option>
+                <option value="intravenous">IV</option>
+                <option value="intramuscular">IM</option>
+                <option value="subcutaneous">Subcutaneous</option>
+                <option value="inhalation">Inhalation</option>
+              </select>
+            </div>
             <Input
               label="Notes"
               placeholder="Special instructions"
               value={med.notes}
               onChange={(e) => updateMedication(idx, 'notes', e.target.value)}
-              className="sm:col-span-2 lg:col-span-1"
             />
           </div>
         </div>

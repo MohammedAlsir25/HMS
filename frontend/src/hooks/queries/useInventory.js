@@ -26,10 +26,11 @@ export function useInventoryItem(id) {
   });
 }
 
-export function useInventoryTransactions() {
+export function useInventoryTransactions(itemId) {
   return useQuery({
     queryKey: inventoryKeys.transactions,
-    queryFn: () => api.get('/inventory/transactions'),
+    queryFn: () => api.get(`/inventory/transactions/${itemId}`),
+    enabled: !!itemId,
   });
 }
 
@@ -44,7 +45,7 @@ export function useCreateInventoryItem() {
 export function useUpdateInventoryItem() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...data }) => api.put(`/inventory/items/${id}`, data),
+    mutationFn: ({ id, ...data }) => api.patch(`/inventory/items/${id}`, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: inventoryKeys.all }),
   });
 }

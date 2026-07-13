@@ -34,4 +34,12 @@ export const PERMISSIONS_LIST = [
   { key: 'asset:read', label: 'View Fixed Assets' },
   { key: 'asset:write', label: 'Manage Fixed Assets' },
   { key: 'notification:read', label: 'View Notifications' },
+  { key: 'preoperative:read', label: 'View Preoperative' },
+  { key: 'preoperative:write', label: 'Manage Preoperative' },
+  { key: 'optic_lab:read', label: 'View Optic Lab' },
+  { key: 'optic_lab:write', label: 'Manage Optic Lab' },
+  { key: 'ward:read', label: 'View Wards' },
+  { key: 'ward:write', label: 'Manage Wards' },
+  { key: 'pricing:read', label: 'View Pricing' },
+  { key: 'pricing:write', label: 'Manage Pricing' },
 ];

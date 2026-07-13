@@ -3,6 +3,7 @@ import { authenticate, requirePermission } from '../../../middleware/auth.js';
 import { asyncHandler } from '../../../middleware/errorHandler.js';
 import { ValidationError, NotFoundError } from '../../../utils/errors.js';
 import { PERMISSIONS } from '../../../middleware/rbac.js';
+import { auditMiddleware } from '../../../middleware/auditLog.js';
 import prisma from '../../../lib/prisma.js';
 
 const router = Router();
@@ -56,10 +57,10 @@ router.get('/:id', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_READ),
   res.json(tx);
 }));
 
-router.post('/', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_WRITE), asyncHandler(async (req, res) => {
+router.post('/', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_WRITE), auditMiddleware('CREATE_TRANSACTION', 'Transaction'), asyncHandler(async (req, res) => {
   const { type, amount, paymentMethod, description, departmentId } = req.body;
   if (!type || !amount || !paymentMethod) throw new ValidationError('type, amount, and paymentMethod are required');
-  let shift = await prisma.shift.findFirst({ where: { closedAt: null } });
+  let shift = await prisma.shift.findFirst({ where: { userId: req.user!.id, closedAt: null } });
   if (!shift) {
     shift = await prisma.shift.create({ data: { userId: req.user!.id, openedAt: new Date() } });
   }

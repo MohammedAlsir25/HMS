@@ -18,6 +18,68 @@ router.post('/check-in', authenticate, requirePermission(PERMISSIONS.APPOINTMENT
   if (!patient) throw new NotFoundError('Patient not found');
   const clinic = await resolveClinic(clinicId);
   if (!clinic) throw new NotFoundError('Clinic not found');
+
+  // If clinic requires optometry pre-screening, route to optometry instead
+  if (clinic.optometryPreScreeningRequired) {
+    const optometryClinic = await prisma.clinic.findFirst({
+      where: { type: 'OPTOMETRY', isActive: true },
+    });
+    if (!optometryClinic) throw new NotFoundError('Optometry clinic not found');
+
+    if (collectPayment) {
+      if (!req.user!.permissions.includes(PERMISSIONS.ACCOUNTING_WRITE)) {
+        throw new ForbiddenError('Insufficient permissions to collect payment');
+      }
+    }
+
+    const optometryToken = await nextToken(optometryClinic.id);
+    const optometryAppointment = await prisma.appointment.create({
+      data: {
+        token: optometryToken,
+        type: type || 'WALKIN',
+        status: 'WAITING',
+        priority: typeof priority === 'number' ? priority : 0,
+        visitType: visitType || 'NEW_VISIT',
+        notes: notes || null,
+        patientId,
+        clinicId: optometryClinic.id,
+        doctorId: req.user!.id,
+        targetClinicId: clinic.id,
+      },
+      include: { patient: { select: { fullName: true, mrn: true, nationalId: true } } },
+    });
+
+    let transaction = null;
+    if (collectPayment) {
+      const fee = visitType === 'FOLLOW_UP' ? clinic.followUpFee : clinic.consultationFee;
+      const department = await prisma.department.findFirst({ where: { clinicId: optometryClinic.id } });
+      let shift = await prisma.shift.findFirst({ where: { userId: req.user!.id, closedAt: null } });
+      if (!shift) {
+        shift = await prisma.shift.create({ data: { userId: req.user!.id } });
+      }
+      transaction = await prisma.transaction.create({
+        data: {
+          type: 'RECEPTION',
+          amount: Number(fee) || 0,
+          paymentMethod: paymentMethod || 'CASH',
+          description: `Pre-screening fee - ${clinic.name}`,
+          shiftId: shift.id,
+          cashierId: req.user!.id,
+          departmentId: department ? department.id : null,
+        },
+        include: { cashier: { select: { id: true, fullName: true } } },
+      });
+    }
+
+    return res.status(201).json({
+      appointment: optometryAppointment,
+      transaction,
+      optometryRouting: true,
+      targetClinic: { id: clinic.id, name: clinic.name, slug: clinic.slug },
+      message: `Patient routed to Optometry for pre-screening before ${clinic.name}`,
+    });
+  }
+
   if (collectPayment) {
     if (!req.user!.permissions.includes(PERMISSIONS.ACCOUNTING_WRITE)) {
       throw new ForbiddenError('Insufficient permissions to collect payment');
@@ -174,6 +236,37 @@ router.patch('/appointments/:id/priority', authenticate, requirePermission(PERMI
     include: { patient: { select: { fullName: true, mrn: true } } },
   });
   res.json(appointment);
+}));
+
+router.get('/follow-ups', authenticate, requirePermission(PERMISSIONS.APPOINTMENT_READ), asyncHandler(async (req, res) => {
+  const { clinicId, dateFrom, dateTo, q } = req.query as Record<string, string>;
+  const where: Record<string, unknown> = { status: 'RESERVED', visitType: 'FOLLOW_UP' };
+  if (clinicId) where.clinicId = clinicId;
+  if (dateFrom || dateTo) {
+    const dateFilter: Record<string, Date> = {};
+    if (dateFrom) dateFilter.gte = new Date(dateFrom);
+    if (dateTo) dateFilter.lte = new Date(dateTo);
+    where.scheduledAt = dateFilter;
+  }
+  if (q && q.length >= 2) {
+    where.patient = {
+      OR: [
+        { fullName: { contains: q, mode: 'insensitive' as const } },
+        { mrn: { contains: q } },
+      ],
+    };
+  }
+  const followUps = await prisma.appointment.findMany({
+    where: where as Prisma.AppointmentWhereInput,
+    include: {
+      patient: { select: { fullName: true, mrn: true, phone: true } },
+      clinic: { select: { name: true, slug: true, id: true } },
+      doctor: { select: { fullName: true } },
+    },
+    orderBy: { scheduledAt: 'asc' },
+    take: 100,
+  });
+  res.json(followUps);
 }));
 
 export default router;

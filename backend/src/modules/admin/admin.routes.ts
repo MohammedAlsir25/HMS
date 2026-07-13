@@ -84,17 +84,117 @@ router.delete('/roles/:id', authenticate, requirePermission(PERMISSIONS.ADMIN_RB
 }));
 
 router.post('/roles/seed', authenticate, requirePermission(PERMISSIONS.ADMIN_RBAC), asyncHandler(async (_req, res) => {
-  const results = [];
-  for (const [, def] of Object.entries(DEFAULT_ROLES)) {
-    const existing = await prisma.role.findUnique({ where: { name: def.name } });
-    if (!existing) {
-      const role = await prisma.role.create({ data: { name: def.name, permissions: def.permissions } });
-      results.push({ action: 'created', role: role.name });
-    } else {
-      results.push({ action: 'skipped', role: existing.name });
-    }
+  const existing = await prisma.role.findMany({
+    where: { name: { in: Object.values(DEFAULT_ROLES).map((d) => d.name) } },
+    select: { name: true },
+  });
+  const existingNames = new Set(existing.map((r) => r.name));
+  const toCreate = Object.entries(DEFAULT_ROLES)
+    .filter(([, def]) => !existingNames.has(def.name))
+    .map(([, def]) => ({ name: def.name, permissions: def.permissions }));
+  if (toCreate.length > 0) {
+    await prisma.role.createMany({ data: toCreate, skipDuplicates: true });
   }
+  const results = [
+    ...toCreate.map((r) => ({ action: 'created', role: r.name })),
+    ...existing.map((r) => ({ action: 'skipped', role: r.name })),
+  ];
   res.json({ message: 'Roles seeded', results });
+}));
+
+router.get('/pricing/operation-types', authenticate, requirePermission(PERMISSIONS.PRICING_READ), asyncHandler(async (_req, res) => {
+  const types = await prisma.operationType.findMany({
+    where: { is_deleted: false },
+    include: { department: { select: { id: true, name: true } } },
+    orderBy: { name: 'asc' },
+  });
+  res.json(types);
+}));
+
+router.patch('/pricing/operation-types/:id', authenticate, requirePermission(PERMISSIONS.PRICING_WRITE), asyncHandler(async (req, res) => {
+  const { price } = req.body as Record<string, unknown>;
+  const type = await prisma.operationType.update({
+    where: { id: req.params.id },
+    data: { price: price !== undefined && price !== null ? Number(price) : null },
+  });
+  res.json(type);
+}));
+
+router.get('/pricing/clinics', authenticate, requirePermission(PERMISSIONS.PRICING_READ), asyncHandler(async (_req, res) => {
+  const clinics = await prisma.clinic.findMany({
+    where: { is_deleted: false },
+    select: { id: true, name: true, nameAr: true, consultationFee: true, followUpFee: true, isActive: true },
+    orderBy: { name: 'asc' },
+  });
+  res.json(clinics);
+}));
+
+router.patch('/pricing/clinics/:id', authenticate, requirePermission(PERMISSIONS.PRICING_WRITE), asyncHandler(async (req, res) => {
+  const { consultationFee, followUpFee } = req.body as Record<string, unknown>;
+  const data: Record<string, unknown> = {};
+  if (consultationFee !== undefined) data.consultationFee = consultationFee === null ? null : Number(consultationFee);
+  if (followUpFee !== undefined) data.followUpFee = followUpFee === null ? null : Number(followUpFee);
+  const clinic = await prisma.clinic.update({ where: { id: req.params.id }, data });
+  res.json(clinic);
+}));
+
+router.get('/pricing/wards', authenticate, requirePermission(PERMISSIONS.PRICING_READ), asyncHandler(async (_req, res) => {
+  const wards = await prisma.ward.findMany({
+    where: { is_deleted: false },
+    select: { id: true, name: true, nameAr: true, type: true, dailyRate: true, isActive: true },
+    orderBy: { name: 'asc' },
+  });
+  res.json(wards);
+}));
+
+router.patch('/pricing/wards/:id', authenticate, requirePermission(PERMISSIONS.PRICING_WRITE), asyncHandler(async (req, res) => {
+  const { dailyRate } = req.body as Record<string, unknown>;
+  const data: Record<string, unknown> = {};
+  if (dailyRate !== undefined) data.dailyRate = dailyRate === null ? null : Number(dailyRate);
+  const ward = await prisma.ward.update({ where: { id: req.params.id }, data });
+  res.json(ward);
+}));
+
+router.get('/pricing/imaging-procedure-types', authenticate, requirePermission(PERMISSIONS.PRICING_READ), asyncHandler(async (_req, res) => {
+  const types = await prisma.imagingProcedureType.findMany({
+    where: { is_deleted: false },
+    orderBy: { name: 'asc' },
+  });
+  res.json(types);
+}));
+
+router.patch('/pricing/imaging-procedure-types/:id', authenticate, requirePermission(PERMISSIONS.PRICING_WRITE), asyncHandler(async (req, res) => {
+  const { price } = req.body as Record<string, unknown>;
+  const type = await prisma.imagingProcedureType.update({
+    where: { id: req.params.id },
+    data: { price: price !== undefined && price !== null ? Number(price) : null },
+  });
+  res.json(type);
+}));
+
+router.post('/pricing/imaging-procedure-types/seed', authenticate, requirePermission(PERMISSIONS.PRICING_WRITE), asyncHandler(async (_req, res) => {
+  const scanTypes = ['A_SCAN', 'B_SCAN', 'OTT', 'BIOMETRY'] as const;
+  type ScanType = typeof scanTypes[number];
+  const names: Record<ScanType, { name: string; nameAr: string }> = {
+    A_SCAN: { name: 'A-Scan', nameAr: 'أ-سكان' },
+    B_SCAN: { name: 'B-Scan', nameAr: 'ب-سكان' },
+    OTT: { name: 'Ocular Trauma Tomography', nameAr: 'تصوير صدمات العين' },
+    BIOMETRY: { name: 'Biometry', nameAr: 'القياسات الحيوية' },
+  };
+  const results: string[] = [];
+  const existingTypes = await prisma.imagingProcedureType.findMany({
+    where: { scanType: { in: Array.from(scanTypes) } },
+    select: { scanType: true },
+  });
+  const existingSet = new Set(existingTypes.map((t) => t.scanType));
+  const toCreate = scanTypes
+    .filter((st) => !existingSet.has(st))
+    .map((st) => ({ scanType: st, name: names[st].name, nameAr: names[st].nameAr }));
+  if (toCreate.length > 0) {
+    await prisma.imagingProcedureType.createMany({ data: toCreate, skipDuplicates: true });
+  }
+  toCreate.forEach((t) => results.push(`Created: ${t.scanType}`));
+  res.json({ message: 'Imaging procedure types seeded', results, count: results.length });
 }));
 
 export default router;

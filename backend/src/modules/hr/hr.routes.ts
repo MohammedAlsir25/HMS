@@ -3,6 +3,7 @@ import { authenticate, requirePermission } from '../../middleware/auth.js';
 import { asyncHandler } from '../../middleware/errorHandler.js';
 import { ValidationError, NotFoundError, ConflictError } from '../../utils/errors.js';
 import { PERMISSIONS } from '../../middleware/rbac.js';
+import { auditMiddleware } from '../../middleware/auditLog.js';
 import bcrypt from 'bcryptjs';
 
 const router = Router();
@@ -114,10 +115,29 @@ router.post('/payroll', authenticate, requirePermission(PERMISSIONS.HR_WRITE), a
   res.status(201).json(record);
 }));
 
-router.patch('/payroll/:id/status', authenticate, requirePermission(PERMISSIONS.HR_WRITE), asyncHandler(async (req, res) => {
+router.patch('/payroll/:id/status', authenticate, requirePermission(PERMISSIONS.HR_WRITE), auditMiddleware('PAYROLL_PAY', 'PayrollRecord'), asyncHandler(async (req, res) => {
   const { status } = req.body as { status?: string };
   const data: Record<string, unknown> = { status };
-  if (status === 'PAID') data.paidAt = new Date();
+  if (status === 'PAID') {
+    data.paidAt = new Date();
+    const payroll = await prisma.payrollRecord.findUnique({
+      where: { id: req.params.id },
+      include: { employee: { select: { id: true, fullName: true, departmentId: true } } },
+    });
+    if (payroll) {
+      await prisma.expense.create({
+        data: {
+          amount: payroll.netPay,
+          category: 'SALARY',
+          description: `Salary: ${payroll.employee?.fullName || 'Employee'} - ${payroll.period}`,
+          date: new Date(),
+          paidTo: payroll.employee?.fullName || null,
+          departmentId: payroll.employee?.departmentId || null,
+          notes: `Payroll record ${payroll.id}`,
+        },
+      });
+    }
+  }
   const record = await prisma.payrollRecord.update({ where: { id: req.params.id }, data });
   res.json(record);
 }));

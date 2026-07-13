@@ -13,6 +13,7 @@ const TABS = [
   { key: 'purchaseOrders', label: 'Purchase Orders' },
   { key: 'approvals', label: 'Approval Queue' },
   { key: 'assets', label: 'Fixed Assets' },
+  { key: 'costCenters', label: 'Cost Centers' },
 ];
 
 const statusColors = {
@@ -41,6 +42,8 @@ export default function ProcurementPage() {
   const [costCenters, setCostCenters] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
+  const [ccForm, setCcForm] = useState({ name: '', code: '', departmentId: '' });
+  const [editingCc, setEditingCc] = useState(null);
 
   const [showRequisitionModal, setShowRequisitionModal] = useState(false);
   const [showPOModal, setShowPOModal] = useState(false);
@@ -51,15 +54,16 @@ export default function ProcurementPage() {
   const [assetForm, setAssetForm] = useState({ name: '', assetType: 'EQUIPMENT', acquisitionCost: '', usefulLifeYears: '5', purchaseDate: '', location: '', serialNumber: '', notes: '' });
 
   const [mutationError, setMutationError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
 
   const fetchRequisitions = useCallback(async () => {
-    try { const data = await api.get('/procurement/requisitions'); setRequisitions(data); } catch { setRequisitions([]); }
-  }, []);
+    try { const data = await api.get(`/procurement/requisitions${search ? `?q=${encodeURIComponent(search)}` : ''}`); setRequisitions(data); } catch { setRequisitions([]); }
+  }, [search]);
 
   const fetchPurchaseOrders = useCallback(async () => {
-    try { const data = await api.get('/procurement/purchase-orders'); setPurchaseOrders(data); } catch { setPurchaseOrders([]); }
-  }, []);
+    try { const data = await api.get(`/procurement/purchase-orders${search ? `?q=${encodeURIComponent(search)}` : ''}`); setPurchaseOrders(data); } catch { setPurchaseOrders([]); }
+  }, [search]);
 
   const fetchPendingApprovals = useCallback(async () => {
     try { const data = await api.get('/procurement/purchase-orders/pending-approval'); setPendingApprovals(data); } catch { setPendingApprovals([]); }
@@ -96,9 +100,11 @@ export default function ProcurementPage() {
   useEffect(() => { if (activeTab === 'purchaseOrders') fetchPurchaseOrders(); }, [activeTab, fetchPurchaseOrders]);
   useEffect(() => { if (activeTab === 'approvals') fetchPendingApprovals(); }, [activeTab, fetchPendingApprovals]);
   useEffect(() => { if (activeTab === 'assets') fetchFixedAssets(); }, [activeTab, fetchFixedAssets]);
+  useEffect(() => { if (activeTab === 'costCenters') fetchCostCenters(); }, [activeTab, fetchCostCenters]);
 
   const handleSubmitRequisition = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
     setMutationError('');
     try {
       const payload = {
@@ -113,10 +119,12 @@ export default function ProcurementPage() {
       setReqForm({ departmentId: '', notes: '', items: [] });
       fetchRequisitions();
     } catch (err) { setMutationError(err.message); }
+    setSubmitting(false);
   };
 
   const handleSubmitPO = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
     setMutationError('');
     try {
       const payload = {
@@ -131,10 +139,12 @@ export default function ProcurementPage() {
       setPoForm({ departmentType: 'pharmacy', expenseType: 'COGS', supplierId: '', costCenterId: '', notes: '', items: [] });
       fetchPurchaseOrders();
     } catch (err) { setMutationError(err.message); }
+    setSubmitting(false);
   };
 
   const handleSubmitAsset = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
     setMutationError('');
     try {
       await api.post('/procurement/assets', assetForm);
@@ -142,29 +152,40 @@ export default function ProcurementPage() {
       setAssetForm({ name: '', assetType: 'EQUIPMENT', acquisitionCost: '', usefulLifeYears: '5', purchaseDate: '', location: '', serialNumber: '', notes: '' });
       fetchFixedAssets();
     } catch (err) { setMutationError(err.message); }
+    setSubmitting(false);
   };
 
   const handleApprove = async (id) => {
+    setSubmitting(true);
     setMutationError('');
     try { await api.post(`/procurement/purchase-orders/${id}/approve`); fetchPendingApprovals(); fetchPurchaseOrders(); } catch (err) { setMutationError(err.message); }
+    setSubmitting(false);
   };
   const handleReject = async (id) => {
     const reason = prompt('Rejection reason:');
-    if (!reason) return;
+    if (!reason) { setSubmitting(false); return; }
+    setSubmitting(true);
     setMutationError('');
     try { await api.post(`/procurement/purchase-orders/${id}/reject`, { rejectionReason: reason }); fetchPendingApprovals(); fetchPurchaseOrders(); } catch (err) { setMutationError(err.message); }
+    setSubmitting(false);
   };
   const handleSubmit = async (id) => {
+    setSubmitting(true);
     setMutationError('');
     try { await api.post(`/procurement/purchase-orders/${id}/submit`); fetchPurchaseOrders(); fetchPendingApprovals(); } catch (err) { setMutationError(err.message); }
+    setSubmitting(false);
   };
   const handleReceive = async (id) => {
+    setSubmitting(true);
     setMutationError('');
     try { await api.post(`/procurement/purchase-orders/${id}/receive`, { receivedItems: [] }); fetchPurchaseOrders(); } catch (err) { setMutationError(err.message); }
+    setSubmitting(false);
   };
   const handleDepreciate = async (id) => {
+    setSubmitting(true);
     setMutationError('');
     try { await api.put(`/procurement/assets/${id}/depreciate`); fetchFixedAssets(); } catch (err) { setMutationError(err.message); }
+    setSubmitting(false);
   };
 
   const addReqLine = () => setReqForm((f) => ({ ...f, items: [...f.items, { description: '', quantity: 1, itemId: '' }] }));
@@ -202,8 +223,8 @@ export default function ProcurementPage() {
     { key: 'paymentStatus', header: 'Payment', render: (p) => p.paymentStatus === 'Paid' ? <Badge variant="success">Paid</Badge> : <Badge>{p.paymentStatus}</Badge> },
     { key: 'actions', header: 'Actions', render: (p) => (
       <div className="flex gap-1">
-        {p.status === 'DRAFT' && <Button size="sm" onClick={() => handleSubmit(p.id)}>Submit</Button>}
-        {p.status === 'APPROVED' && <Button size="sm" onClick={() => handleReceive(p.id)}>Receive</Button>}
+        {p.status === 'DRAFT' && <Button size="sm" loading={submitting} onClick={() => handleSubmit(p.id)}>Submit</Button>}
+        {p.status === 'APPROVED' && <Button size="sm" loading={submitting} onClick={() => handleReceive(p.id)}>Receive</Button>}
       </div>
     )},
   ];
@@ -218,8 +239,8 @@ export default function ProcurementPage() {
     { key: 'createdAt', header: 'Date', render: (p) => new Date(p.createdAt).toLocaleDateString() },
     { key: 'actions', header: 'Actions', render: (p) => canApprove ? (
       <div className="flex gap-1">
-        <Button size="sm" variant="primary" onClick={() => handleApprove(p.id)}>Approve</Button>
-        <Button size="sm" variant="danger" onClick={() => handleReject(p.id)}>Reject</Button>
+        <Button size="sm" variant="primary" loading={submitting} onClick={() => handleApprove(p.id)}>Approve</Button>
+        <Button size="sm" variant="danger" loading={submitting} onClick={() => handleReject(p.id)}>Reject</Button>
       </div>
     ) : null },
   ];
@@ -233,7 +254,7 @@ export default function ProcurementPage() {
     { key: 'usefulLifeYears', header: 'Life (yrs)' },
     { key: 'isActive', header: 'Active', render: (a) => a.isActive ? <Badge variant="success">Yes</Badge> : <Badge>No</Badge> },
     { key: 'actions', header: 'Actions', render: (a) => a.isActive ? (
-      <Button size="sm" variant="ghost" onClick={() => handleDepreciate(a.id)}>Depreciate</Button>
+      <Button size="sm" variant="ghost" loading={submitting} onClick={() => handleDepreciate(a.id)}>Depreciate</Button>
     ) : null },
   ];
 
@@ -302,6 +323,78 @@ export default function ProcurementPage() {
         </Card>
       )}
 
+      {activeTab === 'costCenters' && (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader><CardTitle>Add Cost Center</CardTitle></CardHeader>
+            <CardContent>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                setMutationError('');
+                setSubmitting(true);
+                try {
+                  if (editingCc) {
+                    await api.patch(`/procurement/cost-centers/${editingCc.id}`, ccForm);
+                    setEditingCc(null);
+                  } else {
+                    await api.post('/procurement/cost-centers', ccForm);
+                  }
+                  setCcForm({ name: '', code: '', departmentId: '' });
+                  fetchCostCenters();
+                } catch (err) { setMutationError(err.message); }
+                setSubmitting(false);
+              }} className="flex gap-3 items-end flex-wrap">
+                <div className="flex-1 min-w-[140px]">
+                  <label className="text-caption text-slate block mb-1">Code</label>
+                  <input required value={ccForm.code} onChange={(e) => setCcForm({ ...ccForm, code: e.target.value })}
+                    className="w-full px-3 py-2 bg-paper border border-silver rounded-lg text-body focus:outline-none focus:ring-2 focus:ring-lilac-bloom" placeholder="e.g. CC-001" />
+                </div>
+                <div className="flex-1 min-w-[180px]">
+                  <label className="text-caption text-slate block mb-1">Name</label>
+                  <input required value={ccForm.name} onChange={(e) => setCcForm({ ...ccForm, name: e.target.value })}
+                    className="w-full px-3 py-2 bg-paper border border-silver rounded-lg text-body focus:outline-none focus:ring-2 focus:ring-lilac-bloom" placeholder="Cost center name" />
+                </div>
+                <div className="flex-1 min-w-[160px]">
+                  <label className="text-caption text-slate block mb-1">Department</label>
+                  <select required value={ccForm.departmentId} onChange={(e) => setCcForm({ ...ccForm, departmentId: e.target.value })}
+                    className="w-full px-3 py-2.5 bg-paper border border-silver rounded-lg text-body focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
+                    <option value="">Select</option>
+                    {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <Button type="submit" loading={submitting}>{editingCc ? 'Update' : 'Add'}</Button>
+                  {editingCc && <Button type="button" variant="ghost" onClick={() => { setEditingCc(null); setCcForm({ name: '', code: '', departmentId: '' }); }}>Cancel</Button>}
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle>Cost Centers ({costCenters.length})</CardTitle></CardHeader>
+            <CardContent>
+              <Table columns={[
+                { key: 'code', label: 'Code' },
+                { key: 'name', label: 'Name' },
+                { key: 'dept', label: 'Department', render: (r) => r.department?.name || '-' },
+                { key: 'isActive', label: 'Active', render: (r) => <Badge variant={r.isActive ? 'success' : 'default'}>{r.isActive ? 'Yes' : 'No'}</Badge> },
+                {
+                  key: 'actions', label: '',
+                  render: (r) => (
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => { setEditingCc(r); setCcForm({ name: r.name, code: r.code, departmentId: r.departmentId || '' }); }}>Edit</Button>
+                      <Button size="sm" variant="danger" onClick={async () => {
+                        if (!confirm('Delete this cost center?')) return;
+                        try { await api.delete(`/procurement/cost-centers/${r.id}`); fetchCostCenters(); } catch (err) { setMutationError(err.message); }
+                      }}>Delete</Button>
+                    </div>
+                  ),
+                },
+              ]} data={costCenters} />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <Modal open={showRequisitionModal} onClose={() => setShowRequisitionModal(false)} title="New Requisition">
         <form onSubmit={handleSubmitRequisition} className="space-y-4">
           <select className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom" value={reqForm.departmentId} onChange={(e) => setReqForm((f) => ({ ...f, departmentId: e.target.value }))} required>
@@ -327,7 +420,7 @@ export default function ProcurementPage() {
             ))}
           </div>
 
-          <Button type="submit" className="w-full">Create Requisition</Button>
+          <Button type="submit" className="w-full" loading={submitting}>Create Requisition</Button>
         </form>
       </Modal>
 
@@ -376,7 +469,7 @@ export default function ProcurementPage() {
             )}
           </div>
 
-          <Button type="submit" className="w-full">Create Purchase Order</Button>
+          <Button type="submit" className="w-full" loading={submitting}>Create Purchase Order</Button>
         </form>
       </Modal>
 
@@ -398,7 +491,7 @@ export default function ProcurementPage() {
           <Input label="Purchase Date" type="date" value={assetForm.purchaseDate} onChange={(e) => setAssetForm((f) => ({ ...f, purchaseDate: e.target.value }))} />
           <Input label="Location" value={assetForm.location} onChange={(e) => setAssetForm((f) => ({ ...f, location: e.target.value }))} />
           <Input label="Serial Number" value={assetForm.serialNumber} onChange={(e) => setAssetForm((f) => ({ ...f, serialNumber: e.target.value }))} />
-          <Button type="submit" className="w-full">Create Asset</Button>
+          <Button type="submit" className="w-full" loading={submitting}>Create Asset</Button>
         </form>
       </Modal>
     </div>

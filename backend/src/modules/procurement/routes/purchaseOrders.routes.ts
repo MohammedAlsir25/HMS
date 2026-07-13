@@ -24,11 +24,19 @@ router.get(
   authenticate,
   requirePermission(PERMISSIONS.PURCHASE_READ),
   asyncHandler(async (req, res) => {
-    const { status, departmentType, expenseType } = req.query;
+    const { status, departmentType, expenseType, q } = req.query;
     const where: Record<string, unknown> = {};
     if (status) where.status = status;
     if (departmentType) where.departmentType = departmentType;
     if (expenseType) where.expenseType = expenseType;
+    if (q && (q as string).length >= 2) {
+      where.OR = [
+        { orderNumber: { contains: q as string, mode: 'insensitive' as const } },
+        { notes: { contains: q as string, mode: 'insensitive' as const } },
+        { supplier: { name: { contains: q as string, mode: 'insensitive' as const } } },
+        { createdBy: { fullName: { contains: q as string, mode: 'insensitive' as const } } },
+      ];
+    }
 
     const orders = await prisma.purchaseOrder.findMany({
       where,
@@ -322,7 +330,13 @@ router.post(
       }));
     }
 
-    for (const ri of receivedItems) {
+    const invItemIds = receivedItems.filter((ri) => ri.itemId).map((ri) => ri.itemId);
+    const inventoryItems = await prisma.inventoryItem.findMany({
+      where: { id: { in: invItemIds } },
+    });
+    const invItemMap = new Map(inventoryItems.map((i) => [i.id, i]));
+
+    await Promise.all(receivedItems.map(async (ri) => {
       const poItem = existing.items.find((i) => i.id === ri.itemId);
       if (!poItem) {
         throw new ValidationError(`Item ${ri.itemId} not found in purchase order`);
@@ -338,7 +352,7 @@ router.post(
       });
 
       if (ri.itemId && ri.quantityReceived > 0) {
-        const invItem = await prisma.inventoryItem.findUnique({ where: { id: ri.itemId } });
+        const invItem = invItemMap.get(ri.itemId);
         if (invItem) {
           await prisma.inventoryItem.update({
             where: { id: ri.itemId },
@@ -346,7 +360,7 @@ router.post(
           });
         }
       }
-    }
+    }));
 
     const updatedItems = await prisma.purchaseOrderItem.findMany({
       where: { orderId: req.params.id },

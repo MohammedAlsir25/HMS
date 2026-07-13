@@ -26,8 +26,13 @@ export class NotificationService {
         },
       },
     });
-    for (const user of users) {
-      await NotificationService.notify(user.id, title, message, actionUrl);
-    }
+    await prisma.notification.createMany({
+      data: users.map((user) => ({
+        userId: user.id,
+        title,
+        message,
+        actionUrl,
+      })),
+    });
   }
 }

@@ -10,8 +10,6 @@ export default function NewPatientForm({ clinics, onPatientCreated }) {
   const [form, setForm] = useState({
     fullName: '',
     phone: '',
-    nationalId: '',
-    email: '',
     dateOfBirth: '',
     gender: '',
     diabetesType: 'NONE',
@@ -19,7 +17,6 @@ export default function NewPatientForm({ clinics, onPatientCreated }) {
     notes: '',
     clinicId: clinics?.[0]?.id || '',
     visitType: 'NEW_VISIT',
-    checkInNow: true,
     collectPayment: false,
     paymentMethod: 'CASH',
   });
@@ -32,21 +29,20 @@ export default function NewPatientForm({ clinics, onPatientCreated }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.fullName.trim()) return setError(t('reception.nameRequired'));
+    if (!form.phone.trim()) return setError('Phone is required');
     setSaving(true);
     setError('');
     try {
       const patient = await api.post('/patients', {
         fullName: form.fullName,
-        phone: form.phone || undefined,
-        nationalId: form.nationalId || undefined,
-        email: form.email || undefined,
+        phone: form.phone,
         dateOfBirth: form.dateOfBirth || undefined,
         gender: form.gender || undefined,
         diabetesType: form.diabetesType,
         address: form.address || undefined,
         notes: form.notes || undefined,
       });
-      if (form.checkInNow && form.clinicId) {
+      if (form.clinicId) {
         await api.post('/reception/check-in', {
           patientId: patient.id,
           clinicId: form.clinicId,
@@ -57,9 +53,9 @@ export default function NewPatientForm({ clinics, onPatientCreated }) {
         });
       }
       setForm({
-        fullName: '', phone: '', nationalId: '', email: '', dateOfBirth: '',
+        fullName: '', phone: '', dateOfBirth: '',
         gender: '', diabetesType: 'NONE', address: '', notes: '',
-        clinicId: clinics?.[0]?.id || '', visitType: 'NEW_VISIT', checkInNow: true,
+        clinicId: clinics?.[0]?.id || '', visitType: 'NEW_VISIT',
         collectPayment: false, paymentMethod: 'CASH',
       });
       if (onPatientCreated) onPatientCreated(patient);
@@ -79,11 +75,7 @@ export default function NewPatientForm({ clinics, onPatientCreated }) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input label={t('reception.fullName')} value={form.fullName} onChange={set('fullName')} required />
           <div className="grid grid-cols-2 gap-4">
-            <Input label={t('reception.phone')} value={form.phone} onChange={set('phone')} />
-            <Input label={t('reception.nationalId')} value={form.nationalId} onChange={set('nationalId')} />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input label={t('reception.email')} type="email" value={form.email} onChange={set('email')} />
+            <Input label={t('reception.phone')} value={form.phone} onChange={set('phone')} required />
             <Input label={t('reception.dateOfBirth')} type="date" value={form.dateOfBirth} onChange={set('dateOfBirth')} />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -108,12 +100,7 @@ export default function NewPatientForm({ clinics, onPatientCreated }) {
           <Input label={t('reception.address')} value={form.address} onChange={set('address')} />
           <Input label={t('reception.notes')} value={form.notes} onChange={set('notes')} />
           <hr className="border-silver" />
-          <div className="flex items-center gap-2">
-            <input type="checkbox" id="checkInNow" checked={form.checkInNow} onChange={setBool('checkInNow')} className="rounded border-silver" />
-            <label htmlFor="checkInNow" className="text-sm text-graphite">{t('reception.checkInAfterReg')}</label>
-          </div>
-          {form.checkInNow && (
-            <div className="space-y-4">
+          <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-graphite mb-1">{t('reception.clinic')}</label>
@@ -157,10 +144,9 @@ export default function NewPatientForm({ clinics, onPatientCreated }) {
                 );
               })()}
             </div>
-          )}
           {error && <p className="text-sm text-red-500 dark:text-red-400">{error}</p>}
           <Button type="submit" disabled={saving} className="w-full">
-            {saving ? t('reception.saving') : t('reception.registerAndCheckIn')}
+            {saving ? t('reception.saving') : t('reception.registerPatient')}
           </Button>
         </form>
       </CardContent>

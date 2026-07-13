@@ -4,9 +4,9 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  directUrl    = env("DIRECT_URL")
   relationMode = "prisma"
 }
 
@@ -28,6 +28,7 @@ model User {
   enteredResults         DiagnosticOrderTest[] @relation("ResultEnterer")
   assignedOrders         DiagnosticOrder[]     @relation("OrderAssignee")
   requestedOrders        DiagnosticOrder[]     @relation("OrderRequester")
+  paidOrders             DiagnosticOrder[]     @relation("OrderPaidBy")
   employees              Employee[]
   approvedLeaves         LeaveRequest[]        @relation("LeaveApprover")
   notifications          Notification[]
@@ -40,6 +41,16 @@ model User {
   cashierTransactions    Transaction[]         @relation("Cashier")
   clinic                 Clinic?               @relation(fields: [clinicId], references: [id])
   role                   Role                  @relation(fields: [roleId], references: [id])
+  opticLabCompletedBy    OpticLabJob[]         @relation("OpticLabCompletedBy")
+  opticLabCreatedBy      OpticLabJob[]         @relation("OpticLabCreatedBy")
+  surgeryTeamMembers     SurgeryTeamMember[]
+  createdFollowUps       PostOpFollowUp[]
+  postoperativeNotes     PostoperativeNote[]
+  dischargeSummaries     DischargeSummary[]
+  inpatientVitals        InpatientVital[]
+  nursingNotes           NursingNote[]
+  wardRounds             WardRound[]
+  cashMovements          CashMovement[]
 
   @@index([isActive])
   @@index([roleId])
@@ -62,24 +73,26 @@ model Role {
 }
 
 model Clinic {
-  id               String            @id @default(uuid())
-  name             String
-  nameAr           String?
-  slug             String            @unique
-  type             ClinicType
-  isActive         Boolean           @default(true)
-  consultationFee  Decimal?
-  followUpFee      Decimal?
-  created_at       DateTime?         @default(now()) @db.Timestamptz(6)
-  updated_at       DateTime          @updatedAt @db.Timestamptz(6)
-  is_deleted       Boolean?          @default(false)
-  appointments     Appointment[]
-  clinicalRecords  ClinicalRecord[]
-  department       Department?
-  diagnosticOrders DiagnosticOrder[]
-  referralsFrom    Referral[]        @relation("FromClinic")
-  referralsTo      Referral[]        @relation("ToClinic")
-  users            User[]
+  id                            String            @id @default(uuid())
+  name                          String
+  nameAr                        String?
+  slug                          String            @unique
+  type                          ClinicType
+  isActive                      Boolean           @default(true)
+  consultationFee               Decimal?
+  followUpFee                   Decimal?
+  created_at                    DateTime?         @default(now()) @db.Timestamptz(6)
+  updated_at                    DateTime          @updatedAt @db.Timestamptz(6)
+  is_deleted                    Boolean?          @default(false)
+  optometryPreScreeningRequired Boolean           @default(false)
+  appointments                  Appointment[]
+  clinicalRecords               ClinicalRecord[]
+  departments                   Department[]
+  diagnosticOrders              DiagnosticOrder[]
+  referralsFrom                 Referral[]        @relation("FromClinic")
+  referralsTo                   Referral[]        @relation("ToClinic")
+  screeningAppointments         Appointment[]     @relation("TargetClinic")
+  users                         User[]
 
   @@index([isActive])
   @@index([is_deleted])
@@ -93,7 +106,7 @@ model Department {
   slug         String         @unique
   type         DepartmentType
   isActive     Boolean        @default(true)
-  clinicId     String?        @unique
+  clinicId     String?
   created_at   DateTime?      @default(now()) @db.Timestamptz(6)
   updated_at   DateTime       @updatedAt @db.Timestamptz(6)
   is_deleted   Boolean?       @default(false)
@@ -103,6 +116,10 @@ model Department {
   expenses     Expense[]
   requisitions Requisition[]
   transactions Transaction[]
+  surgeries    Surgery[]
+  operationTypes OperationType[]
+  preoperativeRequests PreoperativeRequest[]
+  wards        Ward[]
 
   @@index([isActive])
   @@index([is_deleted])
@@ -157,6 +174,10 @@ model Patient {
   createdBy         User              @relation("PatientCreator", fields: [createdById], references: [id])
   referrals         Referral[]
   surgeries         Surgery[]
+  preoperativeRequests PreoperativeRequest[]
+  followUps            PostOpFollowUp[]
+  beds                 Bed[]
+  transactions         Transaction[]
 
   @@index([is_deleted])
   @@index([createdAt])
@@ -182,27 +203,34 @@ model PatientFile {
 }
 
 model Appointment {
-  id          String            @id @default(uuid())
-  token       Int
-  type        AppointmentType
-  status      AppointmentStatus @default(WAITING)
-  priority    Int               @default(0)
-  notes       String?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  patientId   String
-  clinicId    String
-  doctorId    String
-  visitType   VisitType?        @default(NEW_VISIT)
-  scheduledAt DateTime?
-  clinic      Clinic            @relation(fields: [clinicId], references: [id])
-  doctor      User              @relation(fields: [doctorId], references: [id])
-  patient     Patient           @relation(fields: [patientId], references: [id])
+  id                String            @id @default(uuid())
+  token             Int
+  type              AppointmentType
+  status            AppointmentStatus @default(WAITING)
+  priority          Int               @default(0)
+  notes             String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  patientId         String
+  clinicId          String
+  doctorId          String
+  visitType         VisitType?        @default(NEW_VISIT)
+  scheduledAt       DateTime?
+  targetClinicId    String?
+  optometryRecordId String?
+  clinic            Clinic            @relation(fields: [clinicId], references: [id])
+  doctor            User              @relation(fields: [doctorId], references: [id])
+  patient           Patient           @relation(fields: [patientId], references: [id])
+  targetClinic      Clinic?           @relation("TargetClinic", fields: [targetClinicId], references: [id])
+  surgeryId         String?
+  surgery           Surgery?          @relation(fields: [surgeryId], references: [id])
+  transactions      Transaction[]
 
   @@index([status])
   @@index([clinicId])
   @@index([patientId])
   @@index([doctorId])
+  @@index([targetClinicId])
   @@index([createdAt])
   @@map("appointments")
 }
@@ -289,6 +317,8 @@ model ClinicalRecord {
   notes              String?
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
+
+  @@index([createdAt])
   patientId          String
   clinicId           String
   clinic             Clinic       @relation(fields: [clinicId], references: [id])
@@ -363,21 +393,336 @@ model ReferralTest {
 }
 
 model Surgery {
-  id        String        @id @default(uuid())
-  orRoom    Int
-  startTime DateTime
-  endTime   DateTime
-  status    SurgeryStatus @default(SCHEDULED)
-  notes     String?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  patientId String
-  patient   Patient       @relation(fields: [patientId], references: [id])
+  id                    String                @id @default(uuid())
+  orRoom                Int
+  startTime             DateTime
+  endTime               DateTime
+  status                SurgeryStatus         @default(SCHEDULED)
+  notes                 String?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  @@index([createdAt])
+  patientId             String
+  patient               Patient               @relation(fields: [patientId], references: [id])
+  departmentId          String
+  department            Department            @relation(fields: [departmentId], references: [id])
+  preoperativeRequestId String?               @unique
+  preoperativeRequest   PreoperativeRequest?  @relation(fields: [preoperativeRequestId], references: [id], onDelete: SetNull)
+  operationTypeId       String?
+  operationType         OperationType?        @relation(fields: [operationTypeId], references: [id])
+  anesthesiaType        String?
+  disposition           SurgeryDisposition    @default(PENDING)
+  admittedWardId        String?
+  admittedWard          Ward?                 @relation(fields: [admittedWardId], references: [id])
+  appointments          Appointment[]
+  beds                  Bed[]
+  teamMembers           SurgeryTeamMember[]
+  intraoperativeEvents  IntraoperativeEvent[]
+  followUps             PostOpFollowUp[]
+  postoperativeNotes    PostoperativeNote[]
+  dischargeSummary      DischargeSummary?
+  transactions          Transaction[]
 
   @@index([status])
   @@index([patientId])
+  @@index([departmentId])
   @@index([startTime])
   @@map("surgeries")
+}
+
+model PostOpFollowUp {
+  id          String              @id @default(uuid())
+  surgeryId   String
+  patientId   String
+  scheduledAt DateTime
+  status      PostOpFollowUpStatus @default(SCHEDULED)
+  completedAt DateTime?
+  notes       String?
+  createdById String
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  surgery     Surgery             @relation(fields: [surgeryId], references: [id], onDelete: Cascade)
+  patient     Patient             @relation(fields: [patientId], references: [id])
+  createdBy   User                @relation(fields: [createdById], references: [id])
+
+  @@index([surgeryId])
+  @@index([patientId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@map("post_op_follow_ups")
+}
+
+model PostoperativeNote {
+  id        String   @id @default(uuid())
+  surgeryId String
+  content   String
+  createdById String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  surgery   Surgery  @relation(fields: [surgeryId], references: [id], onDelete: Cascade)
+  createdBy User     @relation(fields: [createdById], references: [id])
+
+  @@index([surgeryId])
+  @@map("postoperative_notes")
+}
+
+model DischargeSummary {
+  id            String   @id @default(uuid())
+  surgeryId     String   @unique
+  dischargeDate DateTime
+  dischargeNotes String?
+  medications   String?
+  followUpInstructions String?
+  createdById   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  surgery       Surgery  @relation(fields: [surgeryId], references: [id], onDelete: Cascade)
+  createdBy     User     @relation(fields: [createdById], references: [id])
+
+  @@index([surgeryId])
+  @@map("discharge_summaries")
+}
+
+model OperationType {
+  id           String     @id @default(uuid())
+  name         String
+  nameAr       String?
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  isActive     Boolean    @default(true)
+  price        Decimal?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  is_deleted   Boolean?   @default(false)
+  surgeries    Surgery[]
+  preoperativeRequests PreoperativeRequest[]
+
+  @@index([isActive])
+  @@index([is_deleted])
+  @@index([departmentId])
+  @@map("operation_types")
+}
+
+model ORRole {
+  id          String               @id @default(uuid())
+  name        String
+  isActive    Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  is_deleted  Boolean?             @default(false)
+  teamMembers SurgeryTeamMember[]
+
+  @@index([isActive])
+  @@index([is_deleted])
+  @@map("or_roles")
+}
+
+model PreoperativeRequest {
+  id               String              @id @default(uuid())
+  departmentId     String
+  patientId        String
+  requestedById    String
+  operationTypeId  String
+  status           PreoperativeStatus  @default(REQUESTED)
+  confirmedById    String?
+  confirmedAt      DateTime?
+  paidAt           DateTime?
+  paidById         String?
+  labOrderId       String?
+  aScanOrderId     String?
+  bScanOrderId     String?
+  scheduledDate    DateTime?
+  scheduledTime    String?
+  scheduledById    String?
+  cancelledReason  String?
+  cancelledById    String?
+  cancelledAt      DateTime?
+  flaggedReason    String?
+  referredTo       String?
+  notes            String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  department       Department          @relation(fields: [departmentId], references: [id])
+  patient          Patient             @relation(fields: [patientId], references: [id])
+  operationType    OperationType       @relation(fields: [operationTypeId], references: [id])
+  surgery          Surgery?
+  waiver           ConsentWaiver?
+
+  @@index([status])
+  @@index([patientId])
+  @@index([departmentId])
+  @@index([operationTypeId])
+  @@index([createdAt])
+  @@map("preoperative_requests")
+}
+
+model ConsentWaiver {
+  id                    String               @id @default(uuid())
+  preoperativeRequestId String               @unique
+  signedBy              String
+  relationship          RelationshipType
+  signedAt              DateTime
+  documentUrl           String?
+  witnessedById         String?
+  isPrintable           Boolean              @default(true)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  preoperativeRequest   PreoperativeRequest  @relation(fields: [preoperativeRequestId], references: [id])
+
+  @@index([preoperativeRequestId])
+  @@map("consent_waivers")
+}
+
+model SurgeryTeamMember {
+  id        String   @id @default(uuid())
+  surgeryId String
+  userId    String?
+  name      String
+  roleId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  surgery   Surgery  @relation(fields: [surgeryId], references: [id], onDelete: Cascade)
+  role      ORRole   @relation(fields: [roleId], references: [id])
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([surgeryId])
+  @@index([roleId])
+  @@index([userId])
+  @@map("surgery_team_members")
+}
+
+model IntraoperativeEventType {
+  id         String                    @id @default(uuid())
+  name       String
+  isActive   Boolean                   @default(true)
+  createdAt  DateTime                  @default(now())
+  updatedAt  DateTime                  @updatedAt
+  is_deleted Boolean?                  @default(false)
+  events     IntraoperativeEvent[]
+
+  @@index([isActive])
+  @@index([is_deleted])
+  @@map("intraoperative_event_types")
+}
+
+model IntraoperativeEvent {
+  id             String                  @id @default(uuid())
+  surgeryId      String
+  timestamp      DateTime                @default(now())
+  eventTypeId    String
+  description    String?
+  performedById  String
+  createdAt      DateTime                @default(now())
+  surgery        Surgery                 @relation(fields: [surgeryId], references: [id], onDelete: Cascade)
+  eventType      IntraoperativeEventType @relation(fields: [eventTypeId], references: [id])
+
+  @@index([surgeryId])
+  @@index([eventTypeId])
+  @@index([timestamp])
+  @@map("intraoperative_events")
+}
+
+model Ward {
+  id           String     @id @default(uuid())
+  name         String
+  nameAr       String?
+  type         String?
+  floor        String?
+  capacity     Int?
+  departmentId String?
+  isActive     Boolean    @default(true)
+  dailyRate    Decimal?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  is_deleted   Boolean?   @default(false)
+  department        Department? @relation(fields: [departmentId], references: [id])
+  beds              Bed[]
+  admittedSurgeries Surgery[]
+  wardRounds        WardRound[]
+
+  @@index([isActive])
+  @@index([is_deleted])
+  @@index([departmentId])
+  @@map("wards")
+}
+
+model Bed {
+  id           String    @id @default(uuid())
+  bedNumber    String
+  wardId       String
+  status       BedStatus @default(VACANT)
+  patientId    String?
+  surgeryId    String?
+  assignedAt   DateTime?
+  dischargedAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  ward         Ward      @relation(fields: [wardId], references: [id])
+  patient      Patient?  @relation(fields: [patientId], references: [id])
+  surgery      Surgery?  @relation(fields: [surgeryId], references: [id])
+  vitals       InpatientVital[]
+  nursingNotes NursingNote[]
+
+  @@index([wardId])
+  @@index([status])
+  @@index([patientId])
+  @@index([surgeryId])
+  @@map("beds")
+}
+
+model InpatientVital {
+  id              String   @id @default(uuid())
+  bedId           String
+  recordedAt      DateTime @default(now())
+  temperature     Decimal?
+  heartRate       Int?
+  bloodPressureSystolic Int?
+  bloodPressureDiastolic Int?
+  respiratoryRate Int?
+  oxygenSaturation Int?
+  painScore       Int?
+  recordedById    String
+  notes           String?
+  createdAt       DateTime @default(now())
+  bed             Bed      @relation(fields: [bedId], references: [id], onDelete: Cascade)
+  recordedBy      User     @relation(fields: [recordedById], references: [id])
+
+  @@index([bedId])
+  @@index([recordedAt])
+  @@map("inpatient_vitals")
+}
+
+model NursingNote {
+  id         String   @id @default(uuid())
+  bedId      String
+  content    String
+  createdById String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  bed        Bed      @relation(fields: [bedId], references: [id], onDelete: Cascade)
+  createdBy  User     @relation(fields: [createdById], references: [id])
+
+  @@index([bedId])
+  @@index([createdAt])
+  @@map("nursing_notes")
+}
+
+model WardRound {
+  id          String   @id @default(uuid())
+  wardId      String
+  date        DateTime
+  doctorId    String
+  notes       String?
+  plan        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  ward        Ward     @relation(fields: [wardId], references: [id], onDelete: Cascade)
+  doctor      User     @relation(fields: [doctorId], references: [id])
+
+  @@index([wardId])
+  @@index([date])
+  @@map("ward_rounds")
 }
 
 model InventoryItem {
@@ -441,50 +786,120 @@ model InventoryTransaction {
 }
 
 model Transaction {
-  id            String          @id @default(uuid())
-  type          TransactionType
-  amount        Decimal
-  paymentMethod PaymentMethod
-  description   String?
-  createdAt     DateTime        @default(now())
-  shiftId       String
-  cashierId     String
-  cogs          Decimal         @default(0)
-  departmentId  String?
-  updated_at    DateTime        @updatedAt @db.Timestamptz(6)
-  is_deleted    Boolean?        @default(false)
-  cashier       User            @relation("Cashier", fields: [cashierId], references: [id])
-  department    Department?     @relation(fields: [departmentId], references: [id])
-  shift         Shift           @relation(fields: [shiftId], references: [id])
+  id             String          @id @default(uuid())
+  type           TransactionType
+  amount         Decimal
+  paymentMethod  PaymentMethod
+  description    String?
+  createdAt      DateTime        @default(now())
+  shiftId        String
+  cashierId      String
+  cogs           Decimal         @default(0)
+  departmentId   String?
+  patientId      String?
+  surgeryId      String?
+  diagnosticOrderId String?
+  appointmentId  String?
+  imagingOrderId String?
+  updated_at     DateTime        @updatedAt @db.Timestamptz(6)
+  is_deleted     Boolean?        @default(false)
+  cashier        User            @relation("Cashier", fields: [cashierId], references: [id])
+  department     Department?     @relation(fields: [departmentId], references: [id])
+  shift          Shift           @relation(fields: [shiftId], references: [id])
+  patient        Patient?        @relation(fields: [patientId], references: [id])
+  surgery        Surgery?        @relation(fields: [surgeryId], references: [id])
+  diagnosticOrder DiagnosticOrder? @relation(fields: [diagnosticOrderId], references: [id])
+  appointment    Appointment?    @relation(fields: [appointmentId], references: [id])
+  imagingOrder   ImagingOrder?   @relation(fields: [imagingOrderId], references: [id])
+  opticLabJob    OpticLabJob?
 
   @@index([type])
   @@index([paymentMethod])
   @@index([shiftId])
   @@index([cashierId])
   @@index([departmentId])
+  @@index([patientId])
+  @@index([surgeryId])
+  @@index([diagnosticOrderId])
+  @@index([appointmentId])
+  @@index([imagingOrderId])
   @@index([is_deleted])
   @@index([createdAt])
   @@map("transactions")
 }
 
-model Shift {
-  id            String        @id @default(uuid())
-  openedAt      DateTime      @default(now())
-  closedAt      DateTime?
-  expectedTotal Decimal?
-  actualTotal   Decimal?
+model OpticLabJob {
+  id            String      @id @default(uuid())
+  jobNumber     String      @unique
+  status        String      @default("NEW")
+  transactionId String      @unique
+  sphOD         String?
+  cylOD         String?
+  axisOD        String?
+  sphOS         String?
+  cylOS         String?
+  axisOS        String?
+  frameName     String?
+  frameSku      String?
+  frameItemId   String?
+  lensType      String?
+  lensMaterial  String?
+  coating       String?
   notes         String?
-  userId        String
-  created_at    DateTime?     @default(now()) @db.Timestamptz(6)
-  updated_at    DateTime      @updatedAt @db.Timestamptz(6)
-  is_deleted    Boolean?      @default(false)
-  user          User          @relation(fields: [userId], references: [id])
-  transactions  Transaction[]
+  createdAt     DateTime    @default(now())
+
+  @@index([createdAt])
+  startedAt     DateTime?
+  completedAt   DateTime?
+  completedById String?
+  createdById   String?
+  customerName  String?
+  customerPhone String?
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  completedBy   User?       @relation("OpticLabCompletedBy", fields: [completedById], references: [id])
+  createdBy     User?       @relation("OpticLabCreatedBy", fields: [createdById], references: [id])
+
+  @@index([status])
+  @@map("optic_lab_jobs")
+}
+
+model Shift {
+  id              String        @id @default(uuid())
+  openedAt        DateTime      @default(now())
+  closedAt        DateTime?
+  openingBalance  Decimal?      @default(0)
+  expectedTotal   Decimal?
+  actualTotal     Decimal?
+  denominations   Json?
+  notes           String?
+  userId          String
+  created_at      DateTime?     @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime      @updatedAt @db.Timestamptz(6)
+  is_deleted      Boolean?      @default(false)
+  user            User          @relation(fields: [userId], references: [id])
+  transactions    Transaction[]
+  cashMovements   CashMovement[]
 
   @@index([userId])
   @@index([is_deleted])
   @@index([openedAt])
   @@map("shifts")
+}
+
+model CashMovement {
+  id        String   @id @default(uuid())
+  shiftId   String
+  shift     Shift    @relation(fields: [shiftId], references: [id])
+  type      String   // PICKUP | DROP | ADJUSTMENT
+  amount    Decimal
+  reason    String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([shiftId])
+  @@map("cash_movements")
 }
 
 model DiagnosticTest {
@@ -562,6 +977,9 @@ model DiagnosticOrder {
   assignedToId  String?
   panelId       String?
   referralId    String?
+  paid          Boolean               @default(false)
+  paidAt        DateTime?
+  paidById      String?
   tests         DiagnosticOrderTest[]
   assignedTo    User?                 @relation("OrderAssignee", fields: [assignedToId], references: [id])
   fromClinic    Clinic                @relation(fields: [fromClinicId], references: [id])
@@ -569,6 +987,8 @@ model DiagnosticOrder {
   patient       Patient               @relation(fields: [patientId], references: [id])
   referral      Referral?             @relation(fields: [referralId], references: [id])
   requestedBy   User                  @relation("OrderRequester", fields: [requestedById], references: [id])
+  paidBy        User?                 @relation("OrderPaidBy", fields: [paidById], references: [id])
+  transactions  Transaction[]
 
   @@index([status])
   @@index([patientId])
@@ -577,6 +997,8 @@ model DiagnosticOrder {
   @@index([requestedById])
   @@index([orderType])
   @@index([createdAt])
+  @@index([paid])
+  @@index([paidById])
   @@map("diagnostic_orders")
 }
 
@@ -979,6 +1401,67 @@ model CrashLog {
   @@map("crash_logs")
 }
 
+model ImagingProcedureType {
+  id         String   @id @default(uuid())
+  name       String
+  nameAr     String?
+  scanType   ImagingScanType @unique
+  price      Decimal?
+  isActive   Boolean  @default(true)
+  is_deleted Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  orders     ImagingOrder[]
+
+  @@index([scanType])
+  @@index([isActive])
+  @@map("imaging_procedure_types")
+}
+
+model ImagingOrder {
+  id                  String             @id @default(uuid())
+  referralId          String?            @unique
+  patientId           String
+  requestedByClinicId String
+  clinicId            String
+  scanType            ImagingScanType
+  laterality          String?
+  clinicalInfo        String?
+  status              ImagingOrderStatus @default(PENDING)
+  findings            String?
+  impression          String?
+  createdById         String
+  completedById       String?
+  clinicalRecordId    String?
+  procedureTypeId     String?
+  price               Decimal?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  completedAt         DateTime?
+  procedureType       ImagingProcedureType? @relation(fields: [procedureTypeId], references: [id])
+  transactions        Transaction[]
+
+  @@index([patientId])
+  @@index([clinicId])
+  @@index([status])
+  @@index([procedureTypeId])
+  @@index([createdAt])
+  @@map("imaging_orders")
+}
+
+model ImagingFile {
+  id             String   @id @default(uuid())
+  imagingOrderId String
+  originalName   String
+  storedPath     String
+  mimeType       String
+  size           Int
+  createdAt      DateTime @default(now())
+
+  @@index([imagingOrderId])
+  @@map("imaging_files")
+}
+
 enum ClinicType {
   MEDICINE
   ENT
@@ -989,6 +1472,7 @@ enum ClinicType {
   PEDS_OPHTH
   GEN_OPHTH
   OPTOMETRY
+  IMAGING
 }
 
 enum AppointmentType {
@@ -1041,11 +1525,47 @@ enum SurgeryStatus {
   CANCELLED
 }
 
+enum SurgeryDisposition {
+  PENDING
+  DISCHARGE_HOME
+  ADMIT_WARD
+}
+
+enum PreoperativeStatus {
+  REQUESTED
+  CONFIRMED
+  PAYMENT_DONE
+  INVESTIGATIONS_DONE
+  SCHEDULED
+  CANCELLED
+  WAITING
+  IN_PROGRESS
+  CLEARED
+  FLAGGED
+}
+
+enum BedStatus {
+  VACANT
+  OCCUPIED
+  RESERVED
+  MAINTENANCE
+}
+
+enum RelationshipType {
+  SELF
+  PARENT
+  GUARDIAN
+}
+
 enum TransactionType {
   RECEPTION
   PHARMACY
   OPTICS
   LAB
+  WARD
+  SURGERY
+  IMAGING
+  PREOP
 }
 
 enum PaymentMethod {
@@ -1066,6 +1586,7 @@ enum DepartmentType {
   IT
   NURSING
   OTHER
+  IMAGING
 }
 
 enum ExpenseCategory {
@@ -1131,4 +1652,24 @@ enum PaymentStatus {
   PaidInFull
   PartialPayment
   Pending
+}
+
+enum ImagingScanType {
+  A_SCAN
+  B_SCAN
+  OTT
+  BIOMETRY
+}
+
+enum PostOpFollowUpStatus {
+  SCHEDULED
+  COMPLETED
+  MISSED
+}
+
+enum ImagingOrderStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  DISMISSED
 }

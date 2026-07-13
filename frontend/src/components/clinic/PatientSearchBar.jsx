@@ -1,18 +1,18 @@
 import { useRef } from 'react';
 import { Input } from '../ui/Input';
 
-export default function PatientSearchBar({ query, onSearch, results, loading, onSelect, onClear }) {
+export default function PatientSearchBar({ query, onSearch, results, loading, onSelect, onClear, className = '' }) {
   const ref = useRef(null);
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className={`relative w-full ${className}`}>
       <div className="relative">
         <Input
           label="Search Patient"
           placeholder="Search by name, MRN, phone or national ID..."
           value={query}
           onChange={(e) => onSearch(e.target.value)}
-          className="pr-10"
+          className="pr-10 w-full min-w-[320px]"
         />
         {query && (
           <button
@@ -31,7 +31,7 @@ export default function PatientSearchBar({ query, onSearch, results, loading, on
         </div>
       )}
       {results.length > 0 && (
-        <div className="absolute z-10 w-full mt-1 bg-paper border border-silver rounded-lg shadow-md max-h-60 overflow-y-auto">
+        <div className="absolute z-10 w-full mt-1 bg-paper border border-silver rounded-lg shadow-md max-h-96 overflow-y-auto">
           {results.map((p) => (
             <button
               key={p.id}

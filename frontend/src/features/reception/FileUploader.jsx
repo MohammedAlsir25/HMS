@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { notifyError } from '../../utils/notify';
 import { api } from '../../lib/api';
 
 export default function FileUploader({ patientId, patientName }) {
@@ -16,7 +17,7 @@ export default function FileUploader({ patientId, patientName }) {
     try {
       const data = await api.get(`/patients/${patientId}/files`);
       setFiles(data);
-    } catch (err) { console.error('[FileUploader]', err); }
+    } catch (err) { notifyError(err); }
   };
 
   useEffect(() => { fetchFiles(); }, [patientId]);
@@ -30,7 +31,7 @@ export default function FileUploader({ patientId, patientName }) {
       for (const f of selected) formData.append('files', f);
       await api.upload(`/patients/${patientId}/files`, formData);
       fetchFiles();
-    } catch (err) { console.error('[FileUploader]', err); }
+    } catch (err) { notifyError(err); }
     finally { setUploading(false); if (inputRef.current) inputRef.current.value = ''; }
   };
 

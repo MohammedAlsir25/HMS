@@ -2,6 +2,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { usePOSItems, posKeys } from '../../hooks/queries/usePOS';
 import { useReferrals } from '../../hooks/queries/useReferrals';
+import { useCreateLabJob } from '../../hooks/queries/useOpticLab';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
@@ -10,7 +11,9 @@ import { StripCounter } from '../../components/ui/StripCounter';
 import { api } from '../../lib/api';
 import OpticsProducts from './OpticsProducts';
 import SuppliersTab from './SuppliersTab';
+import OpticLabJobsTab from './OpticLabJobsTab';
 import { printReceipt } from '../../lib/printReceipt';
+import { notifyError } from '../../utils/notify';
 
 const paymentMethods = [
   { value: 'CASH', label: 'Cash' },
@@ -25,13 +28,21 @@ export default function OpticsPOS() {
   const [search, setSearch] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [patientName, setPatientName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [rxDetails, setRxDetails] = useState({ sph: '', cyl: '', axis: '' });
   const [completing, setCompleting] = useState(false);
   const [receipt, setReceipt] = useState(null);
   const [receiptItems, setReceiptItems] = useState([]);
   const [activeTab, setActiveTab] = useState('sale');
   const [activeReferralId, setActiveReferralId] = useState(null);
+  const [createLabJob, setCreateLabJob] = useState(false);
+  const [creatingLabJob, setCreatingLabJob] = useState(false);
+  const [lastPatientName, setLastPatientName] = useState('');
+  const [lastCustomerPhone, setLastCustomerPhone] = useState('');
+  const [lastRxDetails, setLastRxDetails] = useState({ sph: '', cyl: '', axis: '' });
   const [error, setError] = useState('');
+
+  const createLabJobMutation = useCreateLabJob();
 
   const { data: items = [], isLoading } = usePOSItems('optics');
   const { data: referrals = [], isLoading: referralsLoading } = useReferrals(activeTab === 'referrals' ? 'type=OPTICS_DISPATCH&status=PENDING' : null);
@@ -82,15 +93,43 @@ export default function OpticsPOS() {
         price: Number(c.price),
         total: Number(c.price) * c.quantity,
       })));
+      setLastPatientName(patientName);
+      setLastCustomerPhone(customerPhone);
+      setLastRxDetails(rxDetails);
       setCart([]);
       setPatientName('');
+      setCustomerPhone('');
       setPaymentMethod('CASH');
       setRxDetails({ sph: '', cyl: '', axis: '' });
       setActiveReferralId(null);
       queryClient.invalidateQueries({ queryKey: posKeys.items('optics') });
     } catch (err) { console.error('[OpticsPOS]', err); setError(err.message || 'Transaction failed'); }
     setCompleting(false);
-  }, [cart, paymentMethod, total, patientName, rxDetails]);
+  }, [cart, paymentMethod, total, patientName, customerPhone, rxDetails]);
+
+  const handleCreateLabJob = useCallback(async () => {
+    if (!receipt) return;
+    setCreatingLabJob(true);
+    try {
+      const frameItem = receiptItems[0];
+      await createLabJobMutation.mutateAsync({
+        transactionId: receipt.id,
+        customerName: lastPatientName,
+        customerPhone: lastCustomerPhone,
+        sphOD: lastRxDetails.sph || null,
+        cylOD: lastRxDetails.cyl || null,
+        axisOD: lastRxDetails.axis || null,
+        frameName: frameItem?.name || null,
+      });
+      setActiveTab('lab');
+      setReceipt(null);
+      setReceiptItems([]);
+      setError('');
+    } catch (err) {
+      notifyError(err);
+    }
+    setCreatingLabJob(false);
+  }, [receipt, receiptItems, lastPatientName, lastCustomerPhone, lastRxDetails, createLabJobMutation]);
 
   if (receipt) {
     return (
@@ -146,6 +185,11 @@ export default function OpticsPOS() {
                 transaction: receipt,
                 items: receiptItems.map((it) => ({ name: it.name, quantity: it.quantity, price: it.price, total: it.total })),
               })}>Print Receipt</Button>
+              {createLabJob && (
+                <Button className="flex-1" variant="secondary" onClick={handleCreateLabJob} loading={creatingLabJob}>
+                  Create Lab Job
+                </Button>
+              )}
               <Button className="flex-1" onClick={() => { setReceipt(null); setReceiptItems([]); setError(''); }}>New Sale</Button>
             </div>
           </CardContent>
@@ -183,6 +227,8 @@ export default function OpticsPOS() {
           onClick={() => setActiveTab('products')}>Products</button>
         <button className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'suppliers' ? 'border-b-2 border-lilac-bloom text-obsidian' : 'text-slate hover:text-obsidian'}`}
           onClick={() => setActiveTab('suppliers')}>Suppliers</button>
+        <button className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'lab' ? 'border-b-2 border-lilac-bloom text-obsidian' : 'text-slate hover:text-obsidian'}`}
+          onClick={() => setActiveTab('lab')}>Lab</button>
       </div>
 
       {activeTab === 'suppliers' ? <SuppliersTab category="optics" /> : null}
@@ -213,6 +259,7 @@ export default function OpticsPOS() {
         </Card>
       ) : null}
       {activeTab === 'products' ? <OpticsProducts /> : null}
+      {activeTab === 'lab' ? <OpticLabJobsTab /> : null}
       {activeTab === 'sale' ? (
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -243,7 +290,7 @@ export default function OpticsPOS() {
                         <p className="text-body text-obsidian truncate">{item.name}</p>
                         <p className="text-caption text-slate">{item.sku} · Stock: {item.quantity}</p>
                       </div>
-                      <span className="text-body font-medium text-obsidian shrink-0 ml-2">SDG ${Number(item.price).toFixed(2)}</span>
+                      <span className="text-body font-medium text-obsidian shrink-0 ml-2">SDG {Number(item.price).toFixed(2)}</span>
                     </div>
                     );
                   })}
@@ -270,7 +317,7 @@ export default function OpticsPOS() {
                     </button>
                   </div>
                   <div className="flex items-center gap-3 mt-2">
-                    <span className="text-caption text-slate whitespace-nowrap">SDG ${c.price.toFixed(2)} each</span>
+                    <span className="text-caption text-slate whitespace-nowrap">SDG {c.price.toFixed(2)} each</span>
                     <StripCounter
                       value={c.quantity}
                       min={1}
@@ -283,7 +330,7 @@ export default function OpticsPOS() {
                 <div className="pt-2 border-t border-silver">
                   <div className="flex justify-between text-body font-semibold">
                     <span>Total</span>
-                    <span>SDG ${total.toFixed(2)}</span>
+                    <span>SDG {total.toFixed(2)}</span>
                   </div>
                 </div>
               )}
@@ -296,12 +343,17 @@ export default function OpticsPOS() {
                 <CardTitle>Prescription & Payment</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Input label="Patient Name" value={patientName} onChange={(e) => setPatientName(e.target.value)} placeholder="Optional" />
+                <Input label="Customer Name" value={patientName} onChange={(e) => setPatientName(e.target.value)} placeholder="Optional" />
+                <Input label="Phone Number" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="Optional" />
                 <div className="grid grid-cols-3 gap-2">
                   <Input label="SPH" value={rxDetails.sph} onChange={(e) => setRxDetails((r) => ({ ...r, sph: e.target.value }))} placeholder="0.00" />
                   <Input label="CYL" value={rxDetails.cyl} onChange={(e) => setRxDetails((r) => ({ ...r, cyl: e.target.value }))} placeholder="0.00" />
                   <Input label="AXIS" value={rxDetails.axis} onChange={(e) => setRxDetails((r) => ({ ...r, axis: e.target.value }))} placeholder="0" />
                 </div>
+                <label className="flex items-center gap-2 text-sm text-graphite cursor-pointer">
+                  <input type="checkbox" checked={createLabJob} onChange={(e) => setCreateLabJob(e.target.checked)} className="accent-lilac-bloom" />
+                  Create lab job after sale
+                </label>
                 <div>
                   <label className="text-sm font-medium text-graphite block mb-1">Method</label>
                   <div className="flex gap-2 flex-wrap">

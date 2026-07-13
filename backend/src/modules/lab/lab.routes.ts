@@ -6,6 +6,7 @@ import { validate } from '../../middleware/validate.js';
 import { createOrderSchema, createTestSchema } from '../../schemas/lab.schema.js';
 import { ValidationError, NotFoundError } from '../../utils/errors.js';
 import { PERMISSIONS } from '../../middleware/rbac.js';
+import { auditMiddleware } from '../../middleware/auditLog.js';
 
 const router = Router();
 import prisma from '../../lib/prisma.js';
@@ -117,12 +118,17 @@ router.delete('/panels/:id', authenticate, requirePermission(PERMISSIONS.DIAGNOS
 }));
 
 router.get('/orders', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_READ), asyncHandler(async (req, res) => {
-  const { status, patientId, fromClinicId, search } = req.query as Record<string, string>;
+  const { status, patientId, fromClinicId, search, pendingPayment } = req.query as Record<string, string>;
   const where: Record<string, unknown> = { orderType: 'LAB' as const };
   if (status) where.status = status;
   if (patientId) where.patientId = patientId;
   if (fromClinicId) where.fromClinicId = fromClinicId;
   if (search) where.patient = { fullName: { contains: search, mode: 'insensitive' as const } };
+  if (pendingPayment === 'true') {
+    where.paid = false;
+  } else {
+    where.paid = true;
+  }
   const orders = await prisma.diagnosticOrder.findMany({
     where: where as Prisma.DiagnosticOrderWhereInput,
     include: ORDER_INCLUDE,
@@ -170,6 +176,9 @@ router.post('/orders', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_O
 }));
 
 router.patch('/orders/:id/claim', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_WRITE), asyncHandler(async (req, res) => {
+  const existing = await prisma.diagnosticOrder.findUnique({ where: { id: req.params.id } });
+  if (!existing) throw new NotFoundError('Order not found');
+  if (!existing.paid) throw new ValidationError('Order must be paid before it can be claimed');
   const order = await prisma.diagnosticOrder.update({
     where: { id: req.params.id },
     data: { status: 'IN_PROGRESS', assignedToId: req.user!.id },
@@ -203,6 +212,18 @@ router.patch('/orders/:id/status', authenticate, requirePermission(PERMISSIONS.D
     await prisma.referral.update({
       where: { id: order.referralId! },
       data: { status: 'FULFILLED' },
+    });
+    const clinicUsers = await prisma.user.findMany({
+      where: { clinicId: order.fromClinicId, isActive: true },
+    });
+    const patientName = order.patient?.fullName || 'Patient';
+    await prisma.notification.createMany({
+      data: clinicUsers.map((user) => ({
+        userId: user.id,
+        title: 'Lab Results Ready',
+        message: `Lab results are ready for ${patientName}`,
+        actionUrl: `/clinics/${order.fromClinic?.slug || order.fromClinicId}`,
+      })),
     });
   }
   res.json(order);
@@ -243,6 +264,18 @@ router.put('/orders/:id/results', authenticate, requirePermission(PERMISSIONS.DI
       where: { id: updated.referralId },
       data: { status: 'FULFILLED' },
     });
+    const clinicUsers = await prisma.user.findMany({
+      where: { clinicId: updated.fromClinicId, isActive: true },
+    });
+    const patientName = updated.patient?.fullName || 'Patient';
+    await prisma.notification.createMany({
+      data: clinicUsers.map((user) => ({
+        userId: user.id,
+        title: 'Lab Results Ready',
+        message: `Lab results are ready for ${patientName}`,
+        actionUrl: `/clinics/${updated.fromClinic?.slug || updated.fromClinicId}`,
+      })),
+    });
   }
   res.json(updated);
 }));
@@ -274,7 +307,7 @@ router.get('/orders/:id/report', authenticate, requirePermission(PERMISSIONS.DIA
   res.json(order);
 }));
 
-router.post('/checkout', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_ORDER), asyncHandler(async (req, res) => {
+router.post('/checkout', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_ORDER), auditMiddleware('LAB_CHECKOUT', 'Transaction'), asyncHandler(async (req, res) => {
   const { orderIds, paymentMethod } = req.body;
   if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
     throw new ValidationError('orderIds array is required');
@@ -287,6 +320,12 @@ router.post('/checkout', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS
     include: { tests: { include: { test: true } } },
   });
   if (orders.length === 0) throw new NotFoundError('No orders found');
+
+  const alreadyPaid = orders.filter((o) => o.paid);
+  if (alreadyPaid.length > 0) {
+    throw new ValidationError(`Order(s) already paid: ${alreadyPaid.map((o) => o.id.slice(0, 8)).join(', ')}`);
+  }
+
   let totalAmount = 0;
   const descriptions = [];
   for (const order of orders) {
@@ -295,19 +334,27 @@ router.post('/checkout', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS
     }
     descriptions.push(`Order ${order.id.slice(0, 8)}`);
   }
-  let shift = await prisma.shift.findFirst({ where: { closedAt: null } });
+  let shift = await prisma.shift.findFirst({ where: { userId: req.user!.id, closedAt: null } });
   if (!shift) {
     shift = await prisma.shift.create({ data: { userId: req.user!.id } });
   }
   const labDept = await prisma.department.findUnique({ where: { slug: 'lab-dept' } });
-  const transaction = await prisma.transaction.create({
-    data: {
-      type: 'LAB', amount: totalAmount, paymentMethod,
-      description: `Lab billing: ${descriptions.join(', ')}`,
-      shiftId: shift.id, cashierId: req.user!.id, departmentId: labDept?.id || null,
-    },
-    include: { department: { select: { id: true, name: true, slug: true } } },
-  });
+  const [transaction] = await prisma.$transaction([
+    prisma.transaction.create({
+      data: {
+        type: 'LAB', amount: totalAmount, paymentMethod,
+        description: `Lab billing: ${descriptions.join(', ')}`,
+        shiftId: shift.id, cashierId: req.user!.id, departmentId: labDept?.id || null,
+      },
+      include: { department: { select: { id: true, name: true, slug: true } } },
+    }),
+    ...orders.map((order) =>
+      prisma.diagnosticOrder.update({
+        where: { id: order.id },
+        data: { paid: true, paidAt: new Date(), paidById: req.user!.id },
+      })
+    ),
+  ]);
   res.status(201).json({ transaction, totalAmount, orderCount: orders.length });
 }));
 

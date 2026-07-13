@@ -3,7 +3,6 @@ import { authenticate, requirePermission } from '../../../middleware/auth.js';
 import { asyncHandler } from '../../../middleware/errorHandler.js';
 import { validate } from '../../../middleware/validate.js';
 import { createPatientSchema } from '../../../schemas/reception.schema.js';
-import { ConflictError } from '../../../utils/errors.js';
 import { PERMISSIONS } from '../../../middleware/rbac.js';
 import prisma from '../../../lib/prisma.js';
 import { generateMRN } from '../reception.utils.js';
@@ -29,19 +28,13 @@ router.get('/search', authenticate, requirePermission(PERMISSIONS.PATIENT_READ),
 }));
 
 router.post('/patients', authenticate, requirePermission(PERMISSIONS.PATIENT_CREATE), validate(createPatientSchema), asyncHandler(async (req, res) => {
-  const { fullName, phone, nationalId, email, dateOfBirth, gender, diabetesType, address, notes } = req.body;
-  if (nationalId) {
-    const existing = await prisma.patient.findUnique({ where: { nationalId } });
-    if (existing) throw new ConflictError('Patient with this national ID already exists');
-  }
+  const { fullName, phone, dateOfBirth, gender, diabetesType, address, notes } = req.body;
   const mrn = generateMRN();
   const patient = await prisma.patient.create({
     data: {
       mrn,
       fullName,
-      phone: phone || null,
-      nationalId: nationalId || null,
-      email: email || null,
+      phone,
       dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
       gender: gender || null,
       diabetesType: diabetesType || 'NONE',

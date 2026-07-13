@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import CrossReferralModal from '../referral/CrossReferralModal';
 import ClinicDashboardShell, { ClinicSection, StatCard } from '../../components/clinic/ClinicDashboardShell';
+import ClinicHistoryPanel from '../../components/clinic/ClinicHistoryPanel';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { notifySuccess, notifyError } from '../../utils/notify';
 import { Table } from '../../components/ui/Table';
 import PatientSearchBar from '../../components/clinic/PatientSearchBar';
 import VitalSignsInput from '../../components/clinic/VitalSignsInput';
@@ -13,25 +15,21 @@ import PrescriptionWriter from '../../components/clinic/PrescriptionWriter';
 import ClinicQueuePanel from '../../components/clinic/ClinicQueuePanel';
 import EncounterSummary from '../../components/clinic/EncounterSummary';
 import ToothChart from '../../components/anatomical/ToothChart';
+import SymptomTagInput from '../../components/clinic/SymptomTagInput';
+import SYMPTOMS from '../../data/symptoms';
 import { usePatients } from '../../hooks/usePatients';
 import { useClinicalRecords } from '../../hooks/useClinicalRecords';
 import { useAIDiagnosis, useIcd10Search } from '../../hooks/useAIDiagnosis';
 import { useClinicQueue } from '../../hooks/useClinicQueue';
+import { Printer, RotateCcw } from 'lucide-react';
+import ScheduleFollowUpModal from './ScheduleFollowUpModal';
+import UpcomingFollowUpsSection from './UpcomingFollowUpsSection';
 
 const dentalBodyAreas = [
   'Maxillary Anterior', 'Maxillary Posterior', 'Mandibular Anterior', 'Mandibular Posterior',
   'Tongue', 'Buccal Mucosa', 'Floor of Mouth', 'Hard Palate', 'Soft Palate',
   'Lips', 'Gingiva', 'Jaw/TMJ', 'Salivary Glands', 'Neck/Lymph Nodes',
 ];
-
-const dentalSymptomCategories = {
-  'Pain': ['Toothache', 'Sensitivity to Cold/Hot', 'Sensitivity to Sweet', 'Pain on Chewing/Biting', 'Jaw Pain', 'Facial Pain'],
-  'Gums': ['Bleeding Gums', 'Swollen Gums', 'Receding Gums', 'Painful Gums'],
-  'Oral': ['Bad Breath (Halitosis)', 'Dry Mouth (Xerostomia)', 'Bad Taste / Metallic Taste', 'Burning Mouth', 'Difficulty Opening (Trismus)'],
-  'Lesions': ['Oral Ulcers / Sores', 'White Patches', 'Red Patches', 'Swelling / Lump', 'Numbness / Tingling'],
-  'Teeth': ['Loose Tooth', 'Broken / Chipped Tooth', 'Missing Tooth', 'Discolored Tooth', 'Worn Down Teeth'],
-  'Other': ['Clicking / Popping Jaw', 'Snoring / Sleep Apnea', 'Clenching / Grinding', 'Mouth Breathing'],
-};
 
 const onsetOptions = ['Sudden', 'Acute (<1 week)', 'Subacute (1-4 weeks)', 'Chronic (>4 weeks)'];
 
@@ -49,16 +47,13 @@ const dentalExamFields = [
   { id: 'cancerScreen', label: 'Oral Cancer Screening', desc: 'Inspection + palpation complete; findings negative/positive (describe lesion)' },
 ];
 
-function emptySymptom() {
-  return { name: '', bodyArea: '', onset: '', duration: '', severity: 5, description: '' };
-}
-
 export default function DentalDashboard() {
   const [showReferral, setShowReferral] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [showReferralBtn, setShowReferralBtn] = useState(false);
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
 
-  const patients = usePatients();
+  const patients = usePatients({ clinicSlug: 'dental' });
   const records = useClinicalRecords('dental');
   const ai = useAIDiagnosis();
 
@@ -75,7 +70,6 @@ export default function DentalDashboard() {
   const [medications, setMedications] = useState([]);
   const [soapNotes, setSoapNotes] = useState({ subjective: '', objective: '', assessment: '', plan: '' });
   const [saving, setSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState('');
   const [showIcd10Dropdown, setShowIcd10Dropdown] = useState(false);
 
   const { data: icd10Results = [] } = useIcd10Search(diagnosis);
@@ -105,18 +99,6 @@ export default function DentalDashboard() {
     setDiagnosisIcd10(code.code);
     setShowIcd10Dropdown(false);
   }, []);
-
-  const addSymptom = useCallback(() => {
-    setSymptoms([...symptoms, emptySymptom()]);
-  }, [symptoms]);
-
-  const updateSymptom = useCallback((idx, field, value) => {
-    setSymptoms(symptoms.map((s, i) => (i === idx ? { ...s, [field]: value } : s)));
-  }, [symptoms]);
-
-  const removeSymptom = useCallback((idx) => {
-    setSymptoms(symptoms.filter((_, i) => i !== idx));
-  }, [symptoms]);
 
   const handleToothSelect = useCallback((toothNum) => {
     setSelectedTooth(toothNum);
@@ -179,14 +161,12 @@ export default function DentalDashboard() {
     setSelectedTooth(null);
     setToothFindings({});
     setDentalExamNotes({});
-    setSaveMessage('');
     ai.reset();
   }, [ai]);
 
   const handleSave = useCallback(async () => {
     if (!patients.selectedPatient) return;
     setSaving(true);
-    setSaveMessage('');
     try {
       const examPayload = {};
       for (const f of dentalExamFields) {
@@ -210,32 +190,20 @@ export default function DentalDashboard() {
       await records.saveRecord(payload);
       if (patients.selectedPatient) records.fetchRecords(patients.selectedPatient.id);
       resetForm();
-      setSaveMessage('Record saved successfully');
-    } catch {
-      setSaveMessage('Failed to save record');
+      notifySuccess('Record saved successfully');
+    } catch (err) {
+      notifyError(err);
     } finally {
       setSaving(false);
     }
   }, [patients.selectedPatient, vitals, symptoms, diagnosis, diagnosisIcd10, medications, soapNotes, toothFindings, dentalExamNotes, selectedTooth, records, resetForm]);
 
-  const flatSymptomOptions = Object.values(dentalSymptomCategories).flat();
 
   return (
     <ClinicDashboardShell
       title="Dental Clinic"
       subtitle="Oral Examination & Dental Treatment"
-      actionButtons={
-        showReferralBtn && (
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setShowSummary(true)}>
-              Print Summary
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => setShowReferral(true)}>
-              Refer Patient
-            </Button>
-          </div>
-        )
-      }
+      historyPanel={<ClinicHistoryPanel clinicSlug="dental" />}
     >
       <ClinicQueuePanel
         queue={queue.queue}
@@ -289,49 +257,13 @@ export default function DentalDashboard() {
             </ClinicSection>
 
             <ClinicSection title="Symptom Assessment">
-              <div className="space-y-3">
-                {symptoms.map((symp, idx) => (
-                  <div key={idx} className="bg-bone rounded-lg p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-caption font-medium text-graphite">Symptom #{idx + 1}</span>
-                      <button onClick={() => removeSymptom(idx)} className="text-red-400 hover:text-red-600 dark:text-red-300 dark:hover:text-red-400 text-caption touch-target">Remove</button>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-sm font-medium text-graphite block mb-1">Symptom</label>
-                        <select value={symp.name} onChange={(e) => updateSymptom(idx, 'name', e.target.value)}
-                          className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
-                          <option value="">Select dental symptom...</option>
-                          {flatSymptomOptions.map((s) => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </div>
-                      <select value={symp.bodyArea} onChange={(e) => updateSymptom(idx, 'bodyArea', e.target.value)}
-                        className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
-                        <option value="">Tooth / Area</option>
-                        {dentalBodyAreas.map((b) => <option key={b} value={b}>{b}</option>)}
-                      </select>
-                      <select value={symp.onset} onChange={(e) => updateSymptom(idx, 'onset', e.target.value)}
-                        className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
-                        <option value="">Onset</option>
-                        {onsetOptions.map((o) => <option key={o} value={o}>{o}</option>)}
-                      </select>
-                      <Input label="Duration" placeholder="e.g. 3 days" value={symp.duration} onChange={(e) => updateSymptom(idx, 'duration', e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-graphite block mb-1">Severity: {symp.severity}/10</label>
-                      <input type="range" min="1" max="10" value={symp.severity} onChange={(e) => updateSymptom(idx, 'severity', parseInt(e.target.value))}
-                        className="w-full accent-lilac-bloom" />
-                    </div>
-                    <Input label="Description" placeholder="Tooth # (FDI), surface, aggravating/relieving factors, quality..." value={symp.description} onChange={(e) => updateSymptom(idx, 'description', e.target.value)} />
-                  </div>
-                ))}
-                <Button variant="ghost" size="sm" onClick={addSymptom}>
-                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" className="mr-1">
-                    <path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
-                  Add Symptom
-                </Button>
-              </div>
+              <SymptomTagInput
+                symptoms={symptoms}
+                onSymptomsChange={setSymptoms}
+                suggestions={SYMPTOMS}
+                bodyAreaOptions={dentalBodyAreas}
+                onsetOptions={onsetOptions}
+              />
             </ClinicSection>
           </div>
 
@@ -427,47 +359,48 @@ export default function DentalDashboard() {
                   <label className="text-sm font-medium text-graphite block mb-1">Subjective</label>
                   <textarea value={soapNotes.subjective} onChange={(e) => setSoapNotes({ ...soapNotes, subjective: e.target.value })}
                     placeholder="Chief complaint, pain history, medical history update, medications, allergies, tobacco/alcohol use..."
-                    className="w-full h-24 px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian placeholder:text-slate focus:outline-none focus:ring-2 focus:ring-lilac-bloom resize-none" />
+                    className="w-full h-36 px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian placeholder:text-slate focus:outline-none focus:ring-2 focus:ring-lilac-bloom resize-none" />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-graphite block mb-1">Objective</label>
                   <textarea value={soapNotes.objective} onChange={(e) => setSoapNotes({ ...soapNotes, objective: e.target.value })}
                     placeholder="Extraoral/intraoral exam, odontogram findings, periodontal charting, radiograph interpretation, pulp vitality results..."
-                    className="w-full h-24 px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian placeholder:text-slate focus:outline-none focus:ring-2 focus:ring-lilac-bloom resize-none" />
+                    className="w-full h-36 px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian placeholder:text-slate focus:outline-none focus:ring-2 focus:ring-lilac-bloom resize-none" />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-graphite block mb-1">Assessment</label>
                   <textarea value={soapNotes.assessment} onChange={(e) => setSoapNotes({ ...soapNotes, assessment: e.target.value })}
                     placeholder="Diagnosis by tooth/site, caries risk level, periodontal staging/grading, differential diagnoses..."
-                    className="w-full h-24 px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian placeholder:text-slate focus:outline-none focus:ring-2 focus:ring-lilac-bloom resize-none" />
+                    className="w-full h-36 px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian placeholder:text-slate focus:outline-none focus:ring-2 focus:ring-lilac-bloom resize-none" />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-graphite block mb-1">Plan</label>
                   <textarea value={soapNotes.plan} onChange={(e) => setSoapNotes({ ...soapNotes, plan: e.target.value })}
                     placeholder="Treatment plan (procedures with CDT codes), medications, referrals, follow-up interval, home care instructions..."
-                    className="w-full h-24 px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian placeholder:text-slate focus:outline-none focus:ring-2 focus:ring-lilac-bloom resize-none" />
+                    className="w-full h-36 px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian placeholder:text-slate focus:outline-none focus:ring-2 focus:ring-lilac-bloom resize-none" />
                 </div>
               </div>
             </ClinicSection>
           </div>
 
           <div className="flex items-center gap-3 mb-6">
-            <Button variant="primary" onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving...' : 'Save Clinical Record'}
-            </Button>
-            <Button variant="ghost" onClick={resetForm}>
-              Reset
+            <Button variant="primary" onClick={handleSave} loading={saving}>
+              Save Clinical Record
             </Button>
             {showReferralBtn && (
               <Button variant="secondary" onClick={() => setShowReferral(true)}>
                 Refer Patient
               </Button>
             )}
-            {saveMessage && (
-              <span className={`text-sm font-medium ${saveMessage.includes('success') ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
-                {saveMessage}
-              </span>
-            )}
+            <Button variant="secondary" onClick={() => setShowFollowUpModal(true)}>
+              Schedule Follow-Up
+            </Button>
+            <Button variant="ghost" onClick={() => setShowSummary(true)} title="Print Summary">
+              <Printer size={16} />
+            </Button>
+            <Button variant="ghost" onClick={resetForm} title="Reset Form">
+              <RotateCcw size={16} />
+            </Button>
           </div>
 
           {records.records.length > 0 && (
@@ -491,13 +424,18 @@ export default function DentalDashboard() {
         </>
       )}
 
-      {!patients.selectedPatient && records.stats && (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
-          <StatCard label="Total Patients" value={records.stats.totalPatients} />
-          <StatCard label="Today's Appointments" value={records.stats.todayAppointments} />
-          <StatCard label="Today's Records" value={records.stats.todayRecords} />
-          <StatCard label="Dental Patients" value={records.stats.totalPatients} variant="highlight" />
-        </div>
+      {!patients.selectedPatient && (
+        <>
+          <UpcomingFollowUpsSection clinicSlug="dental" />
+          {records.stats && (
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
+              <StatCard label="Total Patients" value={records.stats.totalPatients} />
+              <StatCard label="Today's Appointments" value={records.stats.todayAppointments} />
+              <StatCard label="Today's Records" value={records.stats.todayRecords} />
+              <StatCard label="Dental Patients" value={records.stats.totalPatients} variant="highlight" />
+            </div>
+          )}
+        </>
       )}
 
       {showSummary && (
@@ -517,6 +455,14 @@ export default function DentalDashboard() {
         open={showReferral}
         onClose={() => setShowReferral(false)}
         fromClinicId="dental"
+      />
+      <ScheduleFollowUpModal
+        open={showFollowUpModal}
+        onClose={() => setShowFollowUpModal(false)}
+        clinicSlug="dental"
+        patientId={patients.selectedPatient?.id}
+        patientName={patients.selectedPatient?.fullName}
+        onScheduled={() => setShowFollowUpModal(false)}
       />
     </ClinicDashboardShell>
   );

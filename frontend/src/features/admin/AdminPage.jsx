@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { useAdminUsers, useAdminRoles, useCreateUser, useUpdateUser, useDepartments, adminKeys } from '../../hooks/queries/useAdmin';
+import { useAdminUsers, useAdminRoles, useCreateUser, useUpdateUser, useDepartments, adminKeys, useOperationTypePrices, useUpdateOperationTypePrice, useClinicPrices, useUpdateClinicPrice, useWardPrices, useUpdateWardPrice, useImagingProcedureTypes, useUpdateImagingProcedureTypePrice } from '../../hooks/queries/useAdmin';
 import { useClinics } from '../../hooks/queries/useClinics';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -10,6 +10,8 @@ import { Badge } from '../../components/ui/Badge';
 import { Table } from '../../components/ui/Table';
 import { Modal } from '../../components/ui/Modal';
 import { PERMISSIONS_LIST } from './permissions';
+import { CURRENCY } from '../../utils/currency';
+import toast from 'react-hot-toast';
 
 const userColumns = [
   { key: 'fullName', header: 'Name' },
@@ -41,6 +43,7 @@ export default function AdminPage() {
   const [userForm, setUserForm] = useState({ email: '', password: '', fullName: '', phone: '', roleId: '', clinicId: '' });
   const [roleForm, setRoleForm] = useState({ name: '', description: '', permissions: [] });
   const [deptForm, setDeptForm] = useState({ name: '', nameAr: '', slug: '', type: 'OTHER' });
+  const [pricingSubTab, setPricingSubTab] = useState('procedures');
   const [mutationLoading, setMutationLoading] = useState(false);
   const [mutationError, setMutationError] = useState('');
 
@@ -48,6 +51,14 @@ export default function AdminPage() {
   const { data: roles = [] } = useAdminRoles();
   const { data: departments = [], isLoading: loadingDepts } = useDepartments();
   const { data: rolesList = [] } = useClinics();
+  const { data: pricingOpTypes = [], isLoading: loadingOpPrices } = useOperationTypePrices();
+  const { data: pricingClinics = [], isLoading: loadingClinicPrices } = useClinicPrices();
+  const { data: pricingWards = [], isLoading: loadingWardPrices } = useWardPrices();
+  const { data: imagingProcedureTypes = [], isLoading: loadingImagingPrices } = useImagingProcedureTypes();
+  const updateOpPrice = useUpdateOperationTypePrice();
+  const updateClinicPrice = useUpdateClinicPrice();
+  const updateWardPrice = useUpdateWardPrice();
+  const updateImagingPrice = useUpdateImagingProcedureTypePrice();
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
 
@@ -165,6 +176,7 @@ export default function AdminPage() {
         <Button variant={tab === 'users' ? 'primary' : 'secondary'} onClick={() => setTab('users')}>Users</Button>
         <Button variant={tab === 'roles' ? 'primary' : 'secondary'} onClick={() => setTab('roles')}>Roles</Button>
         <Button variant={tab === 'departments' ? 'primary' : 'secondary'} onClick={() => setTab('departments')}>Departments</Button>
+        <Button variant={tab === 'pricing' ? 'primary' : 'secondary'} onClick={() => setTab('pricing')}>Pricing</Button>
       </div>
 
       {tab === 'users' && (
@@ -218,6 +230,148 @@ export default function AdminPage() {
                   </div>
                 ))}
               </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {tab === 'pricing' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Pricing Management</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2 border-b border-silver pb-2 mb-4">
+              <Button variant={pricingSubTab === 'procedures' ? 'primary' : 'secondary'} size="sm" onClick={() => setPricingSubTab('procedures')}>Procedure Fees</Button>
+              <Button variant={pricingSubTab === 'clinics' ? 'primary' : 'secondary'} size="sm" onClick={() => setPricingSubTab('clinics')}>Clinic Fees</Button>
+              <Button variant={pricingSubTab === 'wards' ? 'primary' : 'secondary'} size="sm" onClick={() => setPricingSubTab('wards')}>Ward Rates</Button>
+              <Button variant={pricingSubTab === 'imaging' ? 'primary' : 'secondary'} size="sm" onClick={() => setPricingSubTab('imaging')}>Imaging Fees</Button>
+            </div>
+
+            {pricingSubTab === 'procedures' && (
+              <>
+                {loadingOpPrices ? (
+                  <p className="text-body text-slate">Loading...</p>
+                ) : (
+                  <Table
+                    columns={[
+                      { key: 'name', header: 'Procedure' },
+                      { key: 'department', header: 'Department', render: (v) => v?.name || '-' },
+                      { key: 'price', header: `Price (${CURRENCY})`, render: (v, row) => (
+                        <input
+                          type="number" step="0.01" min="0"
+                          defaultValue={v != null ? Number(v).toFixed(2) : ''}
+                          onBlur={(e) => {
+                            const val = e.target.value;
+                            updateOpPrice.mutate({ id: row.id, price: val ? parseFloat(val) : null });
+                          }}
+                          className="w-28 px-2 py-1 border border-silver rounded text-body text-obsidian focus:outline-none focus:ring-1 focus:ring-lilac-bloom"
+                          placeholder="0.00"
+                        />
+                      )},
+                    ]}
+                    data={pricingOpTypes}
+                  />
+                )}
+              </>
+            )}
+
+            {pricingSubTab === 'clinics' && (
+              <>
+                {loadingClinicPrices ? (
+                  <p className="text-body text-slate">Loading...</p>
+                ) : (
+                  <Table
+                    columns={[
+                      { key: 'name', header: 'Clinic' },
+                      { key: 'nameAr', header: 'Arabic Name' },
+                      { key: 'consultationFee', header: `Consultation Fee (${CURRENCY})`, render: (v, row) => (
+                        <input
+                          type="number" step="0.01" min="0"
+                          defaultValue={v != null ? Number(v).toFixed(2) : ''}
+                          onBlur={(e) => {
+                            const val = e.target.value;
+                            updateClinicPrice.mutate({ id: row.id, consultationFee: val ? parseFloat(val) : null, followUpFee: row.followUpFee });
+                          }}
+                          className="w-28 px-2 py-1 border border-silver rounded text-body text-obsidian focus:outline-none focus:ring-1 focus:ring-lilac-bloom"
+                          placeholder="0.00"
+                        />
+                      )},
+                      { key: 'followUpFee', header: `Follow-up Fee (${CURRENCY})`, render: (v, row) => (
+                        <input
+                          type="number" step="0.01" min="0"
+                          defaultValue={v != null ? Number(v).toFixed(2) : ''}
+                          onBlur={(e) => {
+                            const val = e.target.value;
+                            updateClinicPrice.mutate({ id: row.id, consultationFee: row.consultationFee, followUpFee: val ? parseFloat(val) : null });
+                          }}
+                          className="w-28 px-2 py-1 border border-silver rounded text-body text-obsidian focus:outline-none focus:ring-1 focus:ring-lilac-bloom"
+                          placeholder="0.00"
+                        />
+                      )},
+                    ]}
+                    data={pricingClinics}
+                  />
+                )}
+              </>
+            )}
+
+            {pricingSubTab === 'wards' && (
+              <>
+                {loadingWardPrices ? (
+                  <p className="text-body text-slate">Loading...</p>
+                ) : (
+                  <Table
+                    columns={[
+                      { key: 'name', header: 'Ward' },
+                      { key: 'nameAr', header: 'Arabic Name' },
+                      { key: 'type', header: 'Type' },
+                      { key: 'dailyRate', header: `Daily Rate (${CURRENCY})`, render: (v, row) => (
+                        <input
+                          type="number" step="0.01" min="0"
+                          defaultValue={v != null ? Number(v).toFixed(2) : ''}
+                          onBlur={(e) => {
+                            const val = e.target.value;
+                            updateWardPrice.mutate({ id: row.id, dailyRate: val ? parseFloat(val) : null });
+                          }}
+                          className="w-28 px-2 py-1 border border-silver rounded text-body text-obsidian focus:outline-none focus:ring-1 focus:ring-lilac-bloom"
+                          placeholder="0.00"
+                        />
+                      )},
+                    ]}
+                    data={pricingWards}
+                  />
+                )}
+              </>
+            )}
+
+            {pricingSubTab === 'imaging' && (
+              <>
+                {loadingImagingPrices ? (
+                  <p className="text-body text-slate">Loading...</p>
+                ) : (
+                  <Table
+                    columns={[
+                      { key: 'name', header: 'Procedure' },
+                      { key: 'nameAr', header: 'Arabic Name' },
+                      { key: 'scanType', header: 'Scan Type' },
+                      { key: 'price', header: `Price (${CURRENCY})`, render: (v, row) => (
+                        <input
+                          type="number" step="0.01" min="0"
+                          defaultValue={v != null ? Number(v).toFixed(2) : ''}
+                          onBlur={(e) => {
+                            const val = e.target.value;
+                            updateImagingPrice.mutate({ id: row.id, price: val ? parseFloat(val) : null });
+                          }}
+                          className="w-28 px-2 py-1 border border-silver rounded text-body text-obsidian focus:outline-none focus:ring-1 focus:ring-lilac-bloom"
+                          placeholder="0.00"
+                        />
+                      )},
+                    ]}
+                    data={imagingProcedureTypes}
+                  />
+                )}
+              </>
             )}
           </CardContent>
         </Card>
@@ -283,7 +437,7 @@ export default function AdminPage() {
           </div>
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="secondary" onClick={() => setShowUserModal(false)} className="flex-1">Cancel</Button>
-            <Button type="submit" className="flex-1">Create User</Button>
+            <Button type="submit" className="flex-1" loading={mutationLoading}>Create User</Button>
           </div>
         </form>
       </Modal>
@@ -306,7 +460,7 @@ export default function AdminPage() {
           </div>
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="secondary" onClick={() => setShowRoleModal(false)} className="flex-1">Cancel</Button>
-            <Button type="submit" className="flex-1">{editingRole ? 'Update' : 'Create'} Role</Button>
+            <Button type="submit" className="flex-1" loading={mutationLoading}>{editingRole ? 'Update' : 'Create'} Role</Button>
           </div>
         </form>
       </Modal>
@@ -334,7 +488,7 @@ export default function AdminPage() {
           </div>
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="secondary" onClick={() => setShowDeptModal(false)} className="flex-1">Cancel</Button>
-            <Button type="submit" className="flex-1">{editingDept ? 'Update' : 'Create'} Department</Button>
+            <Button type="submit" className="flex-1" loading={mutationLoading}>{editingDept ? 'Update' : 'Create'} Department</Button>
           </div>
         </form>
       </Modal>

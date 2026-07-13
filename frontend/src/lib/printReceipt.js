@@ -73,10 +73,18 @@ export async function printReceipt(data) {
     });
   } catch { /* no logo fallback */ }
   const html = buildReceiptHtml(data, logoSrc);
-  const blob = new Blob([html], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  const win = window.open(url, '_blank');
-  if (!win) { alert('Please allow popups to print'); return; }
-  setTimeout(() => { win.print(); }, 1000);
-  setTimeout(() => URL.revokeObjectURL(url), 30000);
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = 'none';
+  document.body.appendChild(iframe);
+  const doc = iframe.contentWindow.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
+  setTimeout(() => {
+    iframe.contentWindow.print();
+    setTimeout(() => document.body.removeChild(iframe), 1000);
+  }, 500);
 }

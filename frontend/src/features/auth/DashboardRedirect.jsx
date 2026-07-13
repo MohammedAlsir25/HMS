@@ -3,21 +3,26 @@ import { useAuthStore } from '../../stores/authStore';
 import { getClinicRoute } from '../../app/router';
 
 const ROLE_ROUTES = {
+  'CEO': '/overview',
+  'CFO': '/reports',
+  'Doctor': '/surgery/dashboard',
   'Receptionist': '/reception',
   'Pharmacist': '/pharmacy',
   'Optician': '/optics',
   'Accountant': '/accounting',
-  'CFO': '/accounting',
-  'CEO': '/accounting',
+
   'HR Manager': '/hr',
   'Lab Technician': '/lab',
   'Lab Admin': '/lab',
   'Inventory Manager': '/inventory',
   'Procurement Manager': '/procurement',
+  'OpticLab': '/optic-lab',
 };
 
 const navItems = [
-  { label: 'Reception', link: '/reception', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M16 2v6h6 M9 15l2 2 4-4' },
+  { label: 'Hospital Overview', link: '/overview', icon: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10' },
+  { label: 'Patients', link: '/patients', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0z M12 14c-4.418 0-8 1.79-8 4v2h16v-2c0-2.21-3.582-4-8-4z' },
+  { label: 'Reports', link: '/reports', icon: 'M18 20V10M12 20V4M6 20v-6 M3 20h18 M21 3l-4 4-4-4-4 4-4-4L5 7' },
   { label: 'Waiting Room', link: '/waiting-room', icon: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75' },
   { label: 'Medicine', link: '/clinic/medicine', icon: 'M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z' },
   { label: 'ENT', link: '/clinic/ent', icon: 'M6 18C3.5 16 2 13 2 9c0-3 2-5 5-5s5 2 5 5c0 4-1.5 7-4 9 M12 22c3.5-7.5 7-10 10-10M10 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0' },
@@ -28,7 +33,9 @@ const navItems = [
   { label: 'Peds Ophth', link: '/clinic/pediatrics-ophth', icon: 'M12 2a10 10 0 1 0 10 10M12 2a10 10 0 0 1 10 10M12 2l10 10M12 22l10-10' },
   { label: 'Gen Ophth', link: '/clinic/general-ophth', icon: 'M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6M17 7l-5 5M12 12l-5 5' },
   { label: 'Optometry', link: '/clinic/optometry', icon: 'M10 2l-8 8 8 8M14 2l8 8-8 8M4 6l8-4 8 4M4 18l8 4 8-4' },
-  { label: 'Surgery', link: '/surgery', icon: 'M8 8l8-8M8 8l-4-4M8 8L4 12M16 16l4-4M16 16l4 4M16 16l-8 8M6 18l6-6M18 6l-6 6' },
+  { label: 'Imaging', link: '/clinic/imaging', icon: 'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z M9 14a3 3 0 1 0 6 0 3 3 0 0 0-6 0' },
+  { label: 'Surgery Gantt', link: '/surgery', icon: 'M8 8l8-8M8 8l-4-4M8 8L4 12M16 16l4-4M16 16l4 4M16 16l-8 8M6 18l6-6M18 6l-6 6' },
+  { label: 'Surgery Dashboard', link: '/surgery/dashboard', icon: 'M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6M12 22V2' },
   { label: 'Referrals', link: '/referrals', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M16 2v6h6 M9 15h6M12 12v6' },
   { label: 'Laboratory', link: '/lab', icon: 'M8 2v6l-4 4v2h16v-2l-4-4V2M4 18h16M8 22h8M12 18v4M10 6h4' },
   { label: 'Pharmacy', link: '/pharmacy', icon: 'M7 21V7a5 5 0 0 1 10 0v14M4 21h16M7 7h10M12 7v14 M9 12h6 M9 16h6' },

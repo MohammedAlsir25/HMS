@@ -1,24 +1,48 @@
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
-import { Button } from '../ui/Button';
+
+import { useState } from 'react';
 
 export default function ClinicDashboardShell({
   title,
   subtitle,
   children,
-  actionButtons,
+  historyPanel,
 }) {
+  const [activeTab, setActiveTab] = useState('queue');
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-heading-sm font-semibold text-obsidian">{title}</h1>
-          {subtitle && <p className="text-body text-slate mt-1">{subtitle}</p>}
-        </div>
-        {actionButtons && (
-          <div className="flex gap-2 flex-wrap">{actionButtons}</div>
-        )}
+      <div>
+        <h1 className="text-heading-sm font-semibold text-obsidian">{title}</h1>
+        {subtitle && <p className="text-body text-slate mt-1">{subtitle}</p>}
       </div>
-      {children}
+
+      {historyPanel && (
+        <div className="flex gap-1 border-b border-silver">
+          <button
+            onClick={() => setActiveTab('queue')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors touch-target ${
+              activeTab === 'queue'
+                ? 'border-lilac-bloom text-lilac-bloom'
+                : 'border-transparent text-slate hover:text-obsidian'
+            }`}
+          >
+            Queue
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors touch-target ${
+              activeTab === 'history'
+                ? 'border-lilac-bloom text-lilac-bloom'
+                : 'border-transparent text-slate hover:text-obsidian'
+            }`}
+          >
+            History
+          </button>
+        </div>
+      )}
+
+      {activeTab === 'history' && historyPanel ? historyPanel : children}
     </div>
   );
 }

@@ -2,9 +2,7 @@ import { z } from 'zod';
 
 export const createPatientSchema = z.object({
   fullName: z.string().min(1, 'fullName is required'),
-  phone: z.string().optional().nullable(),
-  nationalId: z.string().optional().nullable(),
-  email: z.string().email().optional().nullable(),
+  phone: z.string().min(1, 'phone is required'),
   dateOfBirth: z.string().optional().nullable(),
   gender: z.enum(['MALE', 'FEMALE']).optional().nullable(),
   diabetesType: z.enum(['NONE', 'TYPE1', 'TYPE2', 'GESTATIONAL']).optional().default('NONE'),

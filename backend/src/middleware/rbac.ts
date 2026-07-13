@@ -38,12 +38,20 @@ export const PERMISSIONS = {
   ASSET_READ: 'asset:read',
   ASSET_WRITE: 'asset:write',
   NOTIFICATION_READ: 'notification:read',
+  OPTIC_LAB_READ: 'optic_lab:read',
+  OPTIC_LAB_WRITE: 'optic_lab:write',
+  PREOP_READ: 'preoperative:read',
+  PREOP_WRITE: 'preoperative:write',
+  WARD_READ: 'ward:read',
+  WARD_WRITE: 'ward:write',
+  PRICING_READ: 'pricing:read',
+  PRICING_WRITE: 'pricing:write',
 };
 
 export const DEFAULT_ROLES = {
   SUPER_ADMIN: {
     name: 'Super Admin',
-    permissions: Object.values(PERMISSIONS),
+    permissions: [...Object.values(PERMISSIONS)],
   },
   DOCTOR: {
     name: 'Doctor',
@@ -58,6 +66,9 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.WAREHOUSE_READ,
       PERMISSIONS.DIAGNOSTICS_READ,
       PERMISSIONS.DIAGNOSTICS_ORDER,
+      PERMISSIONS.PREOP_READ,
+      PERMISSIONS.PREOP_WRITE,
+      PERMISSIONS.WARD_READ,
     ],
   },
   NURSE: {
@@ -67,6 +78,23 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.CLINICAL_READ,
       PERMISSIONS.APPOINTMENT_READ,
       PERMISSIONS.APPOINTMENT_WRITE,
+      PERMISSIONS.WARD_READ,
+      PERMISSIONS.WARD_WRITE,
+    ],
+  },
+  PREOP_OFFICE: {
+    name: 'PreOp Office',
+    permissions: [
+      PERMISSIONS.PATIENT_READ,
+      PERMISSIONS.CLINICAL_READ,
+      PERMISSIONS.APPOINTMENT_READ,
+      PERMISSIONS.APPOINTMENT_WRITE,
+      PERMISSIONS.PREOP_READ,
+      PERMISSIONS.PREOP_WRITE,
+      PERMISSIONS.WARD_READ,
+      PERMISSIONS.WARD_WRITE,
+      PERMISSIONS.SURGERY_READ,
+      PERMISSIONS.SURGERY_WRITE,
     ],
   },
   RECEPTIONIST: {
@@ -78,6 +106,7 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.APPOINTMENT_READ,
       PERMISSIONS.APPOINTMENT_WRITE,
       PERMISSIONS.ACCOUNTING_READ,
+      PERMISSIONS.PREOP_READ,
     ],
   },
   PHARMACIST: {
@@ -102,6 +131,7 @@ export const DEFAULT_ROLES = {
     permissions: [
       PERMISSIONS.ACCOUNTING_READ,
       PERMISSIONS.ACCOUNTING_WRITE,
+      PERMISSIONS.PREOP_READ,
     ],
   },
   HR_MANAGER: {
@@ -193,6 +223,14 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.ASSET_READ,
       PERMISSIONS.ASSET_WRITE,
       PERMISSIONS.NOTIFICATION_READ,
+    ],
+  },
+  OPTIC_LAB: {
+    name: 'OpticLab',
+    permissions: [
+      PERMISSIONS.PATIENT_READ,
+      PERMISSIONS.OPTIC_LAB_READ,
+      PERMISSIONS.OPTIC_LAB_WRITE,
     ],
   },
 };

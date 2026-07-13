@@ -51,14 +51,21 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CLINICAL_WRITE), au
     notes?: string;
     medications?: Array<Record<string, unknown>>;
     testIds?: string[];
+    scanType?: string;
+    laterality?: string;
+    clinicalInfo?: string;
   };
-  const { patientId, fromClinicId, toClinicId, type, notes, medications, testIds } = body;
+  const { patientId, fromClinicId, toClinicId, type, notes, medications, testIds, scanType, laterality, clinicalInfo } = body;
   const fromClinic = await resolveClinic(fromClinicId!);
   if (!fromClinic) throw new NotFoundError('From clinic not found');
   let resolvedToClinicId = toClinicId ?? null;
+  let toClinicType: string | undefined;
   if (resolvedToClinicId) {
     const toClinic = await resolveClinic(resolvedToClinicId);
-    resolvedToClinicId = toClinic ? toClinic.id : null;
+    if (toClinic) {
+      resolvedToClinicId = toClinic.id;
+      toClinicType = toClinic.type;
+    }
   }
 
   const data: Record<string, unknown> = {
@@ -107,7 +114,31 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CLINICAL_WRITE), au
     });
   }
 
+  if (type === 'INTERNAL_CLINIC' && toClinicType === 'IMAGING' && scanType) {
+    await prisma.imagingOrder.create({
+      data: {
+        referralId: referral.id,
+        patientId: patientId as string,
+        requestedByClinicId: fromClinic.id,
+        clinicId: resolvedToClinicId!,
+        scanType: scanType as $Enums.ImagingScanType,
+        laterality: laterality || null,
+        clinicalInfo: clinicalInfo || null,
+        createdById: req.user!.id,
+      },
+    });
+  }
+
   res.status(201).json(referral);
+}));
+
+router.get('/:id', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), asyncHandler(async (req, res) => {
+  const referral = await prisma.referral.findUnique({
+    where: { id: req.params.id },
+    include: REFERRAL_INCLUDE,
+  });
+  if (!referral) throw new NotFoundError('Referral not found');
+  res.json(referral);
 }));
 
 router.patch('/:id/status', authenticate, requirePermission(PERMISSIONS.CLINICAL_WRITE), auditMiddleware('UPDATE_REFERRAL_STATUS', 'Referral'), validate(updateReferralStatusSchema), asyncHandler(async (req, res) => {

@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import CrossReferralModal from '../referral/CrossReferralModal';
 import ClinicDashboardShell, { ClinicSection, StatCard } from '../../components/clinic/ClinicDashboardShell';
+import ClinicHistoryPanel from '../../components/clinic/ClinicHistoryPanel';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { notifySuccess, notifyError } from '../../utils/notify';
 import { Table } from '../../components/ui/Table';
 import PatientSearchBar from '../../components/clinic/PatientSearchBar';
 import VitalSignsInput from '../../components/clinic/VitalSignsInput';
@@ -12,17 +14,18 @@ import AIDiagnosisPanel from '../../components/clinic/AIDiagnosisPanel';
 import PrescriptionWriter from '../../components/clinic/PrescriptionWriter';
 import ClinicQueuePanel from '../../components/clinic/ClinicQueuePanel';
 import EncounterSummary from '../../components/clinic/EncounterSummary';
+import SymptomTagInput from '../../components/clinic/SymptomTagInput';
+import SYMPTOMS from '../../data/symptoms';
 import { usePatients } from '../../hooks/usePatients';
 import { useClinicalRecords } from '../../hooks/useClinicalRecords';
 import { useAIDiagnosis, useIcd10Search } from '../../hooks/useAIDiagnosis';
 import { useClinicQueue } from '../../hooks/useClinicQueue';
+import { Printer, RotateCcw } from 'lucide-react';
+import ScheduleFollowUpModal from './ScheduleFollowUpModal';
+import UpcomingFollowUpsSection from './UpcomingFollowUpsSection';
 
 const bodyAreas = ['Optic Nerve', 'Macula', 'Retina', 'Cornea', 'Lens', 'Anterior Chamber', 'Eyelid', 'Orbit', 'Generalized'];
 const onsetOptions = ['Sudden', 'Acute (<1 week)', 'Subacute (1-4 weeks)', 'Chronic (>4 weeks)'];
-
-function emptySymptom() {
-  return { name: '', bodyArea: '', onset: '', duration: '', severity: 5, description: '' };
-}
 
 const rxFields = [
   { label: 'Sphere (SPH)', fields: ['odSph', 'osSph'] },
@@ -35,8 +38,9 @@ export default function GenOphthDashboard() {
   const [showReferral, setShowReferral] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [showReferralBtn, setShowReferralBtn] = useState(false);
+const [showFollowUpModal, setShowFollowUpModal] = useState(false);
 
-  const patients = usePatients();
+  const patients = usePatients({ clinicSlug: 'general-ophth' });
   const records = useClinicalRecords('general-ophth');
   const ai = useAIDiagnosis();
 
@@ -53,7 +57,6 @@ export default function GenOphthDashboard() {
   const [medications, setMedications] = useState([]);
   const [soapNotes, setSoapNotes] = useState({ subjective: '', objective: '', assessment: '', plan: '' });
   const [saving, setSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState('');
   const [showIcd10Dropdown, setShowIcd10Dropdown] = useState(false);
 
   const { data: icd10Results = [] } = useIcd10Search(diagnosis);
@@ -64,6 +67,10 @@ export default function GenOphthDashboard() {
   });
   const [slitLamp, setSlitLamp] = useState({
     lids: '', conjunctiva: '', cornea: '', anteriorChamber: '', iris: '', lens: '',
+  });
+  const [retinaTest, setRetinaTest] = useState({
+    odMedia: '', odDisc: '', odCDRatio: '', odMacula: '', odVessels: '', odPeriphery: '',
+    osMedia: '', osDisc: '', osCDRatio: '', osMacula: '', osVessels: '', osPeriphery: '',
   });
 
   useEffect(() => {
@@ -87,18 +94,6 @@ export default function GenOphthDashboard() {
     setDiagnosisIcd10(code.code);
     setShowIcd10Dropdown(false);
   }, []);
-
-  const addSymptom = useCallback(() => {
-    setSymptoms([...symptoms, emptySymptom()]);
-  }, [symptoms]);
-
-  const updateSymptom = useCallback((idx, field, value) => {
-    setSymptoms(symptoms.map((s, i) => (i === idx ? { ...s, [field]: value } : s)));
-  }, [symptoms]);
-
-  const removeSymptom = useCallback((idx) => {
-    setSymptoms(symptoms.filter((_, i) => i !== idx));
-  }, [symptoms]);
 
   const handleAIGetSuggestions = useCallback(() => {
     if (!patients.selectedPatient) return;
@@ -152,14 +147,13 @@ export default function GenOphthDashboard() {
     setSoapNotes({ subjective: '', objective: '', assessment: '', plan: '' });
     setRefraction({ odSph: '', odCyl: '', odAxis: '', odPd: '', osSph: '', osCyl: '', osAxis: '', osPd: '' });
     setSlitLamp({ lids: '', conjunctiva: '', cornea: '', anteriorChamber: '', iris: '', lens: '' });
-    setSaveMessage('');
+    setRetinaTest({ odMedia: '', odDisc: '', odCDRatio: '', odMacula: '', odVessels: '', odPeriphery: '', osMedia: '', osDisc: '', osCDRatio: '', osMacula: '', osVessels: '', osPeriphery: '' });
     ai.reset();
   }, [ai]);
 
   const handleSave = useCallback(async () => {
     if (!patients.selectedPatient) return;
     setSaving(true);
-    setSaveMessage('');
     try {
       const payload = {
         patientId: patients.selectedPatient.id,
@@ -178,9 +172,9 @@ export default function GenOphthDashboard() {
       await records.saveRecord(payload);
       if (patients.selectedPatient) records.fetchRecords(patients.selectedPatient.id);
       resetForm();
-      setSaveMessage('Record saved successfully');
-    } catch {
-      setSaveMessage('Failed to save record');
+      notifySuccess('Record saved successfully');
+    } catch (err) {
+      notifyError(err);
     } finally {
       setSaving(false);
     }
@@ -190,18 +184,7 @@ export default function GenOphthDashboard() {
     <ClinicDashboardShell
       title="General Ophthalmology"
       subtitle="Refraction & Comprehensive Eye Exam with AI-Assisted Diagnosis"
-      actionButtons={
-        showReferralBtn && (
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setShowSummary(true)}>
-              Print Summary
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => setShowReferral(true)}>
-              Refer Patient
-            </Button>
-          </div>
-        )
-      }
+      historyPanel={<ClinicHistoryPanel clinicSlug="general-ophth" />}
     >
       <ClinicQueuePanel
         queue={queue.queue}
@@ -252,45 +235,23 @@ export default function GenOphthDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <ClinicSection title="Vital Signs">
               <VitalSignsInput values={vitals} onChange={setVitals} />
+              <div className="mt-4 pt-4 border-t border-silver/50">
+                <p className="text-sm font-medium text-graphite mb-2">Intraocular Pressure</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label="IOP (OD) mmHg" placeholder="e.g. 16" value={vitals.iopOD || ''} onChange={(e) => setVitals((p) => ({ ...p, iopOD: e.target.value }))} />
+                  <Input label="IOP (OS) mmHg" placeholder="e.g. 16" value={vitals.iopOS || ''} onChange={(e) => setVitals((p) => ({ ...p, iopOS: e.target.value }))} />
+                </div>
+              </div>
             </ClinicSection>
 
             <ClinicSection title="Symptom Assessment">
-              <div className="space-y-3">
-                {symptoms.map((symp, idx) => (
-                  <div key={idx} className="bg-bone rounded-lg p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-caption font-medium text-graphite">Symptom #{idx + 1}</span>
-                      <button onClick={() => removeSymptom(idx)} className="text-red-400 hover:text-red-600 dark:text-red-300 dark:hover:text-red-400 text-caption touch-target">Remove</button>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <Input label="Symptom" placeholder="e.g. Blurred Vision" value={symp.name} onChange={(e) => updateSymptom(idx, 'name', e.target.value)} />
-                      <select value={symp.bodyArea} onChange={(e) => updateSymptom(idx, 'bodyArea', e.target.value)}
-                        className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
-                        <option value="">Body Area</option>
-                        {bodyAreas.map((b) => <option key={b} value={b}>{b}</option>)}
-                      </select>
-                      <select value={symp.onset} onChange={(e) => updateSymptom(idx, 'onset', e.target.value)}
-                        className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
-                        <option value="">Onset</option>
-                        {onsetOptions.map((o) => <option key={o} value={o}>{o}</option>)}
-                      </select>
-                      <Input label="Duration" placeholder="e.g. 3 days" value={symp.duration} onChange={(e) => updateSymptom(idx, 'duration', e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-graphite block mb-1">Severity: {symp.severity}/10</label>
-                      <input type="range" min="1" max="10" value={symp.severity} onChange={(e) => updateSymptom(idx, 'severity', parseInt(e.target.value))}
-                        className="w-full accent-lilac-bloom" />
-                    </div>
-                    <Input label="Description" placeholder="Additional details..." value={symp.description} onChange={(e) => updateSymptom(idx, 'description', e.target.value)} />
-                  </div>
-                ))}
-                <Button variant="ghost" size="sm" onClick={addSymptom}>
-                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" className="mr-1">
-                    <path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
-                  Add Symptom
-                </Button>
-              </div>
+              <SymptomTagInput
+                symptoms={symptoms}
+                onSymptomsChange={setSymptoms}
+                suggestions={SYMPTOMS}
+                bodyAreaOptions={bodyAreas}
+                onsetOptions={onsetOptions}
+              />
             </ClinicSection>
           </div>
 
@@ -381,53 +342,205 @@ export default function GenOphthDashboard() {
           </div>
 
           <div className="grid grid-cols-1 gap-6 mb-6">
+            <ClinicSection title="Retina Test">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-graphite border-b border-silver pb-1">Right Eye (OD)</p>
+                  <div>
+                    <label className="text-sm font-medium text-graphite block mb-1">Media</label>
+                    <select value={retinaTest.odMedia} onChange={(e) => setRetinaTest((p) => ({ ...p, odMedia: e.target.value }))}
+                      className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
+                      <option value="">Select...</option>
+                      <option value="Clear">Clear</option>
+                      <option value="Cataract">Cataract</option>
+                      <option value="Vitreous Opacity">Vitreous Opacity</option>
+                      <option value="Vitreous Hemorrhage">Vitreous Hemorrhage</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-graphite block mb-1">Optic Disc</label>
+                    <select value={retinaTest.odDisc} onChange={(e) => setRetinaTest((p) => ({ ...p, odDisc: e.target.value }))}
+                      className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
+                      <option value="">Select...</option>
+                      <option value="Normal">Normal</option>
+                      <option value="Pale">Pale</option>
+                      <option value="Swollen (Edema)">Swollen (Edema)</option>
+                      <option value="Cupped">Cupped</option>
+                      <option value="Tilted">Tilted</option>
+                      <option value="Drusen">Drusen</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <Input label="C/D Ratio" type="number" step="0.1" min="0" max="1" placeholder="0.3" value={retinaTest.odCDRatio} onChange={(e) => setRetinaTest((p) => ({ ...p, odCDRatio: e.target.value }))} />
+                  <div>
+                    <label className="text-sm font-medium text-graphite block mb-1">Macula</label>
+                    <select value={retinaTest.odMacula} onChange={(e) => setRetinaTest((p) => ({ ...p, odMacula: e.target.value }))}
+                      className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
+                      <option value="">Select...</option>
+                      <option value="Normal">Normal</option>
+                      <option value="Abnormal">Abnormal</option>
+                      <option value="Edema">Edema</option>
+                      <option value="Drusen">Drusen</option>
+                      <option value="Hemorrhage">Hemorrhage</option>
+                      <option value="Hole">Hole</option>
+                      <option value="Scar">Scar</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-graphite block mb-1">Vessels</label>
+                    <select value={retinaTest.odVessels} onChange={(e) => setRetinaTest((p) => ({ ...p, odVessels: e.target.value }))}
+                      className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
+                      <option value="">Select...</option>
+                      <option value="Normal">Normal</option>
+                      <option value="Tortuous">Tortuous</option>
+                      <option value="Narrowed">Narrowed</option>
+                      <option value="Sheathed">Sheathed</option>
+                      <option value="Neovascularization">Neovascularization</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-graphite block mb-1">Periphery</label>
+                    <select value={retinaTest.odPeriphery} onChange={(e) => setRetinaTest((p) => ({ ...p, odPeriphery: e.target.value }))}
+                      className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
+                      <option value="">Select...</option>
+                      <option value="Normal">Normal</option>
+                      <option value="Lattice Degeneration">Lattice Degeneration</option>
+                      <option value="Hole">Hole</option>
+                      <option value="Tear">Tear</option>
+                      <option value="Detachment">Detachment</option>
+                      <option value="RPE Changes">RPE Changes</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-graphite border-b border-silver pb-1">Left Eye (OS)</p>
+                  <div>
+                    <label className="text-sm font-medium text-graphite block mb-1">Media</label>
+                    <select value={retinaTest.osMedia} onChange={(e) => setRetinaTest((p) => ({ ...p, osMedia: e.target.value }))}
+                      className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
+                      <option value="">Select...</option>
+                      <option value="Clear">Clear</option>
+                      <option value="Cataract">Cataract</option>
+                      <option value="Vitreous Opacity">Vitreous Opacity</option>
+                      <option value="Vitreous Hemorrhage">Vitreous Hemorrhage</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-graphite block mb-1">Optic Disc</label>
+                    <select value={retinaTest.osDisc} onChange={(e) => setRetinaTest((p) => ({ ...p, osDisc: e.target.value }))}
+                      className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
+                      <option value="">Select...</option>
+                      <option value="Normal">Normal</option>
+                      <option value="Pale">Pale</option>
+                      <option value="Swollen (Edema)">Swollen (Edema)</option>
+                      <option value="Cupped">Cupped</option>
+                      <option value="Tilted">Tilted</option>
+                      <option value="Drusen">Drusen</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <Input label="C/D Ratio" type="number" step="0.1" min="0" max="1" placeholder="0.3" value={retinaTest.osCDRatio} onChange={(e) => setRetinaTest((p) => ({ ...p, osCDRatio: e.target.value }))} />
+                  <div>
+                    <label className="text-sm font-medium text-graphite block mb-1">Macula</label>
+                    <select value={retinaTest.osMacula} onChange={(e) => setRetinaTest((p) => ({ ...p, osMacula: e.target.value }))}
+                      className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
+                      <option value="">Select...</option>
+                      <option value="Normal">Normal</option>
+                      <option value="Abnormal">Abnormal</option>
+                      <option value="Edema">Edema</option>
+                      <option value="Drusen">Drusen</option>
+                      <option value="Hemorrhage">Hemorrhage</option>
+                      <option value="Hole">Hole</option>
+                      <option value="Scar">Scar</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-graphite block mb-1">Vessels</label>
+                    <select value={retinaTest.osVessels} onChange={(e) => setRetinaTest((p) => ({ ...p, osVessels: e.target.value }))}
+                      className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
+                      <option value="">Select...</option>
+                      <option value="Normal">Normal</option>
+                      <option value="Tortuous">Tortuous</option>
+                      <option value="Narrowed">Narrowed</option>
+                      <option value="Sheathed">Sheathed</option>
+                      <option value="Neovascularization">Neovascularization</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-graphite block mb-1">Periphery</label>
+                    <select value={retinaTest.osPeriphery} onChange={(e) => setRetinaTest((p) => ({ ...p, osPeriphery: e.target.value }))}
+                      className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom">
+                      <option value="">Select...</option>
+                      <option value="Normal">Normal</option>
+                      <option value="Lattice Degeneration">Lattice Degeneration</option>
+                      <option value="Hole">Hole</option>
+                      <option value="Tear">Tear</option>
+                      <option value="Detachment">Detachment</option>
+                      <option value="RPE Changes">RPE Changes</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </ClinicSection>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 mb-6">
             <ClinicSection title="SOAP Notes">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="text-sm font-medium text-graphite block mb-1">Subjective</label>
                   <textarea value={soapNotes.subjective} onChange={(e) => setSoapNotes({ ...soapNotes, subjective: e.target.value })}
                     placeholder="Chief complaint, onset, laterality (OD/OS/OU), blur, double vision, flashes, floaters, pain, discharge..."
-                    className="w-full h-24 px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian placeholder:text-slate focus:outline-none focus:ring-2 focus:ring-lilac-bloom resize-none" />
+                    className="w-full h-36 px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian placeholder:text-slate focus:outline-none focus:ring-2 focus:ring-lilac-bloom resize-none" />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-graphite block mb-1">Objective</label>
                   <textarea value={soapNotes.objective} onChange={(e) => setSoapNotes({ ...soapNotes, objective: e.target.value })}
                     placeholder="VA (OD/OS), IOP, slit-lamp exam, dilated fundus exam, refraction..."
-                    className="w-full h-24 px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian placeholder:text-slate focus:outline-none focus:ring-2 focus:ring-lilac-bloom resize-none" />
+                    className="w-full h-36 px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian placeholder:text-slate focus:outline-none focus:ring-2 focus:ring-lilac-bloom resize-none" />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-graphite block mb-1">Assessment</label>
                   <textarea value={soapNotes.assessment} onChange={(e) => setSoapNotes({ ...soapNotes, assessment: e.target.value })}
                     placeholder="Diagnosis, differential, visual significance..."
-                    className="w-full h-24 px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian placeholder:text-slate focus:outline-none focus:ring-2 focus:ring-lilac-bloom resize-none" />
+                    className="w-full h-36 px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian placeholder:text-slate focus:outline-none focus:ring-2 focus:ring-lilac-bloom resize-none" />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-graphite block mb-1">Plan</label>
                   <textarea value={soapNotes.plan} onChange={(e) => setSoapNotes({ ...soapNotes, plan: e.target.value })}
                     placeholder="Treatment plan, medications, follow-up interval, referrals..."
-                    className="w-full h-24 px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian placeholder:text-slate focus:outline-none focus:ring-2 focus:ring-lilac-bloom resize-none" />
+                    className="w-full h-36 px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian placeholder:text-slate focus:outline-none focus:ring-2 focus:ring-lilac-bloom resize-none" />
                 </div>
               </div>
             </ClinicSection>
           </div>
 
           <div className="flex items-center gap-3 mb-6">
-            <Button variant="primary" onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving...' : 'Save Clinical Record'}
-            </Button>
-            <Button variant="ghost" onClick={resetForm}>
-              Reset
+            <Button variant="primary" onClick={handleSave} loading={saving}>
+              Save Clinical Record
             </Button>
             {showReferralBtn && (
               <Button variant="secondary" onClick={() => setShowReferral(true)}>
                 Refer Patient
               </Button>
             )}
-            {saveMessage && (
-              <span className={`text-sm font-medium ${saveMessage.includes('success') ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
-                {saveMessage}
-              </span>
-            )}
+            <Button variant="secondary" onClick={() => setShowFollowUpModal(true)}>
+              Schedule Follow-Up
+            </Button>
+            <Button variant="ghost" onClick={() => setShowSummary(true)} title="Print Summary">
+              <Printer size={16} />
+            </Button>
+            <Button variant="ghost" onClick={resetForm} title="Reset Form">
+              <RotateCcw size={16} />
+            </Button>
           </div>
 
           {records.records.length > 0 && (
@@ -450,13 +563,18 @@ export default function GenOphthDashboard() {
         </>
       )}
 
-      {!patients.selectedPatient && records.stats && (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
-          <StatCard label="Total Patients" value={records.stats.totalPatients} />
-          <StatCard label="Today's Appointments" value={records.stats.todayAppointments} />
-          <StatCard label="Today's Records" value={records.stats.todayRecords} />
-          <StatCard label="Eye Exams Done" value={records.stats.totalPatients} variant="highlight" />
-        </div>
+      {!patients.selectedPatient && (
+        <>
+          <UpcomingFollowUpsSection clinicSlug="general-ophth" />
+          {records.stats && (
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
+              <StatCard label="Total Patients" value={records.stats.totalPatients} />
+              <StatCard label="Today's Appointments" value={records.stats.todayAppointments} />
+              <StatCard label="Today's Records" value={records.stats.todayRecords} />
+              <StatCard label="Eye Exams Done" value={records.stats.totalPatients} variant="highlight" />
+            </div>
+          )}
+        </>
       )}
 
       {showSummary && (
@@ -478,11 +596,15 @@ export default function GenOphthDashboard() {
         fromClinicId="general-ophth"
       />
 
-      {saveMessage && (
-        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg shadow-xl text-sm font-medium transition-all duration-300 ${saveMessage.includes('success') ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
-          {saveMessage}
-        </div>
-      )}
+      <ScheduleFollowUpModal
+        open={showFollowUpModal}
+        onClose={() => setShowFollowUpModal(false)}
+        clinicSlug="general-ophth"
+        patientId={patients.selectedPatient?.id}
+        patientName={patients.selectedPatient?.fullName}
+        onScheduled={() => setShowFollowUpModal(false)}
+      />
+
     </ClinicDashboardShell>
   );
 }

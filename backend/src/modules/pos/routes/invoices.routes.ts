@@ -90,9 +90,14 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.PHARMACY_WRITE), as
     where: { invoiceId: invoice.id },
   });
 
-  for (const item of invoiceItems) {
-    const dbItem = await prisma.inventoryItem.findUnique({ where: { id: item.itemId } });
-    if (!dbItem) continue;
+  const dbItems = await prisma.inventoryItem.findMany({
+    where: { id: { in: invoiceItems.map((i) => i.itemId) } },
+  });
+  const itemMap = new Map(dbItems.map((i) => [i.id, i]));
+
+  await Promise.all(invoiceItems.map(async (item) => {
+    const dbItem = itemMap.get(item.itemId);
+    if (!dbItem) return;
     const existingQty = Number(dbItem.quantity);
     const existingCost = Number(dbItem.costPrice) || 0;
     const receivedQty = item.quantityReceived;
@@ -118,8 +123,7 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.PHARMACY_WRITE), as
         itemId: item.itemId,
       },
     });
-  }
-
+  }));
   const paidAmount = Number(amountPaid) || 0;
   if (category !== 'hospital') {
     const deptSlug = category === 'pharmacy' ? 'pharmacy-dept' : 'optics-dept';

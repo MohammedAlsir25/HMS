@@ -5,6 +5,7 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { api } from '../../lib/api';
+import { notifyError } from '../../utils/notify';
 import ReservationFormModal from './ReservationFormModal';
 
 export default function ReservationsPanel({ clinics }) {
@@ -14,6 +15,7 @@ export default function ReservationsPanel({ clinics }) {
   const [clinicFilter, setClinicFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [submittingId, setSubmittingId] = useState(null);
 
   const fetchReservations = async () => {
     setLoading(true);
@@ -23,7 +25,7 @@ export default function ReservationsPanel({ clinics }) {
       if (searchQ.trim().length >= 2) params.set('q', searchQ.trim());
       const data = await api.get(`/reception/reservations?${params}`);
       setReservations(data);
-    } catch (err) { console.error('[ReservationsPanel]', err); }
+    } catch (err) { notifyError(err); }
     finally { setLoading(false); }
   };
 
@@ -31,10 +33,12 @@ export default function ReservationsPanel({ clinics }) {
 
   const handleArrive = async (id, e) => {
     e.preventDefault();
+    setSubmittingId(id);
     try {
       await api.patch(`/reception/reservations/${id}/arrive`, { priority: 5, visitType: 'NEW_VISIT' });
       fetchReservations();
-    } catch (err) { console.error('[ReservationsPanel]', err); }
+    } catch (err) { notifyError(err); }
+    finally { setSubmittingId(null); }
   };
 
   return (
@@ -82,7 +86,7 @@ export default function ReservationsPanel({ clinics }) {
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant="warning">{t('reception.reserved')}</Badge>
-                  <Button size="sm" variant="primary" onClick={(e) => handleArrive(r.id, e)}>
+                  <Button size="sm" variant="primary" onClick={(e) => handleArrive(r.id, e)} loading={submittingId === r.id}>
                     {t('reception.arrived')}
                   </Button>
                 </div>

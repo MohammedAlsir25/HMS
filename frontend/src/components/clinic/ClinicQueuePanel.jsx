@@ -93,6 +93,11 @@ export default function ClinicQueuePanel({ queue, loading, lastUpdated, onStartC
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {a.optometryReport && (
+                      <Badge variant="info" size="sm" title={`Optometry report: ${a.optometryReport.diagnosis || 'Attached'}`}>
+                        📋 Optometry
+                      </Badge>
+                    )}
                     <Badge className={status.class}>{status.label}</Badge>
                     <Button size="sm" variant="primary" onClick={() => onStartConsultation(a)}>
                       See Patient

@@ -96,11 +96,14 @@ function hasCamelCaseUpdatedAt(table: string): boolean {
 
 router.get('/initial', authenticate, asyncHandler(async (_req, res) => {
   const result: Record<string, unknown[]> = {};
-  for (const table of REFERENCE_TABLES) {
+  const results = await Promise.all(REFERENCE_TABLES.map(async (table) => {
     const delegate = getModel(table);
-    if (!delegate) continue;
+    if (!delegate) return null;
     const records = await delegate.findMany({});
-    result[table] = records;
+    return { table, records };
+  }));
+  for (const entry of results) {
+    if (entry) result[entry.table] = entry.records;
   }
   res.json({ data: result, timestamp: new Date().toISOString() });
 }));

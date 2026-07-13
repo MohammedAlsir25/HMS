@@ -9,6 +9,7 @@ import { Table } from "../../components/ui/Table";
 import { Modal } from "../../components/ui/Modal";
 import { api } from "../../lib/api";
 import { posKeys } from "../../hooks/queries/usePOS";
+import { notifyError } from "../../utils/notify";
 import DeliveryModal from "./DeliveryModal";
 
 function AlertPanel({ alerts, onDismiss }) {
@@ -61,6 +62,8 @@ export default function OpticsProducts() {
   const [alerts, setAlerts] = useState({ lowStock: [], expired: [], expiringSoon: [] });
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [mutationError, setMutationError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [form, setForm] = useState({
     name: "",
     sku: "",
@@ -76,7 +79,7 @@ export default function OpticsProducts() {
       const data = await api.get(`/pos/optics/items${params}`);
       setItems(data);
     } catch (err) {
-      console.error("Failed to load optics items:", err);
+      notifyError(err);
     } finally {
       setLoading(false);
     }
@@ -86,7 +89,7 @@ export default function OpticsProducts() {
     try {
       const data = await api.get("/pos/alerts?category=optics");
       setAlerts(data);
-    } catch (err) { console.error('[OpticsProducts]', err); }
+    } catch (err) { notifyError(err); }
   }, []);
 
   useEffect(() => {
@@ -121,6 +124,7 @@ export default function OpticsProducts() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSaving(true);
     try {
       setMutationError('');
       const payload = {
@@ -146,10 +150,12 @@ export default function OpticsProducts() {
     } catch (err) {
       setMutationError(err.message || "Failed to save item");
     }
+    setSaving(false);
   };
 
   const handleDelete = async () => {
     if (!deleteItem) return;
+    setDeleting(true);
     try {
       setMutationError('');
       await api.delete(`/pos/optics/items/${deleteItem.id}`);
@@ -161,6 +167,7 @@ export default function OpticsProducts() {
     } catch (err) {
       setMutationError(err.message || "Failed to delete item");
     }
+    setDeleting(false);
   };
 
   const handleAdjust = async (e) => {
@@ -288,7 +295,7 @@ export default function OpticsProducts() {
           <Input label={t("opticsProducts.formMinStock")} type="number" min="0" value={form.minStock} onChange={(e) => setForm({ ...form, minStock: e.target.value })} />
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="secondary" onClick={() => { setShowModal(false); setEditItem(null); }} className="flex-1">{t("common.cancel")}</Button>
-            <Button type="submit" className="flex-1">{editItem ? t("opticsProducts.updateBtn") : t("opticsProducts.createBtn")}</Button>
+            <Button type="submit" className="flex-1" loading={saving}>{editItem ? t("opticsProducts.updateBtn") : t("opticsProducts.createBtn")}</Button>
           </div>
         </form>
       </Modal>
@@ -320,7 +327,7 @@ export default function OpticsProducts() {
           <p className="text-caption text-slate">{t("opticsProducts.deleteHint")}</p>
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="secondary" onClick={() => setDeleteItem(null)} className="flex-1">{t("common.cancel")}</Button>
-            <Button type="button" variant="danger" onClick={handleDelete} className="flex-1">{t("common.delete")}</Button>
+            <Button type="button" variant="danger" onClick={handleDelete} loading={deleting} className="flex-1">{t("common.delete")}</Button>
           </div>
         </div>
       </Modal>
