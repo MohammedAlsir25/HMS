@@ -29,6 +29,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/icon.png",
       "icons/icon.ico",
@@ -39,7 +40,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnRzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJEN0Q3MzhENTdGOTg3M0EKUlRRNmgvbFhqWE45TGMwaDBBZ0hCcWVqZG9MU21adjN2SmcwOC81dGdFOGp0YUFkdVJnTG5uWmsK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM0NkIwRUZCQURBQkVGOEMKUldTTTc2dXQrdzVyeE5uUndYekdhN2dGZDUwVHNMR2prekNPalgrQjFMZEdZT3FwQ3pWK0U4VW4K",
       "endpoints": [
         "https://github.com/MohammedAlsir25/AL-Jawahir-Hospital/releases/latest/download/latest.json"
       ]
