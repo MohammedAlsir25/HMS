@@ -330,13 +330,13 @@ router.post(
       }));
     }
 
-    const invItemIds = receivedItems.filter((ri) => ri.itemId).map((ri) => ri.itemId);
+    const invItemIds = receivedItems.filter((ri: { itemId?: string }) => ri.itemId).map((ri: { itemId?: string }) => ri.itemId);
     const inventoryItems = await prisma.inventoryItem.findMany({
       where: { id: { in: invItemIds } },
     });
     const invItemMap = new Map(inventoryItems.map((i) => [i.id, i]));
 
-    await Promise.all(receivedItems.map(async (ri) => {
+    await Promise.all(receivedItems.map(async (ri: { itemId?: string; quantityReceived: number }) => {
       const poItem = existing.items.find((i) => i.id === ri.itemId);
       if (!poItem) {
         throw new ValidationError(`Item ${ri.itemId} not found in purchase order`);
@@ -356,7 +356,7 @@ router.post(
         if (invItem) {
           await prisma.inventoryItem.update({
             where: { id: ri.itemId },
-            data: { quantity: invItem.quantity + ri.quantityReceived },
+            data: { quantity: Number(invItem.quantity) + ri.quantityReceived },
           });
         }
       }

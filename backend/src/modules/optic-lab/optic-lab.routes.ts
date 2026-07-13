@@ -3,7 +3,6 @@ import { authenticate } from '../../middleware/auth.js';
 import { asyncHandler } from '../../middleware/errorHandler.js';
 import { PERMISSIONS } from '../../middleware/rbac.js';
 import { ValidationError, NotFoundError, ConflictError } from '../../utils/errors.js';
-import { NotificationService } from '../procurement/services/NotificationService.js';
 import prisma from '../../lib/prisma.js';
 import { createLabJobSchema, updateLabJobStatusSchema } from './optic-lab.schema.js';
 
