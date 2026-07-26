@@ -1,8 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicotran/tauri-config-schema/main/schema.json",
-  "productName": "ALJawarih Hospital",
-  "version": "1.1.0",
-  "identifier": "com.aljawarih.hospital",
+  "productName": "HMS",
+  "version": "1.0.0",
+  "identifier": "com.hms.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "ALJawarih Hospital",
+        "title": "HMS",
         "width": 1280,
         "height": 800,
         "resizable": true,
@@ -42,7 +42,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM0NkIwRUZCQURBQkVGOEMKUldTTTc2dXQrdzVyeE5uUndYekdhN2dGZDUwVHNMR2prekNPalgrQjFMZEdZT3FwQ3pWK0U4VW4K",
       "endpoints": [
-        "https://github.com/MohammedAlsir25/AL-Jawahir-Hospital/releases/latest/download/latest.json"
+        "https://github.com/hms/releases/latest/download/latest.json"
       ]
     }
   }

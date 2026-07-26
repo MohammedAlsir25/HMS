@@ -1,8 +1,8 @@
 [package]
-name = "al-jawarih-hospital"
-version = "1.1.0"
-description = "Al Jawarih Hospital Management System"
-authors = ["Al Jawarih Hospital"]
+name = "hms"
+version = "1.0.0"
+description = "Hospital Management System"
+authors = ["HMS"]
 edition = "2021"
 
 [lib]
