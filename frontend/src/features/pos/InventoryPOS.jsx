@@ -30,14 +30,16 @@ export default function InventoryPOS() {
   const [search, setSearch] = useState('');
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState(null);
   const [showDelivery, setShowDelivery] = useState(false);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const data = await api.get(`/pos/${activeStore}/items`);
       setItems(data);
-    } catch { setItems([]); }
+    } catch (err) { setItems([]); setFetchError(err.message || 'Failed to load items'); }
     setLoading(false);
   }, [activeStore]);
 
@@ -94,6 +96,16 @@ export default function InventoryPOS() {
             <Input placeholder="Search by name or SKU..." value={search} onChange={(e) => setSearch(e.target.value)} className="mb-4" />
             {loading ? (
               <p className="text-body text-slate">Loading...</p>
+            ) : fetchError ? (
+              <div className="flex flex-col items-center justify-center gap-4 py-8">
+                <p className="text-body text-red-500">{fetchError}</p>
+                <button
+                  onClick={() => { fetchItems(); fetchInvoices(); }}
+                  className="px-4 py-2 text-sm rounded-lg bg-lilac-bloom text-white hover:opacity-90"
+                >
+                  Retry
+                </button>
+              </div>
             ) : filteredItems.length === 0 ? (
               <p className="text-body text-slate text-center py-4">No items found</p>
             ) : (

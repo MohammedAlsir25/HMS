@@ -14,18 +14,20 @@ export default function ReservationsPanel({ clinics }) {
   const [searchQ, setSearchQ] = useState('');
   const [clinicFilter, setClinicFilter] = useState('');
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [submittingId, setSubmittingId] = useState(null);
 
   const fetchReservations = async () => {
     setLoading(true);
+    setFetchError('');
     try {
       const params = new URLSearchParams();
       if (clinicFilter) params.set('clinicId', clinicFilter);
       if (searchQ.trim().length >= 2) params.set('q', searchQ.trim());
       const data = await api.get(`/reception/reservations?${params}`);
       setReservations(data);
-    } catch (err) { notifyError(err); }
+    } catch (err) { notifyError(err); setFetchError(err.message || 'Failed to load reservations'); }
     finally { setLoading(false); }
   };
 
@@ -71,6 +73,8 @@ export default function ReservationsPanel({ clinics }) {
         <ReservationFormModal open={showForm} onClose={() => setShowForm(false)} clinics={clinics} onCreated={fetchReservations} />
         {loading ? (
           <p className="text-sm text-graphite">{t('common.loading')}</p>
+        ) : fetchError ? (
+          <p className="text-body text-red-500 text-center py-4">{fetchError}</p>
         ) : reservations.length === 0 ? (
           <p className="text-sm text-graphite">{t('reception.noReservations')}</p>
         ) : (

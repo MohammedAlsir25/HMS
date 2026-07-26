@@ -1,10 +1,12 @@
-import { useState } from 'react';
-import { useWards, useWardBeds } from '../../hooks/queries/useWards';
+import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useWards, useWardBeds, useWardDashboard, useWardPatients } from '../../hooks/queries/useWards';
 import { useBedVitals, useRecordVital, useBedNursingNotes, useCreateNursingNote, useWardRounds, useCreateWardRound } from '../../hooks/queries/useInpatient';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
+import { Printer } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const statusColors = {
@@ -15,6 +17,7 @@ const statusColors = {
 };
 
 export default function InpatientPage() {
+  const { t } = useTranslation();
   const today = new Date().toISOString().slice(0, 10);
   const [selectedWard, setSelectedWard] = useState('');
   const [selectedBed, setSelectedBed] = useState(null);
@@ -25,6 +28,8 @@ export default function InpatientPage() {
 
   const { data: wards = [] } = useWards();
   const { data: beds = [] } = useWardBeds(selectedWard ? { wardId: selectedWard } : {});
+  const { data: dashboard, isLoading: dashboardLoading, isError: dashboardError, refetch: refetchDashboard } = useWardDashboard();
+  const { data: wardPatients = [], isLoading: patientsLoading } = useWardPatients(selectedWard);
 
   const vitalForm = useRecordVital();
   const noteForm = useCreateNursingNote();
@@ -42,6 +47,7 @@ export default function InpatientPage() {
   const [roundDate, setRoundDate] = useState(today);
   const [roundNotes, setRoundNotes] = useState('');
   const [roundPlan, setRoundPlan] = useState('');
+  const [selectedRoundPatient, setSelectedRoundPatient] = useState(null);
 
   const handleRecordVital = () => {
     const data = {};
@@ -71,21 +77,21 @@ export default function InpatientPage() {
   const selectedWardName = wards.find((w) => w.id === selectedWard)?.name || '';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour="inpatient">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-heading-sm font-semibold text-obsidian">In-Patient Management</h1>
-          <p className="text-body text-slate mt-1">Vitals, nursing notes, and daily rounds</p>
+          <h1 className="text-heading-sm font-semibold text-obsidian">{t('inpatient.title')}</h1>
+          <p className="text-body text-slate mt-1">{t('inpatient.description')}</p>
         </div>
         <div className="flex items-center gap-3">
-          <label htmlFor="ward-select" className="text-sm font-medium text-graphite">Ward</label>
+          <label htmlFor="ward-select" className="text-sm font-medium text-graphite">{t('inpatient.wardLabel')}</label>
           <select
             id="ward-select"
             value={selectedWard}
-            onChange={(e) => { setSelectedWard(e.target.value); setSelectedBed(null); }}
+            onChange={(e) => { setSelectedWard(e.target.value); setSelectedBed(null); setSelectedRoundPatient(null); }}
             className="px-4 py-2 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom"
           >
-            <option value="">Select ward...</option>
+            <option value="">{t('inpatient.selectWard')}</option>
             {wards.map((w) => (
               <option key={w.id} value={w.id}>{w.name} ({w.beds?.length || 0} beds)</option>
             ))}
@@ -93,12 +99,64 @@ export default function InpatientPage() {
         </div>
       </div>
 
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {dashboardLoading ? (
+          <>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i} className="animate-pulse">
+                <CardContent className="py-4">
+                  <div className="h-4 bg-bone rounded w-20 mb-2" />
+                  <div className="h-8 bg-bone rounded w-16" />
+                </CardContent>
+              </Card>
+            ))}
+          </>
+        ) : dashboardError ? (
+          <div className="col-span-full flex flex-col items-center justify-center gap-4 py-8">
+            <p className="text-body text-red-500">Failed to load dashboard</p>
+            <button
+              onClick={() => refetchDashboard()}
+              className="px-4 py-2 text-sm rounded-lg bg-lilac-bloom text-white hover:opacity-90"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <>
+            <Card>
+              <CardContent className="py-4">
+                <p className="text-caption text-slate uppercase tracking-wide">{t('inpatient.totalBeds')}</p>
+                <p className="text-heading-sm font-semibold text-obsidian mt-1">{dashboard?.totalBeds ?? 0}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="py-4">
+                <p className="text-caption text-slate uppercase tracking-wide">{t('inpatient.occupiedBeds')}</p>
+                <p className="text-heading-sm font-semibold text-obsidian mt-1">{dashboard?.occupiedBeds ?? 0}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="py-4">
+                <p className="text-caption text-slate uppercase tracking-wide">{t('inpatient.admissionsToday')}</p>
+                <p className="text-heading-sm font-semibold text-obsidian mt-1">{dashboard?.admissionsToday ?? 0}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="py-4">
+                <p className="text-caption text-slate uppercase tracking-wide">{t('inpatient.dischargesToday')}</p>
+                <p className="text-heading-sm font-semibold text-obsidian mt-1">{dashboard?.dischargesToday ?? 0}</p>
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </div>
+
       {selectedWard && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>{selectedWardName} — Bed Map</CardTitle>
+                <CardTitle>{selectedWardName} — {t('inpatient.bedMap')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
@@ -124,24 +182,59 @@ export default function InpatientPage() {
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>Daily Rounds — {today}</CardTitle>
-                  <Button size="sm" onClick={() => setShowRoundForm(true)}>Add Round</Button>
+                  <CardTitle>{t('inpatient.dailyRounds')} — {today}</CardTitle>
+                  <Button size="sm" onClick={() => setShowRoundForm(true)}>{t('inpatient.addRound')}</Button>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-3 max-h-60 overflow-y-auto">
-                {rounds.length === 0 && <p className="text-caption text-slate text-center py-4">No rounds recorded today</p>}
-                {rounds.map((r) => (
-                  <div key={r.id} className="rounded-lg border border-silver p-3">
-                    <p className="text-caption text-slate">Dr. {r.doctor?.fullName} &middot; {new Date(r.date).toLocaleString()}</p>
-                    {r.notes && <p className="text-body text-obsidian mt-1 whitespace-pre-wrap">{r.notes}</p>}
-                    {r.plan && (
-                      <div className="mt-2 pt-2 border-t border-silver/50">
-                        <p className="text-caption text-slate font-medium">Plan:</p>
-                        <p className="text-body text-obsidian whitespace-pre-wrap">{r.plan}</p>
+              <CardContent>
+                {selectedWard && (
+                  <div className="mb-4">
+                    <p className="text-caption text-slate uppercase tracking-wide mb-2">{t('inpatient.admittedPatients')}</p>
+                    {patientsLoading ? (
+                      <p className="text-caption text-slate">{t('inpatient.loadingPatients')}</p>
+                    ) : wardPatients.length === 0 ? (
+                      <p className="text-caption text-slate italic">{t('inpatient.noAdmitted')}</p>
+                    ) : (
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {wardPatients.map((p) => (
+                          <button
+                            key={p.id}
+                            className={`w-full text-left rounded-lg border p-3 transition-colors ${
+                              selectedRoundPatient?.id === p.id
+                                ? 'border-lilac-bloom bg-lilac-bloom/10'
+                                : 'border-silver hover:bg-bone/50'
+                            }`}
+                            onClick={() => setSelectedRoundPatient(selectedRoundPatient?.id === p.id ? null : p)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-body font-medium text-obsidian">{p.patient?.fullName || 'Unknown'}</span>
+                              <span className="text-caption text-slate">Bed {p.bedNumber}</span>
+                            </div>
+                            <div className="flex gap-3 text-caption text-slate mt-1">
+                              <span>MRN: {p.patient?.mrn || '-'}</span>
+                              {p.assignedAt && <span>Since: {new Date(p.assignedAt).toLocaleDateString()}</span>}
+                            </div>
+                          </button>
+                        ))}
                       </div>
                     )}
                   </div>
-                ))}
+                )}
+                <div className="space-y-3 max-h-60 overflow-y-auto">
+                  {rounds.length === 0 && <p className="text-caption text-slate text-center py-4">{t('inpatient.noRoundsToday')}</p>}
+                  {rounds.map((r) => (
+                    <div key={r.id} className="rounded-lg border border-silver p-3">
+                      <p className="text-caption text-slate">Dr. {r.doctor?.fullName} &middot; {new Date(r.date).toLocaleString()}</p>
+                      {r.notes && <p className="text-body text-obsidian mt-1 whitespace-pre-wrap">{r.notes}</p>}
+                      {r.plan && (
+                        <div className="mt-2 pt-2 border-t border-silver/50">
+                          <p className="text-caption text-slate font-medium">{t('inpatient.planLabel')}</p>
+                          <p className="text-body text-obsidian whitespace-pre-wrap">{r.plan}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -164,7 +257,7 @@ export default function InpatientPage() {
                           className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${activeTab === tab ? 'bg-lilac-bloom text-paper border-lilac-bloom' : 'bg-paper text-graphite border-silver'}`}
                           onClick={() => setActiveTab(tab)}
                         >
-                          {tab === 'vitals' ? 'Vitals' : 'Nursing Notes'}
+                          {tab === 'vitals' ? t('inpatient.tabVitals') : t('inpatient.tabNursingNotes')}
                         </button>
                       ))}
                     </div>
@@ -175,12 +268,12 @@ export default function InpatientPage() {
                   <Card>
                     <CardHeader>
                       <div className="flex items-center justify-between">
-                        <CardTitle>Vital Signs</CardTitle>
-                        <Button size="sm" onClick={() => setShowVitalForm(true)}>Record</Button>
+                        <CardTitle>{t('inpatient.vitalSigns')}</CardTitle>
+                        <Button size="sm" onClick={() => setShowVitalForm(true)}>{t('inpatient.recordVitals')}</Button>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-2 max-h-80 overflow-y-auto">
-                      {vitals.length === 0 && <p className="text-caption text-slate text-center py-4">No vitals recorded</p>}
+                      {vitals.length === 0 && <p className="text-caption text-slate text-center py-4">{t('inpatient.noVitals')}</p>}
                       {vitals.map((v) => (
                         <div key={v.id} className="rounded-lg border border-silver p-3">
                           <p className="text-caption text-slate">{new Date(v.recordedAt).toLocaleString()} — {v.recordedBy?.fullName}</p>
@@ -203,12 +296,12 @@ export default function InpatientPage() {
                   <Card>
                     <CardHeader>
                       <div className="flex items-center justify-between">
-                        <CardTitle>Nursing Notes</CardTitle>
-                        <Button size="sm" onClick={() => setShowNoteForm(true)}>Add</Button>
+                        <CardTitle>{t('inpatient.nursingNotes')}</CardTitle>
+                        <Button size="sm" onClick={() => setShowNoteForm(true)}>{t('inpatient.addNote')}</Button>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-2 max-h-80 overflow-y-auto">
-                      {nursingNotes.length === 0 && <p className="text-caption text-slate text-center py-4">No nursing notes</p>}
+                      {nursingNotes.length === 0 && <p className="text-caption text-slate text-center py-4">{t('inpatient.noNotes')}</p>}
                       {nursingNotes.map((n) => (
                         <div key={n.id} className="rounded-lg border border-silver p-3">
                           <p className="text-body text-obsidian whitespace-pre-wrap">{n.content}</p>
@@ -222,7 +315,7 @@ export default function InpatientPage() {
             ) : (
               <Card>
                 <CardContent>
-                  <p className="text-body text-slate text-center py-8">Select a bed to view details</p>
+                  <p className="text-body text-slate text-center py-8">{t('inpatient.selectBedPrompt')}</p>
                 </CardContent>
               </Card>
             )}
@@ -230,16 +323,66 @@ export default function InpatientPage() {
         </div>
       )}
 
-      <Modal open={showVitalForm} onClose={() => setShowVitalForm(false)} title="Record Vital Signs">
+      {selectedBed && selectedBed.patient && (
+        <div className="flex justify-end">
+          <Button variant="secondary" onClick={() => {
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) return;
+            const latestVital = vitals.length > 0 ? vitals[0] : null;
+            const vitalsHtml = latestVital ? `
+              <table style="width:100%; border-collapse:collapse; margin-top:0.5cm;">
+                <tr><th style="border:1px solid #333; padding:4px 8px; background:#f0f0f0;">Parameter</th><th style="border:1px solid #333; padding:4px 8px; background:#f0f0f0;">Value</th></tr>
+                ${latestVital.temperature !== null ? `<tr><td style="border:1px solid #333; padding:4px 8px;">Temperature</td><td style="border:1px solid #333; padding:4px 8px;">${Number(latestVital.temperature).toFixed(1)}°C</td></tr>` : ''}
+                ${latestVital.heartRate !== null ? `<tr><td style="border:1px solid #333; padding:4px 8px;">Heart Rate</td><td style="border:1px solid #333; padding:4px 8px;">${latestVital.heartRate} bpm</td></tr>` : ''}
+                ${latestVital.bloodPressureSystolic !== null ? `<tr><td style="border:1px solid #333; padding:4px 8px;">Blood Pressure</td><td style="border:1px solid #333; padding:4px 8px;">${latestVital.bloodPressureSystolic}/${latestVital.bloodPressureDiastolic || '?'} mmHg</td></tr>` : ''}
+                ${latestVital.respiratoryRate !== null ? `<tr><td style="border:1px solid #333; padding:4px 8px;">Resp. Rate</td><td style="border:1px solid #333; padding:4px 8px;">${latestVital.respiratoryRate} /min</td></tr>` : ''}
+                ${latestVital.oxygenSaturation !== null ? `<tr><td style="border:1px solid #333; padding:4px 8px;">SpO₂</td><td style="border:1px solid #333; padding:4px 8px;">${latestVital.oxygenSaturation}%</td></tr>` : ''}
+                ${latestVital.painScore !== null ? `<tr><td style="border:1px solid #333; padding:4px 8px;">Pain Score</td><td style="border:1px solid #333; padding:4px 8px;">${latestVital.painScore}/10</td></tr>` : ''}
+                <tr><td style="border:1px solid #333; padding:4px 8px;">Recorded</td><td style="border:1px solid #333; padding:4px 8px;">${new Date(latestVital.recordedAt).toLocaleString()} — ${latestVital.recordedBy?.fullName || '-'}</td></tr>
+              </table>` : '<p>No vitals recorded yet.</p>';
+            const notesHtml = nursingNotes.length > 0 ? nursingNotes.map((n) => `<div style="border-bottom:1px solid #ccc; padding:4px 0;"><strong>${new Date(n.createdAt).toLocaleString()} — ${n.createdBy?.fullName || ''}</strong><br/>${n.content}</div>`).join('') : '<p>No nursing notes.</p>';
+            printWindow.document.write(`
+              <html><head><title>Admission Summary</title>
+              <style>
+                body { font-family: Arial, sans-serif; padding: 2cm; font-size: 12pt; }
+                h1 { font-size: 18pt; margin-bottom: 0.5cm; }
+                h2 { font-size: 14pt; margin-top: 1cm; border-bottom: 1px solid #999; padding-bottom: 0.2cm; }
+                .header { text-align: center; margin-bottom: 1cm; border-bottom: 2px solid #333; padding-bottom: 0.5cm; }
+                .field { margin: 0.3cm 0; }
+                .field label { font-weight: bold; display: inline-block; min-width: 5cm; }
+                .footer { margin-top: 2cm; font-size: 10pt; color: #666; border-top: 1px solid #999; padding-top: 0.5cm; text-align: center; }
+              </style></head><body>
+                <div class="header"><h1>Admission Summary</h1></div>
+                <div class="field"><label>Patient:</label> ${selectedBed.patient.fullName || '-'}</div>
+                <div class="field"><label>MRN:</label> ${selectedBed.patient.mrn || '-'}</div>
+                <div class="field"><label>Ward:</label> ${selectedWardName}</div>
+                <div class="field"><label>Bed:</label> ${selectedBed.bedNumber}</div>
+                <div class="field"><label>Admitted:</label> ${selectedBed.assignedAt ? new Date(selectedBed.assignedAt).toLocaleString() : '-'}</div>
+                <div class="field"><label>Date Printed:</label> ${new Date().toLocaleString()}</div>
+                <h2>Latest Vital Signs</h2>
+                ${vitalsHtml}
+                <h2>Nursing Notes</h2>
+                ${notesHtml}
+                <div class="footer">HMS — Admission Summary</div>
+              </body></html>
+            `);
+            printWindow.document.close();
+            printWindow.focus();
+            printWindow.print();
+          }}><Printer size={14} className="mr-1" /> Print Admission Summary</Button>
+        </div>
+      )}
+
+      <Modal open={showVitalForm} onClose={() => setShowVitalForm(false)} title={t('inpatient.recordVitalSigns')}>
         <div className="grid grid-cols-2 gap-4">
           {[
-            { key: 'temperature', label: 'Temperature (°C)', type: 'number', step: '0.1' },
-            { key: 'heartRate', label: 'Heart Rate (bpm)', type: 'number' },
-            { key: 'bloodPressureSystolic', label: 'BP Systolic', type: 'number' },
-            { key: 'bloodPressureDiastolic', label: 'BP Diastolic', type: 'number' },
-            { key: 'respiratoryRate', label: 'Respiratory Rate (/min)', type: 'number' },
-            { key: 'oxygenSaturation', label: 'SpO₂ (%)', type: 'number' },
-            { key: 'painScore', label: 'Pain Score (0-10)', type: 'number', min: 0, max: 10 },
+            { key: 'temperature', label: t('inpatient.temperature'), type: 'number', step: '0.1' },
+            { key: 'heartRate', label: t('inpatient.heartRate'), type: 'number' },
+            { key: 'bloodPressureSystolic', label: t('inpatient.bpSystolic'), type: 'number' },
+            { key: 'bloodPressureDiastolic', label: t('inpatient.bpDiastolic'), type: 'number' },
+            { key: 'respiratoryRate', label: t('inpatient.respiratoryRate'), type: 'number' },
+            { key: 'oxygenSaturation', label: t('inpatient.oxygenSaturation'), type: 'number' },
+            { key: 'painScore', label: t('inpatient.painScore'), type: 'number', min: 0, max: 10 },
           ].map((field) => (
             <div key={field.key}>
               <label className="block text-sm font-medium text-graphite mb-1">{field.label}</label>
@@ -255,7 +398,7 @@ export default function InpatientPage() {
             </div>
           ))}
           <div className="col-span-2">
-            <label className="block text-sm font-medium text-graphite mb-1">Notes</label>
+            <label className="block text-sm font-medium text-graphite mb-1">{t('inpatient.notesLabel')}</label>
             <textarea
               value={vitalInputs.notes}
               onChange={(e) => setVitalInputs({ ...vitalInputs, notes: e.target.value })}
@@ -265,29 +408,29 @@ export default function InpatientPage() {
           </div>
         </div>
         <div className="flex gap-3 pt-4">
-          <Button variant="secondary" onClick={() => setShowVitalForm(false)} className="flex-1">Cancel</Button>
-          <Button onClick={handleRecordVital} className="flex-1" loading={vitalForm.isPending}>Record</Button>
+          <Button variant="secondary" onClick={() => setShowVitalForm(false)} className="flex-1">{t('wards.cancel')}</Button>
+          <Button onClick={handleRecordVital} className="flex-1" loading={vitalForm.isPending}>{t('inpatient.recordVitals')}</Button>
         </div>
       </Modal>
 
-      <Modal open={showNoteForm} onClose={() => setShowNoteForm(false)} title="Add Nursing Note">
+      <Modal open={showNoteForm} onClose={() => setShowNoteForm(false)} title={t('inpatient.addNursingNote')}>
         <textarea
           value={newNote}
           onChange={(e) => setNewNote(e.target.value)}
           className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom resize-none"
           rows={4}
-          placeholder="Nursing observation, care provided, patient response..."
+          placeholder={t('inpatient.nursingPlaceholder')}
         />
         <div className="flex gap-3 pt-4">
-          <Button variant="secondary" onClick={() => setShowNoteForm(false)} className="flex-1">Cancel</Button>
-          <Button onClick={handleAddNote} className="flex-1" loading={noteForm.isPending} disabled={!newNote.trim()}>Add Note</Button>
+          <Button variant="secondary" onClick={() => setShowNoteForm(false)} className="flex-1">{t('wards.cancel')}</Button>
+          <Button onClick={handleAddNote} className="flex-1" loading={noteForm.isPending} disabled={!newNote.trim()}>{t('inpatient.addNoteButton')}</Button>
         </div>
       </Modal>
 
-      <Modal open={showRoundForm} onClose={() => setShowRoundForm(false)} title="Record Daily Round">
+      <Modal open={showRoundForm} onClose={() => setShowRoundForm(false)} title={t('inpatient.recordDailyRound')}>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-graphite mb-1">Date</label>
+            <label className="block text-sm font-medium text-graphite mb-1">{t('inpatient.roundDate')}</label>
             <input
               type="date"
               value={roundDate}
@@ -296,29 +439,29 @@ export default function InpatientPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-graphite mb-1">Round Notes</label>
+            <label className="block text-sm font-medium text-graphite mb-1">{t('inpatient.roundNotes')}</label>
             <textarea
               value={roundNotes}
               onChange={(e) => setRoundNotes(e.target.value)}
               className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom resize-none"
               rows={3}
-              placeholder="Clinical observations, patient status, concerns..."
+              placeholder={t('inpatient.roundNotesPlaceholder')}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-graphite mb-1">Plan</label>
+            <label className="block text-sm font-medium text-graphite mb-1">{t('inpatient.roundPlan')}</label>
             <textarea
               value={roundPlan}
               onChange={(e) => setRoundPlan(e.target.value)}
               className="w-full px-4 py-3 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom resize-none"
               rows={3}
-              placeholder="Treatment plan, medication changes, investigations..."
+              placeholder={t('inpatient.roundPlanPlaceholder')}
             />
           </div>
         </div>
         <div className="flex gap-3 pt-4">
-          <Button variant="secondary" onClick={() => setShowRoundForm(false)} className="flex-1">Cancel</Button>
-          <Button onClick={handleAddRound} className="flex-1" loading={roundForm.isPending} disabled={!roundDate}>Save Round</Button>
+          <Button variant="secondary" onClick={() => setShowRoundForm(false)} className="flex-1">{t('wards.cancel')}</Button>
+          <Button onClick={handleAddRound} className="flex-1" loading={roundForm.isPending} disabled={!roundDate}>{t('inpatient.saveRound')}</Button>
         </div>
       </Modal>
     </div>

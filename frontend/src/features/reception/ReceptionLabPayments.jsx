@@ -10,8 +10,8 @@ import { notifySuccess, notifyError } from '../../utils/notify';
 export default function ReceptionLabPayments() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const [selectedForPayment, setSelectedForPayment] = useState([]);
-  const [paymentMethod, setPaymentMethod] = useState('CASH');
+
+  const [collectingId, setCollectingId] = useState(null);
 
   const { data: pendingOrders = [], isLoading } = useQuery({
     queryKey: ['lab', 'orders', 'pendingPayment'],
@@ -22,44 +22,37 @@ export default function ReceptionLabPayments() {
     mutationFn: (data) => api.post('/reception/lab/pay', data),
     onSuccess: (result) => {
       notifySuccess(`Payment collected: ${result.totalAmount.toFixed(2)} for ${result.orderCount} orders`);
-      setSelectedForPayment([]);
+      setCollectingId(null);
       queryClient.invalidateQueries({ queryKey: ['lab', 'orders'] });
     },
-    onError: (err) => notifyError(err),
+    onError: (err) => {
+      notifyError(err);
+      setCollectingId(null);
+    },
   });
 
-  const toggleOrder = (orderId) => {
-    setSelectedForPayment((prev) =>
-      prev.includes(orderId) ? prev.filter((id) => id !== orderId) : [...prev, orderId]
-    );
+  const handleCollect = (orderId) => {
+    setCollectingId(orderId);
+    payMutation.mutate({ orderIds: [orderId], paymentMethod: 'CASH' });
   };
-
-  const handlePay = () => {
-    if (selectedForPayment.length === 0) return;
-    payMutation.mutate({ orderIds: selectedForPayment, paymentMethod });
-  };
-
-  const totalAmount = pendingOrders
-    .filter((o) => selectedForPayment.includes(o.id))
-    .reduce((sum, o) => sum + (o.tests || []).reduce((s, t) => s + Number(t.test?.price || 0), 0), 0);
 
   if (isLoading) {
-    return <p className="text-body text-slate text-center py-8">Loading lab orders...</p>;
+    return <p className="text-body text-slate text-center py-8">{t('common.loading')}</p>;
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-subheading font-semibold text-obsidian">Lab Payments</h2>
-          <p className="text-caption text-slate">Collect payment for pending lab orders</p>
+          <h2 className="text-subheading font-semibold text-obsidian">{t('reception.labPayments')}</h2>
+          <p className="text-caption text-slate">{t('reception.labPaymentsDesc')}</p>
         </div>
       </div>
 
       {pendingOrders.length === 0 && (
         <Card>
           <CardContent>
-            <p className="text-body text-slate text-center py-8">No pending lab orders</p>
+            <p className="text-body text-slate text-center py-8">{t('reception.noPendingLabOrders')}</p>
           </CardContent>
         </Card>
       )}
@@ -74,27 +67,28 @@ export default function ReceptionLabPayments() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <input
-                          type="checkbox"
-                          checked={selectedForPayment.includes(order.id)}
-                          onChange={() => toggleOrder(order.id)}
-                          className="accent-lilac-bloom"
-                        />
                         <span className="font-medium text-obsidian">{order.patient?.fullName || 'Unknown'}</span>
                         <span className="text-caption text-slate">MRN: {order.patient?.mrn || '-'}</span>
                       </div>
-                      <div className="ml-6 flex flex-wrap gap-1.5">
+                      <div className="flex flex-wrap gap-1.5">
                         {(order.tests || []).map((ot) => (
                           <Badge key={ot.id} variant="default">{ot.test?.name || ot.testId}</Badge>
                         ))}
                       </div>
                       {order.clinicalNotes && (
-                        <p className="ml-6 text-caption text-slate mt-1">{order.clinicalNotes}</p>
+                        <p className="text-caption text-slate mt-1">{order.clinicalNotes}</p>
                       )}
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className="font-semibold text-obsidian">{orderTotal.toFixed(2)}</p>
-                      <p className="text-caption text-slate">{order.tests?.length || 0} tests</p>
+                    <div className="text-right shrink-0 flex flex-col items-end gap-2">
+                      <p className="font-semibold text-obsidian">{orderTotal.toFixed(2)} AED</p>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() => handleCollect(order.id)}
+                        loading={collectingId === order.id}
+                      >
+                        {t('reception.collect')}
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -102,36 +96,6 @@ export default function ReceptionLabPayments() {
             );
           })}
         </div>
-      )}
-
-      {selectedForPayment.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div>
-                <p className="text-body font-semibold text-obsidian">
-                  {selectedForPayment.length} order(s) selected
-                </p>
-                <p className="text-heading-sm font-bold text-obsidian">{totalAmount.toFixed(2)}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="px-3 py-2 bg-paper border border-silver rounded-lg text-sm text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom"
-                >
-                  <option value="CASH">Cash</option>
-                  <option value="CARD">Card</option>
-                  <option value="INSURANCE">Insurance</option>
-                  <option value="BANK_TRANSFER">Bank Transfer</option>
-                </select>
-                <Button variant="primary" onClick={handlePay} loading={payMutation.isPending}>
-                  Collect Payment
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       )}
     </div>
   );

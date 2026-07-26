@@ -8,7 +8,7 @@ import { Modal } from '../../components/ui/Modal';
 
 export default function SuppliersTab({ category }) {
   const { t } = useTranslation();
-  const { data: suppliers = [], isLoading } = useSuppliers(category);
+  const { data: suppliers = [], isLoading, isError, error } = useSuppliers(category);
   const createSupplier = useCreateSupplier();
   const updateSupplier = useUpdateSupplier();
   const deleteSupplier = useDeleteSupplier();
@@ -76,6 +76,8 @@ export default function SuppliersTab({ category }) {
         <CardContent className="p-0">
           {isLoading ? (
             <p className="text-body text-slate p-4">Loading...</p>
+          ) : isError ? (
+            <p className="text-body text-red-500 p-4">Failed to load: {error?.message || 'Unknown error'}</p>
           ) : suppliers.length === 0 ? (
             <p className="text-body text-slate text-center py-8">No suppliers yet</p>
           ) : (

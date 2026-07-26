@@ -15,11 +15,13 @@ import DeliveryModal from "./DeliveryModal";
 function AlertPanel({ alerts, onDismiss }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(null);
-  const hasAlerts = alerts.lowStock.length > 0 || alerts.expired.length > 0 || alerts.expiringSoon.length > 0;
+  const hasAlerts = alerts.lowStock.length > 0 || alerts.expired.length > 0 || alerts.expiring30.length > 0 || alerts.expiring60.length > 0 || alerts.expiring90.length > 0;
   if (!hasAlerts) return null;
   const sections = [
     { key: "expired", label: t("pharmacyProducts.alertExpired"), items: alerts.expired, color: "red", icon: "!" },
-    { key: "expiringSoon", label: t("pharmacyProducts.alertExpiring"), items: alerts.expiringSoon, color: "yellow", icon: "!" },
+    { key: "expiring30", label: "Expiring within 30 days", items: alerts.expiring30, color: "red", icon: "!" },
+    { key: "expiring60", label: "Expiring within 60 days", items: alerts.expiring60, color: "yellow", icon: "!" },
+    { key: "expiring90", label: "Expiring within 90 days", items: alerts.expiring90, color: "yellow", icon: "!" },
     { key: "lowStock", label: t("pharmacyProducts.alertLowStock"), items: alerts.lowStock, color: "yellow", icon: "\u25bc" },
   ];
   return (
@@ -54,12 +56,13 @@ export default function PharmacyProducts() {
   const [items, setItems] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [deleteItem, setDeleteItem] = useState(null);
   const [adjustItem, setAdjustItem] = useState(null);
   const [adjustForm, setAdjustForm] = useState({ type: "IN", quantity: "", notes: "" });
-  const [alerts, setAlerts] = useState({ lowStock: [], expired: [], expiringSoon: [] });
+  const [alerts, setAlerts] = useState({ lowStock: [], expired: [], expiring30: [], expiring60: [], expiring90: [] });
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [mutationError, setMutationError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -73,15 +76,18 @@ export default function PharmacyProducts() {
     minStock: "",
     packSize: "1",
     expiryDate: "",
+    barcode: "",
   });
 
   const loadItems = useCallback(async () => {
+    setFetchError('');
     try {
       const params = search ? `?search=${encodeURIComponent(search)}` : "";
       const data = await api.get(`/pos/pharmacy/items${params}`);
       setItems(data);
     } catch (err) {
       notifyError(err);
+      setFetchError(err.message || 'Failed to load items');
     } finally {
       setLoading(false);
     }
@@ -90,7 +96,13 @@ export default function PharmacyProducts() {
   const loadAlerts = useCallback(async () => {
     try {
       const data = await api.get("/pos/alerts?category=pharmacy");
-      setAlerts(data);
+      setAlerts({
+        lowStock: data.lowStock || [],
+        expired: data.expired || [],
+        expiring30: data.expiring30 || data.expiringSoon || [],
+        expiring60: data.expiring60 || [],
+        expiring90: data.expiring90 || [],
+      });
     } catch (err) { notifyError(err); }
   }, []);
 
@@ -107,7 +119,7 @@ export default function PharmacyProducts() {
 
   const openCreate = () => {
     setEditItem(null);
-    setForm({ name: "", sku: "", price: "", costPrice: "", initialQuantity: "", minStock: "", packSize: "1", expiryDate: "" });
+    setForm({ name: "", sku: "", price: "", costPrice: "", initialQuantity: "", minStock: "", packSize: "1", expiryDate: "", barcode: "" });
     setShowModal(true);
   };
 
@@ -122,6 +134,7 @@ export default function PharmacyProducts() {
       minStock: item.minStock ? String(item.minStock) : "",
       packSize: item.packSize ? String(item.packSize) : "1",
       expiryDate: item.expiryDate ? item.expiryDate.slice(0, 10) : "",
+      barcode: item.barcode || "",
     });
     setShowModal(true);
   };
@@ -139,6 +152,7 @@ export default function PharmacyProducts() {
         minStock: form.minStock ? parseInt(form.minStock) : 0,
         packSize: parseInt(form.packSize) || 1,
         expiryDate: form.expiryDate || null,
+        barcode: form.barcode || null,
       };
       if (editItem) {
         await api.put(`/pos/pharmacy/items/${editItem.id}`, payload);
@@ -148,7 +162,7 @@ export default function PharmacyProducts() {
       }
       setShowModal(false);
       setEditItem(null);
-      setForm({ name: "", sku: "", price: "", costPrice: "", initialQuantity: "", minStock: "", packSize: "1", expiryDate: "" });
+      setForm({ name: "", sku: "", price: "", costPrice: "", initialQuantity: "", minStock: "", packSize: "1", expiryDate: "", barcode: "" });
       setLoading(true);
       loadItems();
       loadAlerts();
@@ -199,6 +213,7 @@ export default function PharmacyProducts() {
 
   const columns = [
     { key: "sku", label: t("pharmacyProducts.colSku") },
+    { key: "barcode", label: "Barcode", render: (row) => row.barcode || "-" },
     { key: "name", label: t("pharmacyProducts.colName") },
     {
       key: "packSize",
@@ -305,6 +320,8 @@ export default function PharmacyProducts() {
           </form>
           {loading ? (
             <p className="text-body text-slate">{t("pharmacyProducts.loading")}</p>
+          ) : fetchError ? (
+            <p className="text-body text-red-500 text-center py-4">{fetchError}</p>
           ) : items.length === 0 ? (
             <p className="text-body text-slate text-center py-4">{t("pharmacyProducts.noProducts")}</p>
           ) : (
@@ -317,6 +334,7 @@ export default function PharmacyProducts() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input label={t("pharmacyProducts.formName")} required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <Input label={t("pharmacyProducts.formSku")} required value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
+          <Input label="Barcode (optional)" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} placeholder="EAN-13 or custom code" />
           <Input label="Price (per box)" type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
           <Input label="Strips per box" type="number" min="1" step="1" value={form.packSize} onChange={(e) => setForm({ ...form, packSize: e.target.value })} />
           <Input label="Unit Cost (per box)" type="number" min="0" step="0.01" value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: e.target.value })} />

@@ -120,6 +120,64 @@ export function useOpenShift() {
   });
 }
 
+export const paymentPlanKeys = {
+  list: (params) => ['accounting', 'payment-plans', params],
+  detail: (id) => ['accounting', 'payment-plan', id],
+};
+
+export function usePaymentPlans(params) {
+  return useQuery({
+    queryKey: paymentPlanKeys.list(params),
+    queryFn: () => api.get(`/accounting/payment-plans?${params || ''}`),
+  });
+}
+
+export function usePaymentPlan(id) {
+  return useQuery({
+    queryKey: paymentPlanKeys.detail(id),
+    queryFn: () => api.get(`/accounting/payment-plans/${id}`),
+    enabled: !!id,
+  });
+}
+
+export function useCreatePaymentPlan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/accounting/payment-plans', data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['accounting', 'payment-plans'] }),
+  });
+}
+
+export function usePayInstallment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ planId, instId, amount }) => api.post(`/accounting/payment-plans/${planId}/installments/${instId}/pay`, { amount }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounting', 'payment-plans'] });
+    },
+  });
+}
+
+export const arAgingKeys = {
+  summary: ['accounting', 'ar-aging', 'summary'],
+  detail: (params) => ['accounting', 'ar-aging', params],
+};
+
+export function useARAgingSummary() {
+  return useQuery({
+    queryKey: arAgingKeys.summary,
+    queryFn: () => api.get('/accounting/ar-aging/summary'),
+  });
+}
+
+export function useARAging(params) {
+  return useQuery({
+    queryKey: arAgingKeys.detail(params),
+    queryFn: () => api.get(`/accounting/ar-aging?${params || ''}`),
+    enabled: !!params,
+  });
+}
+
 export const cashMovementKeys = {
   list: (shiftId) => ['accounting', 'cash-movements', shiftId],
 };

@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
+import { Card, CardContent } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
-import { Badge } from '../../components/ui/Badge';
-import { Modal } from '../../components/ui/Modal';
 import { Table } from '../../components/ui/Table';
 import { usePatientList } from '../../hooks/queries/usePatients';
 import { useClinics } from '../../hooks/queries/useClinics';
-import NewPatientForm from '../reception/NewPatientForm';
+import PatientRegistration from './PatientRegistration';
 
 const genderLabel = { MALE: 'Male', FEMALE: 'Female' };
 const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-GB') : '—';
@@ -22,15 +20,27 @@ const calculateAge = (dob) => {
 export default function PatientListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const [showRegistration, setShowRegistration] = useState(false);
   const q = searchParams.get('q') || '';
   const page = parseInt(searchParams.get('page')) || 1;
-  const { data, isLoading } = usePatientList({ q: q || undefined, page, limit: 20 });
-  const { data: clinics = [] } = useClinics();
-  const [showNew, setShowNew] = useState(false);
+  const gender = searchParams.get('gender') || '';
+  const dateFrom = searchParams.get('dateFrom') || '';
+  const dateTo = searchParams.get('dateTo') || '';
 
+  const { data, isLoading, isError, refetch } = usePatientList({
+    q: q || undefined,
+    page,
+    limit: 20,
+    gender: gender || undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+  });
+  const { data: clinics = [] } = useClinics();
   const patients = data?.patients || [];
   const total = data?.total || 0;
   const totalPages = data?.totalPages || 0;
+
+  const hasActiveFilters = gender || dateFrom || dateTo;
 
   const updateParams = (updates) => {
     const next = new URLSearchParams(searchParams);
@@ -38,6 +48,12 @@ export default function PatientListPage() {
       if (v === '' || v === undefined || v === null || v === 1 && k === 'page') next.delete(k);
       else next.set(k, v);
     });
+    setSearchParams(next, { replace: true });
+  };
+
+  const clearFilters = () => {
+    const next = new URLSearchParams();
+    if (q) next.set('q', q);
     setSearchParams(next, { replace: true });
   };
 
@@ -58,23 +74,59 @@ export default function PatientListPage() {
           <h1 className="text-heading-sm font-semibold text-obsidian">Patient Directory</h1>
           <p className="text-body text-slate mt-1">{total} patient{total !== 1 ? 's' : ''}</p>
         </div>
-        <Button onClick={() => setShowNew(true)}>Register New Patient</Button>
+        <Button onClick={() => setShowRegistration(true)}>Register Patient</Button>
       </div>
 
       <Card>
         <CardContent className="pt-4">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="flex-1">
+          <div className="flex flex-col md:flex-row items-center gap-3 mb-4">
+            <div className="flex-1 w-full">
               <Input
                 placeholder="Search by name, MRN, phone, or national ID…"
                 value={q}
                 onChange={(e) => updateParams({ q: e.target.value, page: e.target.value ? '' : undefined })}
               />
             </div>
+            <select
+              value={gender}
+              onChange={(e) => updateParams({ gender: e.target.value, page: '' })}
+              className="px-3 py-2.5 bg-paper border border-silver rounded-lg text-body text-obsidian"
+            >
+              <option value="">All Genders</option>
+              <option value="MALE">Male</option>
+              <option value="FEMALE">Female</option>
+            </select>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => updateParams({ dateFrom: e.target.value, page: '' })}
+              className="px-3 py-2.5 bg-paper border border-silver rounded-lg text-body text-obsidian"
+            />
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => updateParams({ dateTo: e.target.value, page: '' })}
+              className="px-3 py-2.5 bg-paper border border-silver rounded-lg text-body text-obsidian"
+            />
+            {hasActiveFilters && (
+              <Button size="sm" variant="ghost" onClick={clearFilters}>
+                Clear Filters
+              </Button>
+            )}
           </div>
 
           {isLoading ? (
             <div className="text-center py-12 text-slate text-body">Loading patients…</div>
+          ) : isError ? (
+            <div className="flex flex-col items-center justify-center gap-4 py-12">
+              <p className="text-body text-red-500">Failed to load patients</p>
+              <button
+                onClick={() => refetch()}
+                className="px-4 py-2 text-sm rounded-lg bg-lilac-bloom text-white hover:opacity-90"
+              >
+                Retry
+              </button>
+            </div>
           ) : (
             <>
               <Table columns={columns} data={patients} onRowClick={(r) => navigate(`/patients/${r.id}`)} />
@@ -93,12 +145,10 @@ export default function PatientListPage() {
         </CardContent>
       </Card>
 
-      <Modal open={showNew} onClose={() => setShowNew(false)} title="Register New Patient">
-        <NewPatientForm
-          clinics={clinics}
-          onPatientCreated={() => { setShowNew(false); updateParams({}); }}
-        />
-      </Modal>
+      <PatientRegistration
+        isOpen={showRegistration}
+        onClose={() => setShowRegistration(false)}
+      />
     </div>
   );
 }

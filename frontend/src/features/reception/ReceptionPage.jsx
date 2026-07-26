@@ -15,13 +15,13 @@ import { Badge } from '../../components/ui/Badge';
 import { CURRENCY } from '../../utils/currency';
 import { printReceipt } from '../../lib/printReceipt';
 import { useCurrentShift, useCreateCashMovement } from '../../hooks/queries/useAccounting';
-import NewPatientForm from './NewPatientForm';
 import ReservationsPanel from './ReservationsPanel';
 import FileUploader from './FileUploader';
 import FollowUpsPanel from './FollowUpsPanel';
 import ReceptionLabPayments from './ReceptionLabPayments';
+import QueueBoard from './QueueBoard';
 
-const TABS = ['newPatient', 'reservations', 'queue', 'followUps', 'labPayments'];
+const TABS = ['checkin', 'reservations', 'queue', 'board', 'followUps', 'labPayments'];
 
 const statusConfig = {
   WAITING: { label: 'Waiting', variant: 'warning' },
@@ -72,7 +72,7 @@ export default function ReceptionPage() {
 
   const { data: clinics = [] } = useClinics();
   const activeClinic = queueClinicFilter || selectedClinic;
-  const { data: queue = [], isLoading: queueLoading } = useReceptionQueue(activeClinic);
+  const { data: queue = [], isLoading: queueLoading, isError: queueError, refetch: refetchQueue } = useReceptionQueue(activeClinic);
   const { data: queueStats = [] } = useReceptionQueueStats();
   const checkIn = useCheckIn();
   const updateStatus = useUpdateAppointmentStatus();
@@ -127,11 +127,6 @@ export default function ReceptionPage() {
     callNext.mutate(activeClinic);
   };
 
-  const handlePatientCreated = (patient) => {
-    setSelectedPatient(patient);
-    setSearchQuery('');
-  };
-
   const waiting = queue.filter((a) => a.status === 'WAITING');
   const called = queue.filter((a) => a.status === 'CALLED');
   const inProgress = queue.filter((a) => a.status === 'IN_PROGRESS');
@@ -143,7 +138,7 @@ export default function ReceptionPage() {
   const activeStats = queueStats.find((s) => s.id === activeClinic);
 
   return (
-      <div className="space-y-6">
+      <div className="space-y-6" data-tour="reception">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-heading-sm font-semibold text-obsidian">{t('reception.title')}</h1>
@@ -154,23 +149,23 @@ export default function ReceptionPage() {
       {openShift && (
         <div className="flex items-center justify-between bg-bone border border-silver rounded-lg px-4 py-2">
           <div className="flex items-center gap-3">
-            <Badge variant="success">Shift Active</Badge>
-            <span className="text-caption text-graphite">since {new Date(openShift.openedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
-            <span className="text-caption text-slate">{openShift.transactions?.length || 0} transactions</span>
+            <Badge variant="success">{t('reception.shiftActive')}</Badge>
+            <span className="text-caption text-graphite">{t('reception.since')} {new Date(openShift.openedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+            <span className="text-caption text-slate">{openShift.transactions?.length || 0} {t('reception.transactions')}</span>
           </div>
-          <Button size="sm" variant="secondary" onClick={() => setShowPickupModal(true)}>Record Pickup</Button>
+          <Button size="sm" variant="secondary" onClick={() => setShowPickupModal(true)}>{t('reception.recordPickup')}</Button>
         </div>
       )}
 
       {showPickupModal && (
         <Modal open={showPickupModal} onClose={() => setShowPickupModal(false)}>
           <div className="space-y-4 p-4">
-            <h2 className="text-subheading font-semibold text-obsidian">Record Cash Pickup</h2>
-            <Input label="Amount (SDG)" type="number" step="0.01" min="0" value={pickupAmount} onChange={(e) => setPickupAmount(e.target.value)} />
-            <Input label="Reason" value={pickupReason} onChange={(e) => setPickupReason(e.target.value)} placeholder="e.g. Manager collected for deposit" />
+            <h2 className="text-subheading font-semibold text-obsidian">{t('reception.recordCashPickup')}</h2>
+            <Input label={t('reception.amountSDG')} type="number" step="0.01" min="0" value={pickupAmount} onChange={(e) => setPickupAmount(e.target.value)} />
+            <Input label={t('reception.reason')} value={pickupReason} onChange={(e) => setPickupReason(e.target.value)} placeholder={t('reception.reasonPlaceholder')} />
             <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setShowPickupModal(false)}>Cancel</Button>
-              <Button onClick={handleRecordPickup} loading={createMovement.isPending} disabled={!pickupAmount}>Record Pickup</Button>
+              <Button variant="ghost" onClick={() => setShowPickupModal(false)}>{t('reception.cancel')}</Button>
+              <Button onClick={handleRecordPickup} loading={createMovement.isPending} disabled={!pickupAmount}>{t('reception.recordPickup')}</Button>
             </div>
           </div>
         </Modal>
@@ -179,7 +174,7 @@ export default function ReceptionPage() {
       {lastReceipt && (
         <div className="bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-700 rounded-lg p-4 flex items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold text-green-700 dark:text-green-300">Payment Collected — SDG {Number(lastReceipt.transaction.amount).toFixed(2)}</p>
+            <p className="text-sm font-semibold text-green-700 dark:text-green-300">{t('reception.paymentCollected', { amount: Number(lastReceipt.transaction.amount).toFixed(2) })}</p>
             <p className="text-caption text-green-600 dark:text-green-400">{lastReceipt.patientName} · {lastReceipt.clinicName}</p>
           </div>
           <div className="flex gap-2 shrink-0">
@@ -191,7 +186,7 @@ export default function ReceptionPage() {
                 mrn: lastReceipt.mrn,
                 clinicName: lastReceipt.clinicName,
               });
-            }}>Print Receipt</Button>
+            }}>{t('reception.printReceipt')}</Button>
             <Button variant="ghost" size="sm" onClick={() => setLastReceipt(null)}>&times;</Button>
           </div>
         </div>
@@ -200,7 +195,7 @@ export default function ReceptionPage() {
       {optometryRoutingMsg && (
         <div className="bg-amber-50 dark:bg-amber-900 border border-amber-200 dark:border-amber-700 rounded-lg p-4 flex items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">Optometry Pre-Screening</p>
+            <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">{t('reception.optometryPreScreening')}</p>
             <p className="text-caption text-amber-600 dark:text-amber-400">{optometryRoutingMsg}</p>
           </div>
           <Button variant="ghost" size="sm" onClick={() => setOptometryRoutingMsg(null)}>&times;</Button>
@@ -215,7 +210,7 @@ export default function ReceptionPage() {
         ))}
       </div>
 
-      {tab === 'newPatient' && (
+      {tab === 'checkin' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1 space-y-4">
             <Card className="p-4 space-y-3">
@@ -293,7 +288,7 @@ export default function ReceptionPage() {
                     return (
                       <div className="p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg">
                         <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
-                          This clinic requires optometry pre-screening. The patient will be registered for Optometry first.
+                          {t('reception.optometryPreScreeningDesc')}
                         </p>
                       </div>
                     );
@@ -333,7 +328,6 @@ export default function ReceptionPage() {
               </Card>
             )}
 
-            <NewPatientForm clinics={clinics} onPatientCreated={handlePatientCreated} />
           </div>
 
           <div className="lg:col-span-2">
@@ -352,6 +346,22 @@ export default function ReceptionPage() {
       {tab === 'reservations' && <ReservationsPanel clinics={clinics} />}
 
       {tab === 'followUps' && <FollowUpsPanel clinics={clinics} />}
+
+      {tab === 'board' && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <select
+              className="px-3 py-2.5 bg-paper border border-silver rounded-lg text-body text-obsidian focus:outline-none focus:ring-2 focus:ring-lilac-bloom"
+              value={queueClinicFilter}
+              onChange={(e) => setQueueClinicFilter(e.target.value)}
+            >
+              <option value="">{t('reception.selectClinicBoard')}</option>
+              {clinics.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <QueueBoard clinicId={queueClinicFilter} />
+        </div>
+      )}
 
       {tab === 'labPayments' && <ReceptionLabPayments />}
 
@@ -373,13 +383,13 @@ export default function ReceptionPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Input
-                    placeholder="Filter patients..."
+                    placeholder={t('reception.filterPatients')}
                     value={queueSearch}
                     onChange={(e) => setQueueSearch(e.target.value)}
                     className="w-48"
                   />
                   <Button variant="primary" size="sm" onClick={handleCallNext} disabled={callNext.isPending || waiting.length === 0}>
-                    {callNext.isPending ? '...' : 'Call Next'}
+                    {callNext.isPending ? '...' : t('reception.callNext')}
                   </Button>
                 </div>
               </div>
@@ -389,13 +399,23 @@ export default function ReceptionPage() {
                   <p className="text-body text-slate text-center py-8">{t('reception.selectClinic')}</p>
                 ) : queueLoading ? (
                   <p className="text-caption text-slate">{t('common.loading')}</p>
+                ) : queueError ? (
+                  <div className="flex flex-col items-center justify-center gap-4 py-8">
+                    <p className="text-body text-red-500">Failed to load queue</p>
+                    <button
+                      onClick={() => refetchQueue()}
+                      className="px-4 py-2 text-sm rounded-lg bg-lilac-bloom text-white hover:opacity-90"
+                    >
+                      Retry
+                    </button>
+                  </div>
                 ) : queue.length === 0 ? (
                   <p className="text-body text-slate text-center py-8">{t('reception.emptyQueue')}</p>
                 ) : (
                   <div className="space-y-4">
                     {inProgress.length > 0 && (
                       <div>
-                        <p className="text-caption font-medium text-green-600 dark:text-green-400 uppercase tracking-wide mb-2">In Progress</p>
+                        <p className="text-caption font-medium text-green-600 dark:text-green-400 uppercase tracking-wide mb-2">{t('reception.inProgress')}</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {inProgress.map((a) => (
                             <QueueCard key={a.id} appt={a} onStatusChange={handleStatusChange} onPriority={handlePriority} t={t} />
@@ -405,7 +425,7 @@ export default function ReceptionPage() {
                     )}
                     {called.length > 0 && (
                       <div>
-                        <p className="text-caption font-medium text-sky-600 dark:text-sky-400 uppercase tracking-wide mb-2">Called</p>
+                        <p className="text-caption font-medium text-sky-600 dark:text-sky-400 uppercase tracking-wide mb-2">{t('reception.called')}</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {called.map((a) => (
                             <QueueCard key={a.id} appt={a} onStatusChange={handleStatusChange} onPriority={handlePriority} t={t} />
@@ -415,8 +435,8 @@ export default function ReceptionPage() {
                     )}
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <p className="text-caption font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wide">Waiting ({filteredWaiting.length})</p>
-                        {activeStats && <p className="text-caption text-slate">Est. wait: ~{filteredWaiting.length * 10} min total</p>}
+                        <p className="text-caption font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wide">{t('reception.waiting', { count: filteredWaiting.length })}</p>
+                        {activeStats && <p className="text-caption text-slate">{t('reception.estWait', { minutes: filteredWaiting.length * 10 })}</p>}
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {filteredWaiting.map((a) => (
@@ -433,15 +453,15 @@ export default function ReceptionPage() {
           <div className="space-y-4">
             <Card>
               <div className="p-4 border-b border-silver">
-                <h3 className="text-subheading font-semibold text-obsidian">Clinic Overview</h3>
+                <h3 className="text-subheading font-semibold text-obsidian">{t('reception.clinicOverview')}</h3>
               </div>
               <div className="p-4 space-y-3 max-h-[480px] overflow-y-auto">
-                {queueStats.length === 0 && <p className="text-caption text-slate">No data</p>}
+                {queueStats.length === 0 && <p className="text-caption text-slate">{t('reception.noData')}</p>}
                 {queueStats.map((s) => (
                   <div key={s.id} className={`flex items-center justify-between p-3 rounded-lg border ${s.id === activeClinic ? 'border-lilac-bloom bg-lilac-bloom/5' : 'border-silver'}`}>
                     <div>
                       <p className="text-sm font-medium text-obsidian">{s.name}</p>
-                      <p className="text-xs text-slate">{s.waiting} waiting &middot; {s.inProgress} active</p>
+                      <p className="text-xs text-slate">{s.waiting} {t('reception.queueWaiting')} &middot; {s.inProgress} {t('reception.queueActive')}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold text-obsidian">{s.waiting}</p>

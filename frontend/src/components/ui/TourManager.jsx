@@ -1,14 +1,12 @@
 import { useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/authStore';
 import { useUIStore } from '../../stores/uiStore';
 import { getTour } from '../../lib/tours';
 
-function isNativePlatform() {
-  return typeof window !== 'undefined' && (window.__TAURI_INTERNALS__ || window.Capacitor?.isNative);
-}
-
 export default function TourManager() {
+  const { t } = useTranslation();
   const location = useLocation();
   const user = useAuthStore((s) => s.user);
   const hasSeenOnboarding = useUIStore((s) => s.hasSeenOnboarding);
@@ -32,7 +30,7 @@ export default function TourManager() {
         scrollTo: true,
         cancelIcon: {
           enabled: true,
-          label: 'Skip',
+          label: t('tour.skip'),
         },
         arrow: true,
         popperOptions: {
@@ -50,14 +48,14 @@ export default function TourManager() {
         attachTo: step.attachTo,
         buttons: step.buttons || [
           {
-            text: 'Skip',
+            text: t('tour.skip'),
             action() {
               tour.cancel();
             },
             secondary: true,
           },
           {
-            text: 'Next',
+            text: t('tour.next'),
             action() {
               tour.next();
             },
@@ -76,9 +74,7 @@ export default function TourManager() {
 
     tourRef.current = tour;
     tour.start();
-  }, [user?.role, location.pathname, setHasSeenOnboarding]);
-
-  if (!isNativePlatform()) return null;
+  }, [user?.role, location.pathname, setHasSeenOnboarding, t]);
 
   const tourDef = getTour(user?.role);
   if (!tourDef) return null;
@@ -90,14 +86,15 @@ export default function TourManager() {
       onClick={startTour}
       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-caption font-medium text-graphite hover:text-obsidian hover:bg-bone transition-colors touch-target"
       type="button"
-      title="Take a tour"
+      title={t('tour.takeATour')}
+      aria-label={t('tour.takeATour')}
     >
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
         <path d="M12 16v-4" />
         <path d="M12 8h.01" />
       </svg>
-      <span className="hidden md:inline">Tour</span>
+      <span className="hidden md:inline">{t('tour.tourLabel')}</span>
     </button>
   );
 }

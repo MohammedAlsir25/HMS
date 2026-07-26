@@ -25,6 +25,9 @@ import { useScreeningQueue, useCompleteScreening } from '../../hooks/queries/use
 import { Printer, RotateCcw } from 'lucide-react';
 import ScheduleFollowUpModal from './ScheduleFollowUpModal';
 import UpcomingFollowUpsSection from './UpcomingFollowUpsSection';
+import LabOrderModal from './LabOrderModal';
+import TemplateLoader from './TemplateLoader';
+import ImagingOrderModal from './ImagingOrderModal';
 
 const bodyAreas = ['Optic Nerve', 'Macula', 'Retina', 'Cornea', 'Lens', 'Anterior Chamber', 'Eyelid', 'Orbit', 'Generalized'];
 const onsetOptions = ['Sudden', 'Acute (<1 week)', 'Subacute (1-4 weeks)', 'Chronic (>4 weeks)'];
@@ -39,6 +42,8 @@ export default function OptometryDashboard() {
   const [currentRecordId, setCurrentRecordId] = useState(null);
   const [viewingRecord, setViewingRecord] = useState(null);
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+  const [showLabOrder, setShowLabOrder] = useState(false);
+  const [showImagingOrder, setShowImagingOrder] = useState(false);
 
   const patients = usePatients({ clinicSlug: 'optometry' });
   const records = useClinicalRecords('optometry');
@@ -575,9 +580,17 @@ export default function OptometryDashboard() {
                 Finish & Send to {targetClinic.name}
               </Button>
             ) : (
-              <Button variant="primary" onClick={handleSave} loading={saving}>
-                Save Clinical Record
-              </Button>
+              <>
+                <Button variant="primary" onClick={handleSave} loading={saving}>
+                  Save Clinical Record
+                </Button>
+                <Button variant="secondary" onClick={() => setShowLabOrder(true)}>
+                  Order Lab Tests
+                </Button>
+                <Button variant="secondary" onClick={() => setShowImagingOrder(true)}>
+                  Order Imaging
+                </Button>
+              </>
             )}
             {showReferralBtn && !targetClinic && (
               <Button variant="secondary" onClick={() => setShowReferral(true)}>
@@ -601,23 +614,32 @@ export default function OptometryDashboard() {
             const pastRecords = records.records.filter((r) => r.id !== currentRecordId);
             if (pastRecords.length === 0) return null;
             return (
-            <ClinicSection title="Patient History" className="mb-6">
-              <Table
-                columns={[
-                  { key: 'date', label: 'Date', render: (r) => new Date(r.encounterDate).toLocaleDateString() },
-                  { key: 'diagnosis', label: 'Diagnosis', render: (r) => r.diagnosis ? <Badge variant="warning">{r.diagnosis}</Badge> : '-' },
-                  { key: 'medications', label: 'Rx', render: (r) => r.medications?.length ? r.medications.map(m => m.drugName).join(', ') : r.prescriptions || '-' },
-                  { key: 'findings', label: 'Refraction', render: (r) => {
-                    const json = r.clinicSpecificJson;
-                    if (!json?.autoRefraction) return '-';
-                    const a = json.autoRefraction;
-                    return `OD: ${a.odSph || '?'} / OS: ${a.osSph || '?'}`;
-                  }},
-                ]}
-                data={pastRecords}
-                onRowClick={(r) => setViewingRecord(viewingRecord?.id === r.id ? null : r)}
-              />
-            </ClinicSection>
+            <>
+              <div className="mb-6">
+                <TemplateLoader
+                  clinicSlug="optometry"
+                  onLoadTemplate={(data) => setSoapNotes(data)}
+                  currentSections={soapNotes}
+                />
+              </div>
+              <ClinicSection title="Patient History" className="mb-6">
+                <Table
+                  columns={[
+                    { key: 'date', label: 'Date', render: (r) => new Date(r.encounterDate).toLocaleDateString() },
+                    { key: 'diagnosis', label: 'Diagnosis', render: (r) => r.diagnosis ? <Badge variant="warning">{r.diagnosis}</Badge> : '-' },
+                    { key: 'medications', label: 'Rx', render: (r) => r.medications?.length ? r.medications.map(m => m.drugName).join(', ') : r.prescriptions || '-' },
+                    { key: 'findings', label: 'Refraction', render: (r) => {
+                      const json = r.clinicSpecificJson;
+                      if (!json?.autoRefraction) return '-';
+                      const a = json.autoRefraction;
+                      return `OD: ${a.odSph || '?'} / OS: ${a.osSph || '?'}`;
+                    }},
+                  ]}
+                  data={pastRecords}
+                  onRowClick={(r) => setViewingRecord(viewingRecord?.id === r.id ? null : r)}
+                />
+              </ClinicSection>
+            </>
             );
           })()}
 
@@ -767,8 +789,25 @@ export default function OptometryDashboard() {
         open={showReferral}
         onClose={() => setShowReferral(false)}
         fromClinicId="optometry"
+        selectedPatient={patients.selectedPatient}
       />
 
+            <LabOrderModal
+        isOpen={showLabOrder}
+        onClose={() => setShowLabOrder(false)}
+        clinicSlug="optometry"
+        patientId={patients.selectedPatient?.id}
+        patientName={patients.selectedPatient?.fullName}
+        onOrderCreated={() => { if (patients.selectedPatient) records.fetchRecords(patients.selectedPatient.id); }}
+      />
+      <ImagingOrderModal
+        isOpen={showImagingOrder}
+        onClose={() => setShowImagingOrder(false)}
+        clinicSlug="optometry"
+        patientId={patients.selectedPatient?.id}
+        patientName={patients.selectedPatient?.fullName}
+        onOrderCreated={() => { if (patients.selectedPatient) records.fetchRecords(patients.selectedPatient.id); }}
+      />
       <ScheduleFollowUpModal
         open={showFollowUpModal}
         onClose={() => setShowFollowUpModal(false)}

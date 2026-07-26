@@ -1,0 +1,73 @@
+[dir="rtl"] .rtl-flip {
+  transform: scaleX(-1);
+}
+
+[dir="rtl"] .rtl-mirror {
+  transform: rotate(180deg);
+}
+
+[dir="rtl"] .rtl-flip-x {
+  transform: scaleX(-1);
+}
+
+[dir="rtl"] .rtl-text-start {
+  text-align: right;
+}
+
+[dir="rtl"] .rtl-text-end {
+  text-align: left;
+}
+
+[dir="rtl"] .rtl-mx-auto {
+  margin-inline-start: auto;
+  margin-inline-end: auto;
+}
+
+[dir="rtl"] .rtl-ml-auto {
+  margin-inline-start: auto;
+}
+
+[dir="rtl"] .rtl-mr-auto {
+  margin-inline-end: auto;
+}
+
+[dir="rtl"] .sidebar-container {
+  direction: rtl;
+}
+
+[dir="rtl"] .sidebar-container [data-sidebar] {
+  direction: rtl;
+}
+
+[dir="rtl"] kbd {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+[dir="rtl"] .shepherd-element {
+  direction: rtl;
+}
+
+[dir="rtl"] table {
+  text-align: right;
+}
+
+[dir="rtl"] th {
+  text-align: right;
+}
+
+[dir="rtl"] td {
+  text-align: right;
+}
+
+[dir="rtl"] [data-modal] {
+  direction: rtl;
+}
+
+@media print {
+  [dir="rtl"] .rtl-flip,
+  [dir="rtl"] .rtl-mirror,
+  [dir="rtl"] .rtl-flip-x {
+    transform: none !important;
+  }
+}

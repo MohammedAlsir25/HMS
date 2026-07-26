@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
@@ -16,7 +16,6 @@ export default function ReservationFormModal({ open, onClose, clinics, onCreated
   const [doctorId, setDoctorId] = useState('');
   const [scheduledAt, setScheduledAt] = useState('');
   const [notes, setNotes] = useState('');
-  const [newPatient, setNewPatient] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -46,7 +45,6 @@ export default function ReservationFormModal({ open, onClose, clinics, onCreated
       setDoctorId('');
       setScheduledAt('');
       setNotes('');
-      setNewPatient(false);
       setSearchQuery('');
       setSubmitting(false);
       setError('');
@@ -82,12 +80,7 @@ export default function ReservationFormModal({ open, onClose, clinics, onCreated
         scheduledAt: scheduledAt || undefined,
         notes: notes || undefined,
       };
-      if (patientId) {
-        payload.patientId = patientId;
-      } else {
-        payload.fullName = fullName;
-        payload.phone = phone || undefined;
-      }
+      payload.patientId = patientId;
       await api.post('/reception/reservations', payload);
       onCreated?.();
       onClose();
@@ -109,54 +102,30 @@ export default function ReservationFormModal({ open, onClose, clinics, onCreated
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="text-sm font-medium text-graphite block mb-1">Patient</label>
-          {!newPatient && (
-            <>
-              <Input
-                placeholder="Search existing patient..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              {searching && <p className="text-xs text-slate mt-1">Searching...</p>}
-              {searchResults.length > 0 && (
-                <div className="max-h-36 overflow-y-auto space-y-1 mt-1 border border-silver rounded-lg">
-                  {searchResults.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      className={`w-full text-left px-3 py-2 text-sm transition-colors ${patientId === p.id ? 'bg-lilac-bloom text-obsidian' : 'hover:bg-bone text-graphite'}`}
-                      onClick={() => handleSelectPatient(p)}
-                    >
-                      <span className="font-medium">{p.fullName}</span>
-                      <span className="text-xs text-slate ml-2">{p.mrn}</span>
-                      {p.phone && <span className="text-xs text-slate ml-2">{p.phone}</span>}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-          {newPatient && (
-            <div className="space-y-2">
-              <Input
-                placeholder="Full Name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                required={newPatient}
-              />
-              <Input
-                placeholder="Phone"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
-            </div>
-          )}
-          <button
-            type="button"
-            className="text-xs text-lilac-bloom hover:underline mt-1"
-            onClick={() => { setNewPatient(!newPatient); setPatientId(''); setSearchQuery(''); }}
-          >
-            {newPatient ? 'Search existing patient instead' : 'Register new patient'}
-          </button>
+          <>
+            <Input
+              placeholder="Search existing patient..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searching && <p className="text-xs text-slate mt-1">Searching...</p>}
+            {searchResults.length > 0 && (
+              <div className="max-h-36 overflow-y-auto space-y-1 mt-1 border border-silver rounded-lg">
+                {searchResults.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`w-full text-left px-3 py-2 text-sm transition-colors ${patientId === p.id ? 'bg-lilac-bloom text-obsidian' : 'hover:bg-bone text-graphite'}`}
+                    onClick={() => handleSelectPatient(p)}
+                  >
+                    <span className="font-medium">{p.fullName}</span>
+                    <span className="text-xs text-slate ml-2">{p.mrn}</span>
+                    {p.phone && <span className="text-xs text-slate ml-2">{p.phone}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
         </div>
 
         <div>
@@ -210,7 +179,7 @@ export default function ReservationFormModal({ open, onClose, clinics, onCreated
 
         <div className="flex gap-2 pt-2">
           <Button variant="ghost" className="flex-1" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" className="flex-1" disabled={submitting || !clinicId || (!patientId && !fullName)}>
+          <Button variant="primary" className="flex-1" disabled={submitting || !clinicId || !patientId}>
             {submitting ? 'Creating...' : 'Create Reservation'}
           </Button>
         </div>

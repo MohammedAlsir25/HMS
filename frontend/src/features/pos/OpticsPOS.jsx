@@ -44,7 +44,7 @@ export default function OpticsPOS() {
 
   const createLabJobMutation = useCreateLabJob();
 
-  const { data: items = [], isLoading } = usePOSItems('optics');
+  const { data: items = [], isLoading, isError: itemsError, refetch: refetchItems } = usePOSItems('optics');
   const { data: referrals = [], isLoading: referralsLoading } = useReferrals(activeTab === 'referrals' ? 'type=OPTICS_DISPATCH&status=PENDING' : null);
 
   const addToCart = (item) => {
@@ -277,7 +277,18 @@ export default function OpticsPOS() {
                 className="mb-3"
               />
               {isLoading && <p className="text-body text-slate">Loading inventory...</p>}
-              {!isLoading && (
+              {itemsError && !isLoading && (
+                <div className="flex flex-col items-center justify-center gap-4 py-8">
+                  <p className="text-body text-red-500">Failed to load inventory</p>
+                  <button
+                    onClick={() => refetchItems()}
+                    className="px-4 py-2 text-sm rounded-lg bg-lilac-bloom text-white hover:opacity-90"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+              {!isLoading && !itemsError && (
                 <div className="max-h-[50vh] overflow-y-auto space-y-1">
                   {filteredItems.map((item) => {
                     const outOfStock = item.quantity < 1;

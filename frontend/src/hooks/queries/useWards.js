@@ -9,6 +9,8 @@ export const wardKeys = {
   bedNotes: (bedId) => [...wardKeys.all(), 'notes', bedId],
   rounds: (wardId, date) => [...wardKeys.all(), 'rounds', wardId, date],
   availableBeds: (wardId) => [...wardKeys.all(), 'available', wardId],
+  dashboard: () => [...wardKeys.all(), 'dashboard'],
+  wardPatients: (wardId) => [...wardKeys.all(), 'patients', wardId],
 };
 
 export function useWards() {
@@ -64,8 +66,8 @@ export function useCreateBed() {
 export function useAssignBed() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ bedId, patientId, surgeryId }) =>
-      api.patch(`/wards/beds/${bedId}/assign`, { patientId, surgeryId }),
+    mutationFn: ({ bedId, patientId, surgeryId, admissionDate }) =>
+      api.patch(`/wards/beds/${bedId}/assign`, { patientId, surgeryId, admissionDate }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: wardKeys.all() }),
   });
 }
@@ -73,7 +75,8 @@ export function useAssignBed() {
 export function useDischargeBed() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (bedId) => api.patch(`/wards/beds/${bedId}/discharge`),
+    mutationFn: ({ bedId, dischargeDate, dischargeNotes }) =>
+      api.patch(`/wards/beds/${bedId}/discharge`, { dischargeDate, dischargeNotes }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: wardKeys.all() }),
   });
 }
@@ -143,5 +146,21 @@ export function useCreateWardRound() {
   return useMutation({
     mutationFn: (data) => api.post('/wards/rounds', data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: wardKeys.all() }),
+  });
+}
+
+export function useWardDashboard() {
+  return useQuery({
+    queryKey: wardKeys.dashboard(),
+    queryFn: () => api.get('/wards/dashboard'),
+    placeholderData: (prev) => prev,
+  });
+}
+
+export function useWardPatients(wardId) {
+  return useQuery({
+    queryKey: wardKeys.wardPatients(wardId),
+    queryFn: () => api.get(`/wards/${wardId}/patients`),
+    enabled: !!wardId,
   });
 }

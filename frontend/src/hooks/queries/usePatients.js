@@ -5,6 +5,7 @@ export const patientKeys = {
   all: ['patients'],
   list: (params) => ['patients', 'list', params],
   detail: (id) => ['patients', id],
+  audit: (id, params) => ['patients', id, 'audit', params],
 };
 
 export function usePatientList(params = {}) {
@@ -34,5 +35,43 @@ export function useUpdatePatient() {
       queryClient.invalidateQueries({ queryKey: patientKeys.detail(variables.id) });
       queryClient.invalidateQueries({ queryKey: patientKeys.all });
     },
+  });
+}
+
+export function useCreatePatient() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/patients', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: patientKeys.all });
+    },
+  });
+}
+
+export function useMergePatients() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, sourcePatientId }) => api.post(`/patients/${id}/merge`, { sourcePatientId }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: patientKeys.detail(variables.id) });
+      queryClient.invalidateQueries({ queryKey: patientKeys.all });
+    },
+  });
+}
+
+export function usePatientAudit(patientId, params = {}) {
+  const queryString = new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
+  ).toString();
+  return useQuery({
+    queryKey: patientKeys.audit(patientId, params),
+    queryFn: () => api.get(`/patients/${patientId}/audit${queryString ? `?${queryString}` : ''}`),
+    enabled: !!patientId,
+  });
+}
+
+export function useCheckDuplicates() {
+  return useMutation({
+    mutationFn: (data) => api.post('/patients/check-duplicates', data),
   });
 }

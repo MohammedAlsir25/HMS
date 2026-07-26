@@ -42,4 +42,6 @@ export const PERMISSIONS_LIST = [
   { key: 'ward:write', label: 'Manage Wards' },
   { key: 'pricing:read', label: 'View Pricing' },
   { key: 'pricing:write', label: 'Manage Pricing' },
+  { key: 'department:read', label: 'View Departments' },
+  { key: 'department:write', label: 'Manage Departments' },
 ];

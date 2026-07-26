@@ -230,6 +230,134 @@ const SIMPLE_STEPS = [
   },
 ];
 
+const INSURANCE_STEPS = [
+  {
+    id: 'welcome',
+    title: 'Insurance Dashboard',
+    text: 'Manage insurance companies, policies, pre-authorizations, and claims from this hub.',
+    attachTo: { element: '[data-tour="insurance-page"]', on: 'bottom' },
+  },
+  {
+    id: 'preauth',
+    title: 'Pre-Authorizations',
+    text: 'Submit and track pre-authorization requests for insurance-covered procedures.',
+    attachTo: { element: '[data-tour="insurance-preauth"]', on: 'bottom' },
+  },
+  {
+    id: 'claims',
+    title: 'Claims Tracking',
+    text: 'Monitor claim status, record settlements, and reconcile insurance payments.',
+    attachTo: { element: '[data-tour="insurance-claims"]', on: 'bottom' },
+  },
+  {
+    id: 'done',
+    title: 'You\'re all set!',
+    text: 'Review pending pre-authorizations or process a new claim.',
+    buttons: [
+      {
+        text: 'Done',
+        action() { this.complete(); },
+      },
+    ],
+  },
+];
+
+const EMERGENCY_STEPS = [
+  {
+    id: 'welcome',
+    title: 'Emergency Dashboard',
+    text: 'View acuity distribution, waiting patients, and bed availability at a glance.',
+    attachTo: { element: '[data-tour="emergency-page"]', on: 'bottom' },
+  },
+  {
+    id: 'triage',
+    title: 'Triage Workspace',
+    text: 'Assess incoming patients using the 5-level ESI triage system and record vitals.',
+    attachTo: { element: '[data-tour="emergency-triage"]', on: 'bottom' },
+  },
+  {
+    id: 'register',
+    title: 'Rapid Registration',
+    text: 'Quickly register new emergency patients or pull in existing records.',
+    attachTo: { element: '[data-tour="emergency-register"]', on: 'bottom' },
+  },
+  {
+    id: 'done',
+    title: 'You\'re all set!',
+    text: 'Start by triaging the next waiting patient or reviewing the acuity board.',
+    buttons: [
+      {
+        text: 'Done',
+        action() { this.complete(); },
+      },
+    ],
+  },
+];
+
+const DOCTOR_STEPS = [
+  {
+    id: 'welcome',
+    title: 'Consultation Workspace',
+    text: 'This is your clinical consultation page. You can record vitals, symptoms, diagnoses, and prescriptions here.',
+    attachTo: { element: '[data-tour="consultation-page"]', on: 'bottom' },
+  },
+  {
+    id: 'vitals',
+    title: 'Vital Signs',
+    text: 'Enter patient vital signs. Abnormal values are highlighted automatically.',
+    attachTo: { element: '[data-tour="vital-signs"]', on: 'bottom' },
+  },
+  {
+    id: 'prescriptions',
+    title: 'Prescriptions',
+    text: 'Write prescriptions with dosage, frequency, and duration. Medications are searchable.',
+    attachTo: { element: '[data-tour="prescription-writer"]', on: 'bottom' },
+  },
+  {
+    id: 'done',
+    title: 'You\'re all set!',
+    text: 'You can access clinic dashboards from the sidebar for an overview of your patients.',
+    buttons: [
+      {
+        text: 'Done',
+        action() { this.complete(); },
+      },
+    ],
+  },
+];
+
+const NURSE_STEPS = [
+  {
+    id: 'welcome',
+    title: 'Wards Dashboard',
+    text: 'View ward occupancy, bed assignments, and patient vitals from this overview.',
+    attachTo: { element: '[data-tour="wards-page"]', on: 'bottom' },
+  },
+  {
+    id: 'beds',
+    title: 'Bed Map',
+    text: 'The visual bed map shows occupied (red), available (green), and reserved (yellow) beds per ward.',
+    attachTo: { element: '[data-tour="bed-map"]', on: 'bottom' },
+  },
+  {
+    id: 'inpatient',
+    title: 'Inpatient Management',
+    text: 'Admit, transfer, and discharge patients from here. Ward rounds are listed for your shift.',
+    attachTo: { element: '[data-tour="inpatient-page"]', on: 'bottom' },
+  },
+  {
+    id: 'done',
+    title: 'You\'re all set!',
+    text: 'Check ward occupancy or start your rounds from the patient list.',
+    buttons: [
+      {
+        text: 'Done',
+        action() { this.complete(); },
+      },
+    ],
+  },
+];
+
 const TOURS = {
   'Super Admin': { path: '/dashboard', steps: DASHBOARD_STEPS },
   'Receptionist': { path: '/reception', steps: RECEPTION_STEPS },
@@ -243,6 +371,12 @@ const TOURS = {
   'Lab Admin': { path: '/lab', steps: LAB_STEPS },
   'Inventory Manager': { path: '/inventory', steps: INVENTORY_STEPS },
   'Procurement Manager': { path: '/procurement', steps: SIMPLE_STEPS },
+  'Insurance Clerk': { path: '/insurance/pre-authorizations', steps: INSURANCE_STEPS },
+  'Insurance Manager': { path: '/insurance/companies', steps: INSURANCE_STEPS },
+  'Doctor': { path: '/clinic/medicine', steps: DOCTOR_STEPS },
+  'Nurse': { path: '/wards', steps: NURSE_STEPS },
+  'Emergency Physician': { path: '/emergency', steps: EMERGENCY_STEPS },
+  'Triage Nurse': { path: '/emergency/triage', steps: EMERGENCY_STEPS },
 };
 
 export function getTour(role) {

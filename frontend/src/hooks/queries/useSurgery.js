@@ -4,10 +4,13 @@ import { api } from '../../lib/api';
 export const surgeryKeys = {
   byDate: (date) => ['surgeries', date],
   followUps: (filters) => ['surgery-follow-ups', filters],
+  followUpDetails: (filters) => ['surgery-follow-up-details', filters],
   availability: (date) => ['surgery-availability', date],
   stats: (filters) => ['surgery-stats', filters],
   notes: (id) => ['surgery-notes', id],
   discharge: (id) => ['surgery-discharge', id],
+  team: (id) => ['surgery-team', id],
+  events: (id) => ['surgery-events', id],
 };
 
 export function useSurgeries(date) {
@@ -106,6 +109,17 @@ export function useSurgeryFollowUps(filters = {}) {
   });
 }
 
+export function useSurgeryFollowUpDetails(filters = {}) {
+  const params = new URLSearchParams();
+  if (filters.surgeryId) params.set('surgeryId', filters.surgeryId);
+  const qs = params.toString();
+  return useQuery({
+    queryKey: surgeryKeys.followUpDetails(filters),
+    queryFn: () => api.get(`/surgeries/follow-ups${qs ? `?${qs}` : ''}`),
+    enabled: !!filters.surgeryId,
+  });
+}
+
 export function useCreateFollowUp() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -121,5 +135,80 @@ export function useUpdateFollowUp() {
     mutationFn: ({ followUpId, status, notes }) =>
       api.patch(`/surgeries/follow-ups/${followUpId}`, { status, notes }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['surgery-follow-ups'] }),
+  });
+}
+
+export function useUpdateFollowUpStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }) =>
+      api.patch(`/surgeries/follow-ups/${id}`, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['surgery-follow-ups'] });
+      queryClient.invalidateQueries({ queryKey: ['surgery-follow-up-details'] });
+    },
+  });
+}
+
+export function useSurgeryTeam(surgeryId) {
+  return useQuery({
+    queryKey: surgeryKeys.team(surgeryId),
+    queryFn: () => api.get(`/surgeries/${surgeryId}/team`),
+    enabled: !!surgeryId,
+  });
+}
+
+export function useAddTeamMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ surgeryId, name, roleId }) =>
+      api.post(`/surgeries/${surgeryId}/team`, { name, roleId }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: surgeryKeys.team(variables.surgeryId) });
+    },
+  });
+}
+
+export function useRemoveTeamMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ surgeryId, memberId }) =>
+      api.delete(`/surgeries/${surgeryId}/team/${memberId}`),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: surgeryKeys.team(variables.surgeryId) });
+    },
+  });
+}
+
+export function useOrRoles() {
+  return useQuery({
+    queryKey: ['surgery-or-roles'],
+    queryFn: () => api.get('/surgeries/or-roles'),
+  });
+}
+
+export function useSurgeryEvents(surgeryId) {
+  return useQuery({
+    queryKey: surgeryKeys.events(surgeryId),
+    queryFn: () => api.get(`/surgeries/${surgeryId}/events`),
+    enabled: !!surgeryId,
+  });
+}
+
+export function useAddSurgeryEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ surgeryId, eventTypeId, description }) =>
+      api.post(`/surgeries/${surgeryId}/events`, { eventTypeId, description }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: surgeryKeys.events(variables.surgeryId) });
+    },
+  });
+}
+
+export function useEventTypes() {
+  return useQuery({
+    queryKey: ['surgery-event-types'],
+    queryFn: () => api.get('/surgeries/event-types'),
   });
 }

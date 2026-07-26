@@ -7,10 +7,14 @@ export const useUIStore = create(
       theme: 'light',
       language: 'en',
       hasSeenOnboarding: false,
+      sidebarCollapsed: false,
+      mobileSidebarOpen: false,
 
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
       setHasSeenOnboarding: (v) => set({ hasSeenOnboarding: v }),
+      setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
+      setMobileSidebarOpen: (v) => set({ mobileSidebarOpen: v }),
     }),
     {
       name: 'jh-ui-storage',
@@ -18,6 +22,7 @@ export const useUIStore = create(
         theme: state.theme,
         language: state.language,
         hasSeenOnboarding: state.hasSeenOnboarding,
+        sidebarCollapsed: state.sidebarCollapsed,
       }),
     },
   ),

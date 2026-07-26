@@ -3,12 +3,41 @@ import { useSurgeryStats, useSurgeries } from '../../hooks/queries/useSurgery';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { formatCurrency } from '../../utils/currency';
+import LowStockWidget from '../../components/pharmacy/LowStockWidget';
 
 export default function HospitalOverview() {
   const today = new Date().toISOString().slice(0, 10);
-  const { data: accounting } = useAccountingSummary();
-  const { data: stats = {} } = useSurgeryStats();
-  const { data: surgeries = [] } = useSurgeries(today);
+  const { data: accounting, isLoading: accLoading, isError: accError } = useAccountingSummary();
+  const { data: stats = {}, isLoading: statsLoading, isError: statsError } = useSurgeryStats();
+  const { data: surgeries = [], isLoading: surgeriesLoading, isError: surgeriesError } = useSurgeries(today);
+
+  if (accLoading || statsLoading || surgeriesLoading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="h-8 w-48 bg-bone rounded" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => <div key={i} className="h-28 bg-bone rounded-xl" />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => <div key={i} className="h-48 bg-bone rounded-xl" />)}
+        </div>
+      </div>
+    );
+  }
+
+  if (accError || statsError || surgeriesError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-heading-sm font-semibold text-obsidian">Hospital Overview</h1>
+          <p className="text-body text-slate mt-1">{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        </div>
+        <div className="bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
+          Failed to load dashboard data. Please try refreshing the page.
+        </div>
+      </div>
+    );
+  }
   const sum = (obj) => obj ? Object.values(obj).reduce((a, b) => a + b, 0) : 0;
 
   const pending = (stats.SCHEDULED || 0) + (stats.PREP || 0);
@@ -126,6 +155,8 @@ export default function HospitalOverview() {
             ))}
           </CardContent>
         </Card>
+
+        <LowStockWidget />
       </div>
 
       {accounting?.openShift && (

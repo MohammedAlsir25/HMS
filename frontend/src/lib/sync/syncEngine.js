@@ -27,18 +27,6 @@ function notify(state) {
 let syncState = { status: 'idle', lastSyncAt: null, error: null };
 let syncPromise = null;
 
-async function isOnline() {
-  try {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), 3000);
-    await fetch('/api/health', { method: 'HEAD', signal: controller.signal });
-    clearTimeout(id);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function getOnlineStatus() {
   return navigator.onLine;
 }

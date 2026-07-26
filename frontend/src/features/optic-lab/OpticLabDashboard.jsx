@@ -66,7 +66,7 @@ function KanbanCard({ job, onMove }) {
 export default function OpticLabDashboard() {
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState('board');
-  const { data: allJobs = [], isLoading } = useOpticLabJobs();
+  const { data: allJobs = [], isLoading, isError, refetch } = useOpticLabJobs();
   const { data: stats } = useOpticLabStats();
   const { data: customers = [] } = useOpticLabCustomers();
   const updateStatus = useUpdateLabJobStatus();
@@ -99,6 +99,20 @@ export default function OpticLabDashboard() {
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64"><div className="loader" /></div>;
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-12">
+        <p className="text-body text-red-500">Failed to load optic lab jobs</p>
+        <button
+          onClick={() => refetch()}
+          className="px-4 py-2 text-sm rounded-lg bg-lilac-bloom text-white hover:opacity-90"
+        >
+          Retry
+        </button>
+      </div>
+    );
   }
 
   return (

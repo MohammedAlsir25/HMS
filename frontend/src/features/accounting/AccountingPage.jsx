@@ -12,6 +12,9 @@ import { Table } from '../../components/ui/Table';
 import { CURRENCY, formatCurrency } from '../../utils/currency';
 import { printReceipt } from '../../lib/printReceipt';
 
+import ServiceItemCatalog from './ServiceItemCatalog';
+import InvoicePage from './InvoicePage';
+
 const TYPE_ICONS = {
   RECEPTION: '🩺',
   PHARMACY: '💊',
@@ -190,7 +193,7 @@ export default function AccountingPage() {
   const [closeShiftSaving, setCloseShiftSaving] = useState(false);
   const [cmSaving, setCmSaving] = useState(false);
 
-  const { data: summary, isLoading: loading } = useAccountingSummary();
+  const { data: summary, isLoading: loading, isError: summaryError, refetch: refetchSummary } = useAccountingSummary();
   const { data: departments } = useDepartments();
   const { data: revenueByDay = [] } = useRevenueByDay(`days=30`);
   const { data: revenueByType = [] } = useRevenueByType(`from=${get30DaysAgo()}&to=${getTodayStr()}`);
@@ -424,6 +427,23 @@ export default function AccountingPage() {
     );
   }
 
+  if (summaryError) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-heading-sm font-semibold text-obsidian">{t('accounting.title')}</h1>
+        <div className="flex flex-col items-center justify-center gap-4 py-12">
+          <p className="text-body text-red-500">Failed to load accounting data</p>
+          <button
+            onClick={() => refetchSummary()}
+            className="px-4 py-2 text-sm rounded-lg bg-lilac-bloom text-white hover:opacity-90"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const todayByType = summary?.today?.byType || {};
 
   const isLoadingOverlay = addSaving || expenseSaving || paySaving || debtSaving;
@@ -454,6 +474,8 @@ export default function AccountingPage() {
         <Button variant={tab === 'expenses' ? 'primary' : 'secondary'} size="sm" onClick={() => setTab('expenses')}>Expenses</Button>
         <Button variant={tab === 'debts' ? 'primary' : 'secondary'} size="sm" onClick={() => setTab('debts')}>Debt</Button>
         <Button variant={tab === 'cash' ? 'primary' : 'secondary'} size="sm" onClick={() => setTab('cash')}>Cash</Button>
+        <Button variant={tab === 'service-items' ? 'primary' : 'secondary'} size="sm" onClick={() => setTab('service-items')}>Service Items</Button>
+        <Button variant={tab === 'invoices' ? 'primary' : 'secondary'} size="sm" onClick={() => setTab('invoices')}>Invoices</Button>
       </div>
 
       {tab === 'overview' && (
@@ -1033,6 +1055,9 @@ export default function AccountingPage() {
           </Card>
         </>
       )}
+
+      {tab === 'service-items' && <ServiceItemCatalog />}
+      {tab === 'invoices' && <InvoicePage />}
 
       {payingDebt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-obsidian/50" onClick={() => setPayingDebt(null)}>

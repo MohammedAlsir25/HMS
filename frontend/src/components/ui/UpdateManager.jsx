@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from './Button';
+import { getVersion } from '@tauri-apps/api/app';
+import { check } from '@tauri-apps/plugin-updater';
+import { relaunch } from '@tauri-apps/plugin-process';
 
 function isTauri() {
   return typeof window !== 'undefined' && window.__TAURI_INTERNALS__;
@@ -22,7 +25,6 @@ export default function UpdateManager({ compact = false }) {
     setTauri(true);
     (async () => {
       try {
-        const { getVersion } = await import('@tauri-apps/api/app');
         setCurrentVersion(await getVersion());
       } catch {
         setCurrentVersion('1.1.0');
@@ -38,7 +40,6 @@ export default function UpdateManager({ compact = false }) {
     setDownloaded(0);
     setTotalSize(0);
     try {
-      const { check } = await import('@tauri-apps/plugin-updater');
       const u = await check();
       if (u) setUpdate(u);
     } catch (err) {
@@ -61,8 +62,6 @@ export default function UpdateManager({ compact = false }) {
     setProgress(0);
     setDownloaded(0);
     try {
-      const { check } = await import('@tauri-apps/plugin-updater');
-      const { restart } = await import('@tauri-apps/plugin-process');
       const u = await check();
       if (!u) { setInstalling(false); return; }
       setTotalSize(u.contentLength || 0);
@@ -82,7 +81,7 @@ export default function UpdateManager({ compact = false }) {
         }
       });
       setProgress(100);
-      await restart();
+      await relaunch();
     } catch (err) {
       setError(err.message || 'Installation failed');
       setInstalling(false);
@@ -120,7 +119,7 @@ export default function UpdateManager({ compact = false }) {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-obsidian">Desktop App</h3>
-          <p className="text-caption text-slate">Al Jawarih Hospital v{currentVersion || '1.1.0'}</p>
+          <p className="text-caption text-slate">HMS v{currentVersion || '1.0.0'}</p>
         </div>
         <Button variant="secondary" size="sm" onClick={handleCheck} disabled={checking || installing}>
           {checking ? 'Checking...' : 'Check for Updates'}

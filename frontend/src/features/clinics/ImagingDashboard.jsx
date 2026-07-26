@@ -6,6 +6,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Ca
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { Modal } from '../../components/ui/Modal';
+import ImageViewer from '../../components/imaging/ImageViewer';
 import { notifyError } from '../../utils/notify';
 import ScheduleFollowUpModal from './ScheduleFollowUpModal';
 import UpcomingFollowUpsSection from './UpcomingFollowUpsSection';
@@ -89,6 +91,9 @@ function ImagingDetailPanel({ order, onRefresh }) {
   const [impression, setImpression] = useState(order?.impression || '');
   const [uploading, setUploading] = useState(false);
   const [printHtml, setPrintHtml] = useState(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerFileIndex, setViewerFileIndex] = useState(0);
+  const [signedUrls, setSignedUrls] = useState({});
 
   useEffect(() => {
     if (order) {
@@ -161,6 +166,25 @@ function ImagingDetailPanel({ order, onRefresh }) {
     finally { setUploading(false); e.target.value = ''; }
   }, [order?.id, queryClient, onRefresh]);
 
+  const openViewer = useCallback(async (fileId, index) => {
+    setViewerFileIndex(index);
+    setViewerOpen(true);
+    const imageFiles = (order.files || []).filter(f => f.mimeType?.startsWith('image/'));
+    const toFetch = imageFiles.filter(f => !signedUrls[f.id]);
+    if (toFetch.length > 0) {
+      const results = await Promise.allSettled(
+        toFetch.map(f => api.get(`/imaging/files/${f.id}/download`).then(r => r.data || r))
+      );
+      const updates = {};
+      results.forEach((r, i) => {
+        if (r.status === 'fulfilled') updates[toFetch[i].id] = r.value.signedUrl;
+      });
+      setSignedUrls(prev => ({ ...prev, ...updates }));
+    }
+  }, [order?.files, signedUrls]);
+
+  const imageFiles = (order?.files || []).filter(f => f.mimeType?.startsWith('image/'));
+
   if (!order) {
     return (
       <Card>
@@ -207,15 +231,27 @@ function ImagingDetailPanel({ order, onRefresh }) {
           <CardHeader><CardTitle>Image Upload</CardTitle></CardHeader>
           <CardContent>
             <div className="flex items-center gap-3">
-              <input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={handleUpload}
+              <input type="file" multiple accept="image/jpeg,image/png,image/webp,application/dicom,.dcm" onChange={handleUpload}
                 className="block w-full text-sm text-slate file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-lilac-bloom/10 file:text-lilac-bloom hover:file:bg-lilac-bloom/20"
                 disabled={uploading} />
               {uploading && <span className="text-caption text-slate">Uploading...</span>}
             </div>
             {order.files?.length > 0 && (
               <div className="mt-3 grid grid-cols-4 gap-2">
-                {order.files.map((f) => (
-                  <FileThumbnail key={f.id} file={f} />
+                {order.files.map((f, idx) => (
+                  f.mimeType?.startsWith('image/') ? (
+                    <button key={f.id} onClick={() => openViewer(f.id, idx)}
+                      className="text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-lilac-bloom rounded-lg">
+                      <FileThumbnail file={f} />
+                    </button>
+                  ) : f.mimeType === 'application/pdf' ? (
+                    <a key={f.id} href={`/imaging/files/${f.id}/download`} target="_blank" rel="noopener noreferrer"
+                      className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-lilac-bloom rounded-lg">
+                      <FileThumbnail file={f} />
+                    </a>
+                  ) : (
+                    <FileThumbnail key={f.id} file={f} />
+                  )
                 ))}
               </div>
             )}
@@ -269,6 +305,40 @@ function ImagingDetailPanel({ order, onRefresh }) {
           </div>
         </CardContent>
       </Card>
+
+      <Modal open={viewerOpen} onClose={() => setViewerOpen(false)} title="Image Viewer" className="max-w-4xl">
+        {imageFiles.length > 0 && (
+          <div className="flex gap-3" style={{ minHeight: 420 }}>
+            {imageFiles.length > 1 && (
+              <div className="w-20 flex flex-col gap-1 overflow-y-auto shrink-0">
+                {imageFiles.map((f, idx) => (
+                  <button key={f.id} onClick={() => setViewerFileIndex(idx)}
+                    className={`w-full h-14 rounded-lg border overflow-hidden transition-colors ${idx === viewerFileIndex ? 'border-lilac-bloom' : 'border-silver hover:border-lilac-bloom/50'}`}>
+                    {signedUrls[f.id] ? (
+                      <img src={signedUrls[f.id]} alt={f.originalName} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-bone text-[10px] text-slate px-1">{f.originalName}</div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex-1 min-h-0">
+              {signedUrls[imageFiles[viewerFileIndex]?.id] ? (
+                <ImageViewer
+                  src={signedUrls[imageFiles[viewerFileIndex].id]}
+                  alt={imageFiles[viewerFileIndex]?.originalName || ''}
+                  className="h-[420px]"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[420px] bg-bone rounded-xl border border-silver">
+                  <div className="w-8 h-8 border-2 border-lilac-bloom border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

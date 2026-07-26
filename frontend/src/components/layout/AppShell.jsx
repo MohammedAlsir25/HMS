@@ -1,15 +1,17 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { Menu } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
+import { useUIStore } from '../../stores/uiStore';
 import { api } from '../../lib/api';
-import StaggeredMenu from './StaggeredMenu';
+import Sidebar from './Sidebar';
 import UserProfileDropdown from './UserProfileDropdown';
 import SyncStatusBadge from './SyncStatusBadge';
 import SettingsModal from '../../features/settings/SettingsModal';
 import WelcomeToast from '../ui/WelcomeToast';
 import TourManager from '../ui/TourManager';
 import UpdateManager from '../ui/UpdateManager';
-import GradientText from '../ui/GradientText';
+import Breadcrumb from '../ui/Breadcrumb';
 
 let appWindow = null;
 async function getWindow() {
@@ -96,16 +98,10 @@ function NotificationBell() {
 export default function AppShell({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const isDashboard = location.pathname === '/dashboard';
-  const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === 'Super Admin';
-
-  const toggleMenu = useCallback((forced) => {
-    setMenuOpen((prev) => (forced !== undefined ? forced : !prev));
-  }, []);
+  const setMobileSidebarOpen = useUIStore((s) => s.setMobileSidebarOpen);
 
   const handleMinimize = useCallback(async () => {
     const w = await getWindow();
@@ -147,84 +143,63 @@ export default function AppShell({ children }) {
   }, []);
 
   return (
-    <div className="relative h-dvh flex flex-col">
-      <WelcomeToast />
-      {isAdmin && <StaggeredMenu position="left" isFixed isOpen={menuOpen} onToggle={toggleMenu} />}
+    <div className="relative h-dvh flex">
+      <Sidebar />
+      <div className="flex-1 flex flex-col min-w-0 ml-0 md:ml-16 lg:ml-72 transition-all duration-300">
+        <WelcomeToast />
 
-      <header className="sticky top-0 z-20 bg-paper/90 backdrop-blur-sm border-b border-silver/50 pt-1" data-tauri-drag-region>
-        <div className="mx-auto flex items-center gap-3 px-4 md:px-6 lg:px-8 py-2" style={{ maxWidth: '1440px' }} data-tauri-drag-region="">
-          {isAdmin && (
+        <header className="sticky top-0 z-20 bg-paper/90 backdrop-blur-sm border-b border-silver/50 pt-1" data-tauri-drag-region>
+          <div className="mx-auto flex items-center gap-3 px-4 md:px-6 lg:px-8 py-2" style={{ maxWidth: '1440px' }} data-tauri-drag-region="">
             <button
-              onClick={toggleMenu}
-              className="shrink-0 touch-target flex items-center justify-center w-12 h-12 rounded-lg text-graphite hover:text-obsidian hover:bg-bone transition-colors"
-              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-              type="button"
+              onClick={() => setMobileSidebarOpen(true)}
+              className="md:hidden shrink-0 touch-target flex items-center justify-center w-10 h-10 rounded-lg text-graphite hover:text-obsidian hover:bg-bone transition-colors"
+              aria-label="Open navigation"
             >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                {menuOpen ? (
-                  <path d="M18 6L6 18M6 6l12 12" />
-                ) : (
-                  <path d="M3 12h18M3 6h18M3 18h18" />
-                )}
-              </svg>
+              <Menu className="w-5 h-5" />
             </button>
-          )}
-          <div className="flex-1 flex items-center justify-center gap-2">
-            <img
-              src="/logo.png"
-              alt="Al Jawarih"
-              className={`h-9 w-auto transition-opacity duration-200 cursor-pointer ${isAdmin && menuOpen ? 'invisible' : ''}`}
-              onClick={() => navigate('/dashboard')}
-            />
-            {isDashboard && (
-              <GradientText
-                colors={["#B497CF", "#5227FF", "#FF9FFC", "#5227FF", "#B497CF"]}
-                animationSpeed={4}
-                showBorder={false}
-                className="text-heading-xs font-semibold hidden md:flex m-0"
-              >
-                Al Jawarih Hospital
-              </GradientText>
-            )}
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            <NotificationBell />
-            <TourManager />
-            <SyncStatusBadge />
-            <UserProfileDropdown onSettings={() => setSettingsOpen(true)} />
-            {isTauri() && (
-            <div className="flex items-center ml-1 md:ml-2 -mr-2 md:-mr-3">
-              <button onClick={handleMinimize} className="w-[46px] h-[32px] flex items-center justify-center text-graphite hover:text-obsidian hover:bg-bone transition-colors rounded-none" type="button" aria-label="Minimize">
-                <svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor"><rect width="10" height="1" /></svg>
-              </button>
-              <button onClick={handleMaximize} className="w-[46px] h-[32px] flex items-center justify-center text-graphite hover:text-obsidian hover:bg-bone transition-colors rounded-none" type="button" aria-label={isMaximized ? 'Restore' : 'Maximize'}>
-                {isMaximized ? (
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2"><rect x="1" y="3" width="7" height="7" /><rect x="3" y="1" width="7" height="7" fill="transparent" /></svg>
-                ) : (
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2"><rect x="1" y="1" width="8" height="8" /></svg>
-                )}
-              </button>
-              <button onClick={handleClose} className="w-[46px] h-[32px] flex items-center justify-center text-graphite hover:text-white hover:bg-red-500 transition-colors rounded-none" type="button" aria-label="Close">
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M1 1l8 8M9 1l-8 8" /></svg>
-              </button>
+
+            <div className="flex-1" />
+
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+              <TourManager />
+              <SyncStatusBadge />
+              <UserProfileDropdown onSettings={() => setSettingsOpen(true)} />
+              {isTauri() && (
+              <div className="flex items-center ml-1 md:ml-2 -mr-2 md:-mr-3">
+                <button onClick={handleMinimize} className="w-[46px] h-[32px] flex items-center justify-center text-graphite hover:text-obsidian hover:bg-bone transition-colors rounded-none" type="button" aria-label="Minimize">
+                  <svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor"><rect width="10" height="1" /></svg>
+                </button>
+                <button onClick={handleMaximize} className="w-[46px] h-[32px] flex items-center justify-center text-graphite hover:text-obsidian hover:bg-bone transition-colors rounded-none" type="button" aria-label={isMaximized ? 'Restore' : 'Maximize'}>
+                  {isMaximized ? (
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2"><rect x="1" y="3" width="7" height="7" /><rect x="3" y="1" width="7" height="7" fill="transparent" /></svg>
+                  ) : (
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2"><rect x="1" y="1" width="8" height="8" /></svg>
+                  )}
+                </button>
+                <button onClick={handleClose} className="w-[46px] h-[32px] flex items-center justify-center text-graphite hover:text-white hover:bg-red-500 transition-colors rounded-none" type="button" aria-label="Close">
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M1 1l8 8M9 1l-8 8" /></svg>
+                </button>
+              </div>
+              )}
             </div>
-            )}
           </div>
-        </div>
-      </header>
+        </header>
 
-      <UpdateManager compact />
+        <UpdateManager compact />
 
-      <main
-        className="flex-1 p-4 md:p-6 lg:p-8 flex flex-col overflow-y-auto"
-        style={{ scrollBehavior: 'smooth' }}
-      >
-        <div className="mx-auto w-full flex-1 flex flex-col" style={{ maxWidth: '1440px' }}>
-          {children}
-        </div>
-      </main>
+        <main
+          className="flex-1 p-4 md:p-6 lg:p-8 flex flex-col overflow-y-auto"
+          style={{ scrollBehavior: 'smooth' }}
+        >
+          <div className="mx-auto w-full flex-1 flex flex-col" style={{ maxWidth: '1440px' }}>
+            <Breadcrumb />
+            {children}
+          </div>
+        </main>
 
-      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+        <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      </div>
     </div>
   );
 }

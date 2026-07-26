@@ -8,12 +8,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: {
     rollupOptions: {
-      external: [
-        '@tauri-apps/api/core',
-        '@tauri-apps/plugin-process',
-        '@tauri-apps/plugin-updater',
-        '@tauri-apps/plugin-opener',
-      ],
+      external: [],
       output: {
         manualChunks(id) {
           if (id.includes('node_modules/three')) return 'vendor-three';

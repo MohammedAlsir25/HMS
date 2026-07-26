@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { useAdminUsers, useAdminRoles, useCreateUser, useUpdateUser, useDepartments, adminKeys, useOperationTypePrices, useUpdateOperationTypePrice, useClinicPrices, useUpdateClinicPrice, useWardPrices, useUpdateWardPrice, useImagingProcedureTypes, useUpdateImagingProcedureTypePrice } from '../../hooks/queries/useAdmin';
+import { useAdminUsers, useAdminRoles, useCreateUser, useUpdateUser, useDepartments, useDepartmentStats, useCreateDepartment, useUpdateDepartment, useDeleteDepartment, adminKeys, useOperationTypePrices, useUpdateOperationTypePrice, useClinicPrices, useUpdateClinicPrice, useWardPrices, useUpdateWardPrice, useImagingProcedureTypes, useUpdateImagingProcedureTypePrice } from '../../hooks/queries/useAdmin';
 import { useClinics } from '../../hooks/queries/useClinics';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -11,6 +11,7 @@ import { Table } from '../../components/ui/Table';
 import { Modal } from '../../components/ui/Modal';
 import { PERMISSIONS_LIST } from './permissions';
 import { CURRENCY } from '../../utils/currency';
+import SystemHealth from './SystemHealth';
 import toast from 'react-hot-toast';
 
 const userColumns = [
@@ -43,13 +44,14 @@ export default function AdminPage() {
   const [userForm, setUserForm] = useState({ email: '', password: '', fullName: '', phone: '', roleId: '', clinicId: '' });
   const [roleForm, setRoleForm] = useState({ name: '', description: '', permissions: [] });
   const [deptForm, setDeptForm] = useState({ name: '', nameAr: '', slug: '', type: 'OTHER' });
+  const [deptFilter, setDeptFilter] = useState('');
   const [pricingSubTab, setPricingSubTab] = useState('procedures');
   const [mutationLoading, setMutationLoading] = useState(false);
   const [mutationError, setMutationError] = useState('');
 
-  const { data: users = [], isLoading: loadingUsers } = useAdminUsers();
+  const { data: users = [], isLoading: loadingUsers, isError: usersError, refetch: refetchUsers } = useAdminUsers();
   const { data: roles = [] } = useAdminRoles();
-  const { data: departments = [], isLoading: loadingDepts } = useDepartments();
+  const { data: departments = [], isLoading: loadingDepts, isError: deptsError, refetch: refetchDepts } = useDepartments();
   const { data: rolesList = [] } = useClinics();
   const { data: pricingOpTypes = [], isLoading: loadingOpPrices } = useOperationTypePrices();
   const { data: pricingClinics = [], isLoading: loadingClinicPrices } = useClinicPrices();
@@ -61,8 +63,13 @@ export default function AdminPage() {
   const updateImagingPrice = useUpdateImagingProcedureTypePrice();
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
+  const createDept = useCreateDepartment();
+  const updateDept = useUpdateDepartment();
+  const deleteDept = useDeleteDepartment();
+  const { data: deptStats } = useDepartmentStats();
 
   const loading = loadingUsers || loadingDepts;
+  const adminError = usersError || deptsError;
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
@@ -125,23 +132,34 @@ export default function AdminPage() {
   const handleCreateDepartment = async (e) => {
     e.preventDefault();
     setMutationError('');
-    setMutationLoading(true);
     try {
       if (editingDept) {
-        await api.patch(`/departments/${editingDept.id}`, deptForm);
+        await updateDept.mutateAsync({ id: editingDept.id, ...deptForm });
       } else {
-        await api.post('/departments', deptForm);
+        await createDept.mutateAsync(deptForm);
       }
       setShowDeptModal(false);
       setEditingDept(null);
       setDeptForm({ name: '', nameAr: '', slug: '', type: 'OTHER' });
-      queryClient.invalidateQueries({ queryKey: adminKeys.departments });
     } catch (err) {
       setMutationError(err.message || 'Failed to save department');
-    } finally {
-      setMutationLoading(false);
     }
   };
+
+  const handleDeleteDepartment = async (deptId) => {
+    if (!confirm('Delete this department? This action cannot be undone.')) return;
+    setMutationError('');
+    try {
+      await deleteDept.mutateAsync(deptId);
+      toast.success('Department deleted');
+    } catch (err) {
+      setMutationError(err.message || 'Failed to delete department');
+    }
+  };
+
+  const filteredDepartments = departments.filter((d) =>
+    !deptFilter || d.type === deptFilter || d.name.toLowerCase().includes(deptFilter.toLowerCase())
+  );
 
   const togglePermission = (perm) => {
     setRoleForm((prev) => ({
@@ -177,6 +195,7 @@ export default function AdminPage() {
         <Button variant={tab === 'roles' ? 'primary' : 'secondary'} onClick={() => setTab('roles')}>Roles</Button>
         <Button variant={tab === 'departments' ? 'primary' : 'secondary'} onClick={() => setTab('departments')}>Departments</Button>
         <Button variant={tab === 'pricing' ? 'primary' : 'secondary'} onClick={() => setTab('pricing')}>Pricing</Button>
+        <Button variant={tab === 'system' ? 'primary' : 'secondary'} onClick={() => setTab('system')}>System</Button>
       </div>
 
       {tab === 'users' && (
@@ -190,6 +209,16 @@ export default function AdminPage() {
           <CardContent>
             {loading ? (
               <p className="text-body text-slate">Loading users...</p>
+            ) : adminError ? (
+              <div className="flex flex-col items-center justify-center gap-4 py-8">
+                <p className="text-body text-red-500">Failed to load data</p>
+                <button
+                  onClick={() => { refetchUsers(); refetchDepts(); }}
+                  className="px-4 py-2 text-sm rounded-lg bg-lilac-bloom text-white hover:opacity-90"
+                >
+                  Retry
+                </button>
+              </div>
             ) : (
               <Table columns={userColumns} data={users} />
             )}
@@ -208,6 +237,16 @@ export default function AdminPage() {
           <CardContent>
             {loading ? (
               <p className="text-body text-slate">Loading roles...</p>
+            ) : adminError ? (
+              <div className="flex flex-col items-center justify-center gap-4 py-8">
+                <p className="text-body text-red-500">Failed to load data</p>
+                <button
+                  onClick={() => { refetchUsers(); refetchDepts(); }}
+                  className="px-4 py-2 text-sm rounded-lg bg-lilac-bloom text-white hover:opacity-90"
+                >
+                  Retry
+                </button>
+              </div>
             ) : (
               <div className="space-y-4">
                 {roles.map((role) => (
@@ -377,40 +416,95 @@ export default function AdminPage() {
         </Card>
       )}
 
+      {tab === 'system' && <SystemHealth />}
+
       {tab === 'departments' && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Departments ({departments.length})</CardTitle>
-              <Button onClick={() => { setEditingDept(null); setDeptForm({ name: '', nameAr: '', slug: '', type: 'OTHER' }); setShowDeptModal(true); }}>Add Department</Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <p className="text-body text-slate">Loading departments...</p>
-            ) : (
-              <div className="space-y-4">
-                {departments.map((dept) => (
-                  <div key={dept.id} className="p-4 border border-silver rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <span className="font-medium text-obsidian">{dept.name}</span>
-                        <Badge variant="info" size="sm" className="ml-2">{dept.type}</Badge>
-                        {dept.clinic && <span className="text-caption text-slate ml-2">→ {dept.clinic.name}</span>}
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => { setEditingDept(dept); setDeptForm({ name: dept.name, nameAr: dept.nameAr || '', slug: dept.slug, type: dept.type }); setShowDeptModal(true); }}>Edit</Button>
-                      </div>
-                    </div>
-                    <div className="text-caption text-slate">
-                      slug: {dept.slug}
-                    </div>
-                  </div>
-                ))}
+        <div className="space-y-6">
+          {deptStats && (
+            <div className="grid grid-cols-4 gap-4">
+              <div className="p-4 border border-silver rounded-lg bg-white">
+                <p className="text-caption text-slate">Total</p>
+                <p className="text-heading-sm font-semibold text-obsidian">{deptStats.total}</p>
               </div>
-            )}
-          </CardContent>
-        </Card>
+              <div className="p-4 border border-silver rounded-lg bg-white">
+                <p className="text-caption text-slate">Active</p>
+                <p className="text-heading-sm font-semibold text-green-600">{deptStats.activeCount}</p>
+              </div>
+              <div className="p-4 border border-silver rounded-lg bg-white">
+                <p className="text-caption text-slate">Inactive</p>
+                <p className="text-heading-sm font-semibold text-red-500">{deptStats.inactiveCount}</p>
+              </div>
+              <div className="p-4 border border-silver rounded-lg bg-white">
+                <p className="text-caption text-slate">Types</p>
+                <p className="text-heading-sm font-semibold text-obsidian">{deptStats.byType?.length || 0}</p>
+              </div>
+            </div>
+          )}
+          {deptStats?.byType && deptStats.byType.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {deptStats.byType.map((b) => (
+                <Badge key={b.type} variant="info" size="sm">{b.type}: {b.count}</Badge>
+              ))}
+            </div>
+          )}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Departments ({departments.length})</CardTitle>
+                <div className="flex gap-2">
+                  <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}
+                    className="px-3 py-2 border border-silver rounded text-body text-obsidian focus:outline-none focus:ring-1 focus:ring-lilac-bloom">
+                    <option value="">All Types</option>
+                    {['CLINIC', 'PHARMACY', 'LAB', 'SURGERY', 'ADMIN', 'HR', 'FINANCE', 'IT', 'NURSING', 'OTHER', 'IMAGING', 'EMERGENCY'].map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                  <Button onClick={() => { setEditingDept(null); setDeptForm({ name: '', nameAr: '', slug: '', type: 'OTHER' }); setShowDeptModal(true); }}>Add Department</Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <p className="text-body text-slate">Loading departments...</p>
+              ) : adminError ? (
+                <div className="flex flex-col items-center justify-center gap-4 py-8">
+                  <p className="text-body text-red-500">Failed to load departments</p>
+                  <button
+                    onClick={() => { refetchUsers(); refetchDepts(); }}
+                    className="px-4 py-2 text-sm rounded-lg bg-lilac-bloom text-white hover:opacity-90"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : filteredDepartments.length === 0 ? (
+                <p className="text-body text-slate">No departments found.</p>
+              ) : (
+                <div className="space-y-4">
+                  {filteredDepartments.map((dept) => (
+                    <div key={dept.id} className="p-4 border border-silver rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <span className="font-medium text-obsidian">{dept.name}</span>
+                          <Badge variant="info" size="sm" className="ml-2">{dept.type}</Badge>
+                          {dept.clinic && <span className="text-caption text-slate ml-2">→ {dept.clinic.name}</span>}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => { setEditingDept(dept); setDeptForm({ name: dept.name, nameAr: dept.nameAr || '', slug: dept.slug, type: dept.type }); setShowDeptModal(true); }}>Edit</Button>
+                          <Button variant="danger" size="sm" onClick={() => handleDeleteDepartment(dept.id)}>Delete</Button>
+                        </div>
+                      </div>
+                      <div className="flex gap-4 text-caption text-slate">
+                        <span>slug: {dept.slug}</span>
+                        {dept._count && <span>Employees: {dept._count.employees || 0}</span>}
+                        {dept._count && <span>Surgeries: {dept._count.surgeries || 0}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       <Modal open={showUserModal} onClose={() => setShowUserModal(false)} title="Add User">
@@ -483,6 +577,8 @@ export default function AdminPage() {
               <option value="FINANCE">Finance</option>
               <option value="IT">IT</option>
               <option value="NURSING">Nursing</option>
+              <option value="IMAGING">Imaging</option>
+              <option value="EMERGENCY">Emergency</option>
               <option value="OTHER">Other</option>
             </select>
           </div>

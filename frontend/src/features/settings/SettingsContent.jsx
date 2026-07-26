@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
+import { Bell, Mail, MessageSquare } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useUIStore } from '../../stores/uiStore';
+import { api } from '../../lib/api';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -40,6 +42,39 @@ function ToggleGroup({ label, options, value, onChange }) {
   );
 }
 
+function Switch({ checked, onChange, label, icon: Icon }) {
+  return (
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        {Icon && <Icon className="w-5 h-5 text-graphite" />}
+        <span className="text-body font-medium text-graphite">{label}</span>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-lilac-bloom focus:ring-offset-2
+          ${checked ? 'bg-lilac-bloom' : 'bg-silver'}`}
+      >
+        <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out
+          ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
+      </button>
+    </div>
+  );
+}
+
+const NOTIFICATION_PREFS_KEY = 'jh-notification-prefs';
+
+function loadNotificationPrefs() {
+  try {
+    const stored = localStorage.getItem(NOTIFICATION_PREFS_KEY);
+    return stored ? JSON.parse(stored) : { email: true, push: true, sms: false };
+  } catch {
+    return { email: true, push: true, sms: false };
+  }
+}
+
 export default function SettingsContent() {
   const { t } = useTranslation();
   const [repairing, setRepairing] = useState(false);
@@ -48,6 +83,13 @@ export default function SettingsContent() {
   const logout = useAuthStore((s) => s.logout);
   const { theme, setTheme, language, setLanguage, hasSeenOnboarding, setHasSeenOnboarding } = useUIStore();
   const fileInputRef = useRef(null);
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+
+  const [notificationPrefs, setNotificationPrefs] = useState(loadNotificationPrefs);
 
   const isNative = typeof window !== 'undefined' && (window.__TAURI_INTERNALS__ || window.Capacitor?.isNative);
   const isTauri = typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__;
@@ -92,6 +134,35 @@ export default function SettingsContent() {
       setUser({ ...user, avatarUrl: dataUrl });
     };
     reader.readAsDataURL(file);
+  };
+
+  const handlePasswordChange = async () => {
+    if (!currentPassword || !newPassword) {
+      toast.error(t('settings.fillAllFields') || 'Please fill all password fields');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error(t('settings.passwordsDoNotMatch') || 'Passwords do not match');
+      return;
+    }
+    setPasswordLoading(true);
+    try {
+      await api.put('/auth/password', { currentPassword, newPassword });
+      toast.success(t('settings.passwordUpdated') || 'Password updated successfully');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      toast.error(err.message || t('settings.passwordUpdateFailed') || 'Failed to update password');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  const updateNotificationPrefs = (patch) => {
+    const updated = { ...notificationPrefs, ...patch };
+    setNotificationPrefs(updated);
+    localStorage.setItem(NOTIFICATION_PREFS_KEY, JSON.stringify(updated));
   };
 
   return (
@@ -139,7 +210,7 @@ export default function SettingsContent() {
                        hover:bg-gray-800 dark:hover:bg-zinc-700
                        active:scale-95 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-black/50"
           >
-            Edit Profile
+            {t('settings.editProfile')}
           </button>
         </div>
       </div>
@@ -170,35 +241,76 @@ export default function SettingsContent() {
       </Section>
 
       <Section title={t('settings.security')}>
-        <Input label={t('settings.currentPassword')} type="password" placeholder={t('settings.currentPasswordPlaceholder')} />
-        <Input label={t('settings.newPassword')} type="password" placeholder={t('settings.newPasswordPlaceholder')} />
-        <Input label={t('settings.confirmPassword')} type="password" placeholder={t('settings.confirmPasswordPlaceholder')} />
-        <Button variant="secondary" disabled>{t('settings.updatePassword')}</Button>
+        <Input
+          label={t('settings.currentPassword')}
+          type="password"
+          placeholder={t('settings.currentPasswordPlaceholder')}
+          value={currentPassword}
+          onChange={(e) => setCurrentPassword(e.target.value)}
+        />
+        <Input
+          label={t('settings.newPassword')}
+          type="password"
+          placeholder={t('settings.newPasswordPlaceholder')}
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+        />
+        <Input
+          label={t('settings.confirmPassword')}
+          type="password"
+          placeholder={t('settings.confirmPasswordPlaceholder')}
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+        />
+        <Button variant="secondary" onClick={handlePasswordChange} disabled={passwordLoading}>
+          {passwordLoading ? (t('settings.updating') || 'Updating...') : t('settings.updatePassword')}
+        </Button>
+      </Section>
+
+      <Section title={t('settings.notifications')}>
+        <Switch
+          label={t('settings.emailNotifications') || 'Email Notifications'}
+          icon={Mail}
+          checked={notificationPrefs.email}
+          onChange={(v) => updateNotificationPrefs({ email: v })}
+        />
+        <Switch
+          label={t('settings.pushNotifications') || 'Push Notifications'}
+          icon={Bell}
+          checked={notificationPrefs.push}
+          onChange={(v) => updateNotificationPrefs({ push: v })}
+        />
+        <Switch
+          label={t('settings.smsNotifications') || 'SMS Notifications'}
+          icon={MessageSquare}
+          checked={notificationPrefs.sms}
+          onChange={(v) => updateNotificationPrefs({ sms: v })}
+        />
       </Section>
 
       {isNative && (
-        <Section title="Tour Guide">
-          <p className="text-body text-slate">Reset the guided tour to show again on your next dashboard visit.</p>
+        <Section title={t('settings.tourGuide')}>
+          <p className="text-body text-slate">{t('settings.tourGuideDesc')}</p>
           <Button variant="secondary" onClick={() => setHasSeenOnboarding(false)}>
-            Reset Tour
+            {t('settings.resetTour')}
           </Button>
         </Section>
       )}
 
       {isNative && (
-        <Section title="Sync">
-          <p className="text-body text-slate">Re-download all data and reset the local database if you encounter sync issues.</p>
+        <Section title={t('settings.sync')}>
+          <p className="text-body text-slate">{t('settings.syncDesc')}</p>
           <Button variant="secondary" onClick={handleRepairSync} disabled={repairing}>
-            {repairing ? 'Repairing...' : 'Repair Sync Data'}
+            {repairing ? t('settings.repairing') : t('settings.repairSyncData')}
           </Button>
         </Section>
       )}
 
       {isTauri && isAdmin && (
-        <Section title="Developer">
-          <p className="text-body text-slate">Toggle the WebView developer console for debugging.</p>
+        <Section title={t('settings.developer')}>
+          <p className="text-body text-slate">{t('settings.developerDesc')}</p>
           <Button variant="secondary" onClick={toggleDevtools}>
-            {devtoolsOpen ? 'Close DevTools' : 'Open DevTools'}
+            {devtoolsOpen ? t('settings.closeDevTools') : t('settings.openDevTools')}
           </Button>
         </Section>
       )}

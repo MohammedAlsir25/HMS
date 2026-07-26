@@ -1,0 +1,116 @@
+@media print {
+  @page {
+    margin: 1cm;
+    size: A4;
+  }
+
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+    line-height: 1.5;
+  }
+
+  nav,
+  aside,
+  header,
+  footer,
+  [data-sidebar],
+  [role="navigation"],
+  .sidebar,
+  .app-sidebar {
+    display: none !important;
+  }
+
+  button,
+  [role="button"],
+  .no-print,
+  .toast-container,
+  [data-tour],
+  .shepherd-modal-overlay-container,
+  .shepherd-element,
+  [class*="Toaster"] {
+    display: none !important;
+  }
+
+  .fixed,
+  .sticky {
+    position: static !important;
+  }
+
+  a[href]::after {
+    content: none !important;
+  }
+
+  img {
+    max-width: 100% !important;
+    page-break-inside: avoid;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100% !important;
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  th,
+  td {
+    border: 1px solid #ccc !important;
+    padding: 6px 10px !important;
+    text-align: start !important;
+    font-size: 11pt;
+  }
+
+  h1, h2, h3, h4 {
+    page-break-after: avoid;
+    page-break-inside: avoid;
+  }
+
+  .card-surface,
+  .card-surface-elevated {
+    border: 1px solid #ddd !important;
+    box-shadow: none !important;
+    border-radius: 8px !important;
+    page-break-inside: avoid;
+  }
+
+  .text-heading-sm {
+    font-size: 20pt !important;
+  }
+
+  .text-subheading {
+    font-size: 14pt !important;
+  }
+
+  .text-body {
+    font-size: 11pt !important;
+  }
+
+  .text-caption {
+    font-size: 9pt !important;
+  }
+
+  @page :first {
+    margin-top: 0;
+  }
+
+  @page :last {
+    margin-bottom: 0;
+  }
+}

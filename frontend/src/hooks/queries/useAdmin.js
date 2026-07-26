@@ -5,6 +5,7 @@ export const adminKeys = {
   users: ['admin', 'users'],
   roles: ['admin', 'roles'],
   departments: ['departments'],
+  departmentStats: ['departments', 'stats'],
 };
 
 export function useAdminUsers() {
@@ -41,6 +42,46 @@ export function useDepartments() {
   return useQuery({
     queryKey: adminKeys.departments,
     queryFn: () => api.get('/departments'),
+  });
+}
+
+export function useDepartmentStats() {
+  return useQuery({
+    queryKey: adminKeys.departmentStats,
+    queryFn: () => api.get('/departments/stats'),
+  });
+}
+
+export function useCreateDepartment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/departments', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminKeys.departments });
+      queryClient.invalidateQueries({ queryKey: adminKeys.departmentStats });
+    },
+  });
+}
+
+export function useUpdateDepartment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }) => api.patch(`/departments/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminKeys.departments });
+      queryClient.invalidateQueries({ queryKey: adminKeys.departmentStats });
+    },
+  });
+}
+
+export function useDeleteDepartment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => api.delete(`/departments/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminKeys.departments });
+      queryClient.invalidateQueries({ queryKey: adminKeys.departmentStats });
+    },
   });
 }
 

@@ -1,4 +1,4 @@
-const DB_NAME = 'al-jawarih';
+const DB_NAME = 'hms';
 const META_STORE = '_meta';
 const storeNames = new Set();
 let dbPromise = null;

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import CrossReferralModal from '../referral/CrossReferralModal';
 import ClinicDashboardShell, { ClinicSection, StatCard } from '../../components/clinic/ClinicDashboardShell';
 import ClinicHistoryPanel from '../../components/clinic/ClinicHistoryPanel';
@@ -9,13 +10,15 @@ import { Button } from '../../components/ui/Button';
 import { notifySuccess, notifyError } from '../../utils/notify';
 import { Table } from '../../components/ui/Table';
 import PatientSearchBar from '../../components/clinic/PatientSearchBar';
-import VitalSignsInput from '../../components/clinic/VitalSignsInput';
+import VitalSignsInput, { getAbnormalVitals } from '../../components/clinic/VitalSignsInput';
 import AIDiagnosisPanel from '../../components/clinic/AIDiagnosisPanel';
 import PrescriptionWriter from '../../components/clinic/PrescriptionWriter';
 import ClinicQueuePanel from '../../components/clinic/ClinicQueuePanel';
 import EncounterSummary from '../../components/clinic/EncounterSummary';
 import LabResultsView from '../../components/clinic/LabResultsView';
 import SymptomTagInput from '../../components/clinic/SymptomTagInput';
+import LabOrderModal from './LabOrderModal';
+import TemplateLoader from './TemplateLoader';
 import SYMPTOMS from '../../data/symptoms';
 import { usePatients } from '../../hooks/usePatients';
 import { useClinicalRecords } from '../../hooks/useClinicalRecords';
@@ -33,6 +36,8 @@ export default function MedicineDashboard() {
   const [showSummary, setShowSummary] = useState(false);
   const [showReferralBtn, setShowReferralBtn] = useState(false);
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+  const [showLabOrder, setShowLabOrder] = useState(false);
+  const location = useLocation();
 
   const patients = usePatients({ clinicSlug: 'medicine' });
   const records = useClinicalRecords('medicine');
@@ -52,12 +57,20 @@ export default function MedicineDashboard() {
   const [soapNotes, setSoapNotes] = useState({ subjective: '', objective: '', assessment: '', plan: '' });
   const [saving, setSaving] = useState(false);
   const [showIcd10Dropdown, setShowIcd10Dropdown] = useState(false);
+  const [pageError, setPageError] = useState(null);
 
   const { data: icd10Results = [] } = useIcd10Search(diagnosis);
 
   useEffect(() => {
+    if (location.state?.selectedPatientId && patients.selectPatientById) {
+      patients.selectPatientById(location.state.selectedPatientId);
+    }
+  }, [location.state]);
+
+  useEffect(() => {
     if (patients.selectedPatient) {
-      records.fetchRecords(patients.selectedPatient.id);
+      setPageError(null);
+      records.fetchRecords(patients.selectedPatient.id).catch((err) => setPageError(err.message || 'Failed to load records'));
       setShowReferralBtn(true);
       ai.reset();
     } else {
@@ -153,6 +166,63 @@ export default function MedicineDashboard() {
       setSaving(false);
     }
   }, [patients.selectedPatient, vitals, symptoms, diagnosis, diagnosisIcd10, medications, soapNotes, records, resetForm]);
+
+  const refetchAll = useCallback(() => {
+    setPageError(null);
+    if (patients.selectedPatient) {
+      records.fetchRecords(patients.selectedPatient.id).catch((err) => setPageError(err.message || 'Failed to load records'));
+    }
+  }, [patients.selectedPatient, records.fetchRecords]);
+
+  if (patients.loading || records.loading) {
+    return (
+      <ClinicDashboardShell
+        title="Medicine Clinic"
+        subtitle="Internal Medicine & Chronic Disease Management"
+        historyPanel={<ClinicHistoryPanel clinicSlug="medicine" />}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-32 rounded-lg bg-slate/5 animate-pulse" />
+          ))}
+        </div>
+      </ClinicDashboardShell>
+    );
+  }
+
+  if (pageError) {
+    return (
+      <ClinicDashboardShell
+        title="Medicine Clinic"
+        subtitle="Internal Medicine & Chronic Disease Management"
+        historyPanel={<ClinicHistoryPanel clinicSlug="medicine" />}
+      >
+        <div className="flex flex-col items-center gap-3 py-12">
+          <p className="text-body text-red-500">Failed to load clinic data</p>
+          <button onClick={refetchAll} className="px-4 py-2 text-sm rounded-lg bg-lilac-bloom text-white hover:opacity-90">
+            Retry
+          </button>
+        </div>
+      </ClinicDashboardShell>
+    );
+  }
+
+  if (records.records.length === 0 && patients.selectedPatient && !patients.loading && !records.loading) {
+    return (
+      <ClinicDashboardShell
+        title="Medicine Clinic"
+        subtitle="Internal Medicine & Chronic Disease Management"
+        historyPanel={<ClinicHistoryPanel clinicSlug="medicine" />}
+      >
+        <div className="flex flex-col items-center gap-3 py-12">
+          <p className="text-body text-slate">No clinical records found for this patient.</p>
+          <button onClick={refetchAll} className="px-4 py-2 text-sm rounded-lg bg-lilac-bloom text-white hover:opacity-90">
+            Retry
+          </button>
+        </div>
+      </ClinicDashboardShell>
+    );
+  }
 
   return (
     <ClinicDashboardShell
@@ -272,7 +342,12 @@ export default function MedicineDashboard() {
 
           <div className="grid grid-cols-1 gap-6 mb-6">
             <ClinicSection title="SOAP Notes">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <TemplateLoader
+                clinicSlug="medicine"
+                onLoadTemplate={(data) => setSoapNotes(data)}
+                currentSections={soapNotes}
+              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                 <div>
                   <label className="text-sm font-medium text-graphite block mb-1">Subjective</label>
                   <textarea value={soapNotes.subjective} onChange={(e) => setSoapNotes({ ...soapNotes, subjective: e.target.value })}
@@ -304,6 +379,9 @@ export default function MedicineDashboard() {
           <div className="flex items-center gap-3 mb-6">
             <Button variant="primary" onClick={handleSave} loading={saving}>
               Save Clinical Record
+            </Button>
+            <Button variant="secondary" onClick={() => setShowLabOrder(true)}>
+              Order Lab Tests
             </Button>
             {showReferralBtn && (
               <Button variant="secondary" onClick={() => setShowReferral(true)}>
@@ -378,6 +456,15 @@ export default function MedicineDashboard() {
         open={showReferral}
         onClose={() => setShowReferral(false)}
         fromClinicId="medicine"
+        selectedPatient={patients.selectedPatient}
+      />
+      <LabOrderModal
+        isOpen={showLabOrder}
+        onClose={() => setShowLabOrder(false)}
+        clinicSlug="medicine"
+        patientId={patients.selectedPatient?.id}
+        patientName={patients.selectedPatient?.fullName}
+        onOrderCreated={() => { if (patients.selectedPatient) records.fetchRecords(patients.selectedPatient.id); }}
       />
       <ScheduleFollowUpModal
         open={showFollowUpModal}

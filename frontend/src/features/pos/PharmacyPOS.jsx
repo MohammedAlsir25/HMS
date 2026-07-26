@@ -32,7 +32,7 @@ export default function PharmacyPOS() {
   const [activeReferralId, setActiveReferralId] = useState(null);
   const [error, setError] = useState('');
 
-  const { data: items = [], isLoading } = usePOSItems('pharmacy');
+  const { data: items = [], isLoading, isError: itemsError, refetch: refetchItems } = usePOSItems('pharmacy');
   const { data: referrals = [], isLoading: referralsLoading } = useReferrals(activeTab === 'referrals' ? 'type=PHARMACY_DISPATCH&status=PENDING' : null);
 
   const addToCart = (item) => {
@@ -72,11 +72,45 @@ export default function PharmacyPOS() {
   const handleDispenseReferral = useCallback((referral) => {
     setPatientName(referral.patient?.fullName || '');
     setActiveReferralId(referral.id);
+
+    if (referral.medications?.length > 0) {
+      const newCart = [];
+      const unmatched = [];
+      for (const med of referral.medications) {
+        const match = items.find(i =>
+          i.name.toLowerCase().includes(med.drugName.toLowerCase())
+        );
+        if (match) {
+          const packSize = match.packSize || 1;
+          const existing = newCart.find(c => c.id === match.id);
+          if (existing) {
+            existing.quantity += packSize;
+          } else {
+            newCart.push({
+              id: match.id,
+              name: match.name,
+              sku: match.sku,
+              price: Number(match.price),
+              packSize,
+              quantity: packSize,
+              mode: 'box',
+            });
+          }
+        } else {
+          unmatched.push(med.drugName);
+        }
+      }
+      setCart(newCart);
+      if (unmatched.length > 0) {
+        setError(`Could not find in inventory: ${unmatched.join(', ')}`);
+      }
+    }
+
     setActiveTab('sale');
-  }, []);
+  }, [items]);
 
   const filteredItems = items.filter((i) =>
-    !search || i.name.toLowerCase().includes(search.toLowerCase()) || i.sku.toLowerCase().includes(search.toLowerCase())
+    !search || i.name.toLowerCase().includes(search.toLowerCase()) || i.sku.toLowerCase().includes(search.toLowerCase()) || (i.barcode && i.barcode.toLowerCase().includes(search.toLowerCase()))
   );
 
   const handleComplete = useCallback(async () => {
@@ -254,13 +288,24 @@ export default function PharmacyPOS() {
             <CardContent>
               <Input
                 label="Search"
-                placeholder="Search by name or SKU..."
+                placeholder="Search by name, SKU, or barcode..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="mb-3"
               />
               {isLoading && <p className="text-body text-slate">Loading inventory...</p>}
-              {!isLoading && (
+              {itemsError && !isLoading && (
+                <div className="flex flex-col items-center justify-center gap-4 py-8">
+                  <p className="text-body text-red-500">Failed to load inventory</p>
+                  <button
+                    onClick={() => refetchItems()}
+                    className="px-4 py-2 text-sm rounded-lg bg-lilac-bloom text-white hover:opacity-90"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+              {!isLoading && !itemsError && (
                 <div className="max-h-[50vh] overflow-y-auto space-y-1">
                   {filteredItems.map((item) => {
                     const outOfStock = item.quantity < 1;

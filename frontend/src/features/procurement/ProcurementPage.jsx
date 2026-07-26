@@ -56,51 +56,67 @@ export default function ProcurementPage() {
   const [mutationError, setMutationError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [pageError, setPageError] = useState('');
 
   const fetchRequisitions = useCallback(async () => {
-    try { const data = await api.get(`/procurement/requisitions${search ? `?q=${encodeURIComponent(search)}` : ''}`); setRequisitions(data); } catch { setRequisitions([]); }
+    try { const data = await api.get(`/procurement/requisitions${search ? `?q=${encodeURIComponent(search)}` : ''}`); setRequisitions(data); setPageError(''); } catch (err) { setRequisitions([]); setPageError(err.message || 'Failed to load requisitions'); }
   }, [search]);
 
   const fetchPurchaseOrders = useCallback(async () => {
-    try { const data = await api.get(`/procurement/purchase-orders${search ? `?q=${encodeURIComponent(search)}` : ''}`); setPurchaseOrders(data); } catch { setPurchaseOrders([]); }
+    try { const data = await api.get(`/procurement/purchase-orders${search ? `?q=${encodeURIComponent(search)}` : ''}`); setPurchaseOrders(data); setPageError(''); } catch (err) { setPurchaseOrders([]); setPageError(err.message || 'Failed to load purchase orders'); }
   }, [search]);
 
   const fetchPendingApprovals = useCallback(async () => {
-    try { const data = await api.get('/procurement/purchase-orders/pending-approval'); setPendingApprovals(data); } catch { setPendingApprovals([]); }
+    try { const data = await api.get('/procurement/purchase-orders/pending-approval'); setPendingApprovals(data); setPageError(''); } catch (err) { setPendingApprovals([]); setPageError(err.message || 'Failed to load approvals'); }
   }, []);
 
   const fetchFixedAssets = useCallback(async () => {
-    try { const data = await api.get('/procurement/assets'); setFixedAssets(data); } catch { setFixedAssets([]); }
+    try { const data = await api.get('/procurement/assets'); setFixedAssets(data); setPageError(''); } catch (err) { setFixedAssets([]); setPageError(err.message || 'Failed to load assets'); }
   }, []);
 
   const fetchSuppliers = useCallback(async () => {
-    try { const data = await api.get('/pos/suppliers'); setSuppliers(data); } catch { setSuppliers([]); }
+    try { const data = await api.get('/pos/suppliers'); setSuppliers(data); setPageError(''); } catch (err) { setSuppliers([]); setPageError(err.message || 'Failed to load suppliers'); }
   }, []);
 
   const fetchCostCenters = useCallback(async () => {
-    try { const data = await api.get('/procurement/cost-centers'); setCostCenters(data); } catch { setCostCenters([]); }
+    try { const data = await api.get('/procurement/cost-centers'); setCostCenters(data); setPageError(''); } catch (err) { setCostCenters([]); setPageError(err.message || 'Failed to load cost centers'); }
   }, []);
 
   const fetchDepartments = useCallback(async () => {
-    try { const data = await api.get('/departments'); setDepartments(data); } catch { setDepartments([]); }
+    try { const data = await api.get('/departments'); setDepartments(data); setPageError(''); } catch (err) { setDepartments([]); setPageError(err.message || 'Failed to load departments'); }
   }, []);
 
   const fetchInventoryItems = useCallback(async () => {
-    try { const data = await api.get('/pos/pharmacy/items'); setInventoryItems(data); } catch { setInventoryItems([]); }
+    try { const data = await api.get('/pos/pharmacy/items'); setInventoryItems(data); setPageError(''); } catch (err) { setInventoryItems([]); setPageError(err.message || 'Failed to load inventory items'); }
   }, []);
 
   useEffect(() => {
-    fetchSuppliers();
-    fetchCostCenters();
-    fetchDepartments();
-    fetchInventoryItems();
+    setLoading(true);
+    setPageError('');
+    Promise.all([
+      fetchSuppliers(),
+      fetchCostCenters(),
+      fetchDepartments(),
+      fetchInventoryItems(),
+    ]).finally(() => setLoading(false));
   }, [fetchSuppliers, fetchCostCenters, fetchDepartments, fetchInventoryItems]);
 
-  useEffect(() => { if (activeTab === 'requisitions') fetchRequisitions(); }, [activeTab, fetchRequisitions]);
-  useEffect(() => { if (activeTab === 'purchaseOrders') fetchPurchaseOrders(); }, [activeTab, fetchPurchaseOrders]);
-  useEffect(() => { if (activeTab === 'approvals') fetchPendingApprovals(); }, [activeTab, fetchPendingApprovals]);
-  useEffect(() => { if (activeTab === 'assets') fetchFixedAssets(); }, [activeTab, fetchFixedAssets]);
-  useEffect(() => { if (activeTab === 'costCenters') fetchCostCenters(); }, [activeTab, fetchCostCenters]);
+  useEffect(() => {
+    if (activeTab === 'requisitions') { setLoading(true); fetchRequisitions().finally(() => setLoading(false)); }
+  }, [activeTab, fetchRequisitions]);
+  useEffect(() => {
+    if (activeTab === 'purchaseOrders') { setLoading(true); fetchPurchaseOrders().finally(() => setLoading(false)); }
+  }, [activeTab, fetchPurchaseOrders]);
+  useEffect(() => {
+    if (activeTab === 'approvals') { setLoading(true); fetchPendingApprovals().finally(() => setLoading(false)); }
+  }, [activeTab, fetchPendingApprovals]);
+  useEffect(() => {
+    if (activeTab === 'assets') { setLoading(true); fetchFixedAssets().finally(() => setLoading(false)); }
+  }, [activeTab, fetchFixedAssets]);
+  useEffect(() => {
+    if (activeTab === 'costCenters') { setLoading(true); fetchCostCenters().finally(() => setLoading(false)); }
+  }, [activeTab, fetchCostCenters]);
 
   const handleSubmitRequisition = async (e) => {
     e.preventDefault();
@@ -257,6 +273,39 @@ export default function ProcurementPage() {
       <Button size="sm" variant="ghost" loading={submitting} onClick={() => handleDepreciate(a.id)}>Depreciate</Button>
     ) : null },
   ];
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-heading-sm font-semibold text-obsidian">Procurement</h1>
+          <p className="text-body text-slate mt-1">Manage requisitions, purchase orders, approvals & fixed assets</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-32 rounded-lg bg-slate/5 animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (pageError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-heading-sm font-semibold text-obsidian">Procurement</h1>
+          <p className="text-body text-slate mt-1">Manage requisitions, purchase orders, approvals & fixed assets</p>
+        </div>
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg px-4 py-8 text-center">
+          <p className="text-sm text-red-700 dark:text-red-300">{pageError}</p>
+          <button onClick={() => { setPageError(''); setLoading(true); Promise.all([fetchSuppliers(), fetchCostCenters(), fetchDepartments(), fetchInventoryItems()]).finally(() => setLoading(false)); }} className="mt-3 px-4 py-2 text-sm rounded-lg bg-lilac-bloom text-white hover:opacity-90">
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

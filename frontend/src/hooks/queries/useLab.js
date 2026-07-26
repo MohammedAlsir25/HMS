@@ -80,3 +80,54 @@ export function useLabCheckout() {
     },
   });
 }
+
+export const labSampleKeys = {
+  all: ['lab', 'samples'],
+  list: (params) => ['lab', 'samples', params],
+  order: (orderId) => ['lab', 'samples', 'order', orderId],
+};
+
+export function useLabSamples(params) {
+  return useQuery({
+    queryKey: labSampleKeys.list(params),
+    queryFn: () => api.get(`/lab/samples${params ? `?${params}` : ''}`),
+  });
+}
+
+export function useLabSamplesByOrder(orderId) {
+  return useQuery({
+    queryKey: labSampleKeys.order(orderId),
+    queryFn: () => api.get(`/lab/samples?orderId=${orderId}`),
+    enabled: !!orderId,
+  });
+}
+
+export function useCreateSample() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/lab/samples', data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: labSampleKeys.all });
+      if (variables.orderId) {
+        queryClient.invalidateQueries({ queryKey: labSampleKeys.order(variables.orderId) });
+      }
+    },
+  });
+}
+
+export function useCollectSample() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, notes }) => api.patch(`/lab/samples/${id}/collect`, { notes }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: labSampleKeys.all }),
+  });
+}
+
+export function useUpdateSampleStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status, rejectionReason }) =>
+      api.patch(`/lab/samples/${id}/status`, { status, rejectionReason }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: labSampleKeys.all }),
+  });
+}

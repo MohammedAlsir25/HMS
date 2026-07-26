@@ -24,6 +24,9 @@ import { useClinicQueue } from '../../hooks/useClinicQueue';
 import { Printer, RotateCcw } from 'lucide-react';
 import ScheduleFollowUpModal from './ScheduleFollowUpModal';
 import UpcomingFollowUpsSection from './UpcomingFollowUpsSection';
+import LabOrderModal from './LabOrderModal';
+import TemplateLoader from './TemplateLoader';
+import ImagingOrderModal from './ImagingOrderModal';
 
 const retinaBodyAreas = [
   'Macula', 'Optic Disc', 'Retinal Vessels', 'Peripheral Retina',
@@ -54,6 +57,8 @@ export default function RetinaDashboard() {
   const [showSummary, setShowSummary] = useState(false);
   const [showReferralBtn, setShowReferralBtn] = useState(false);
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+  const [showLabOrder, setShowLabOrder] = useState(false);
+  const [showImagingOrder, setShowImagingOrder] = useState(false);
 
   const patients = usePatients({ clinicSlug: 'retina' });
   const records = useClinicalRecords('retina');
@@ -73,6 +78,7 @@ export default function RetinaDashboard() {
   const [soapNotes, setSoapNotes] = useState({ subjective: '', objective: '', assessment: '', plan: '' });
   const [saving, setSaving] = useState(false);
   const [showIcd10Dropdown, setShowIcd10Dropdown] = useState(false);
+  const [pageError, setPageError] = useState(null);
 
   const { data: icd10Results = [] } = useIcd10Search(diagnosis);
 
@@ -83,7 +89,8 @@ export default function RetinaDashboard() {
 
   useEffect(() => {
     if (patients.selectedPatient) {
-      records.fetchRecords(patients.selectedPatient.id);
+      setPageError(null);
+      records.fetchRecords(patients.selectedPatient.id).catch((err) => setPageError(err.message || 'Failed to load records'));
       setShowReferralBtn(true);
       ai.reset();
     } else {
@@ -204,6 +211,63 @@ export default function RetinaDashboard() {
       setSaving(false);
     }
   }, [patients.selectedPatient, vitals, symptoms, diagnosis, diagnosisIcd10, medications, soapNotes, findings, retinaExamNotes, activeEye, records, resetForm]);
+
+  const refetchAll = useCallback(() => {
+    setPageError(null);
+    if (patients.selectedPatient) {
+      records.fetchRecords(patients.selectedPatient.id).catch((err) => setPageError(err.message || 'Failed to load records'));
+    }
+  }, [patients.selectedPatient, records.fetchRecords]);
+
+  if (patients.loading || records.loading) {
+    return (
+      <ClinicDashboardShell
+        title="Retina Clinic"
+        subtitle="Fundus & Retinal Examination with AI-Assisted Diagnosis"
+        historyPanel={<ClinicHistoryPanel clinicSlug="retina" />}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-32 rounded-lg bg-slate/5 animate-pulse" />
+          ))}
+        </div>
+      </ClinicDashboardShell>
+    );
+  }
+
+  if (pageError) {
+    return (
+      <ClinicDashboardShell
+        title="Retina Clinic"
+        subtitle="Fundus & Retinal Examination with AI-Assisted Diagnosis"
+        historyPanel={<ClinicHistoryPanel clinicSlug="retina" />}
+      >
+        <div className="flex flex-col items-center gap-3 py-12">
+          <p className="text-body text-red-500">Failed to load clinic data</p>
+          <button onClick={refetchAll} className="px-4 py-2 text-sm rounded-lg bg-lilac-bloom text-white hover:opacity-90">
+            Retry
+          </button>
+        </div>
+      </ClinicDashboardShell>
+    );
+  }
+
+  if (records.records.length === 0 && patients.selectedPatient && !patients.loading && !records.loading) {
+    return (
+      <ClinicDashboardShell
+        title="Retina Clinic"
+        subtitle="Fundus & Retinal Examination with AI-Assisted Diagnosis"
+        historyPanel={<ClinicHistoryPanel clinicSlug="retina" />}
+      >
+        <div className="flex flex-col items-center gap-3 py-12">
+          <p className="text-body text-slate">No clinical records found for this patient.</p>
+          <button onClick={refetchAll} className="px-4 py-2 text-sm rounded-lg bg-lilac-bloom text-white hover:opacity-90">
+            Retry
+          </button>
+        </div>
+      </ClinicDashboardShell>
+    );
+  }
 
 
   return (
@@ -378,6 +442,11 @@ export default function RetinaDashboard() {
 
           <div className="grid grid-cols-1 gap-6 mb-6">
             <ClinicSection title="SOAP Notes">
+              <TemplateLoader
+                clinicSlug="retina"
+                onLoadTemplate={(data) => setSoapNotes(data)}
+                currentSections={soapNotes}
+              />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="text-sm font-medium text-graphite block mb-1">Subjective</label>
@@ -410,6 +479,12 @@ export default function RetinaDashboard() {
           <div className="flex items-center gap-3 mb-6">
             <Button variant="primary" onClick={handleSave} loading={saving}>
               Save Clinical Record
+            </Button>
+            <Button variant="secondary" onClick={() => setShowLabOrder(true)}>
+              Order Lab Tests
+            </Button>
+            <Button variant="secondary" onClick={() => setShowImagingOrder(true)}>
+              Order Imaging
             </Button>
             {showReferralBtn && (
               <Button variant="secondary" onClick={() => setShowReferral(true)}>
@@ -481,6 +556,23 @@ export default function RetinaDashboard() {
         open={showReferral}
         onClose={() => setShowReferral(false)}
         fromClinicId="retina"
+        selectedPatient={patients.selectedPatient}
+      />
+            <LabOrderModal
+        isOpen={showLabOrder}
+        onClose={() => setShowLabOrder(false)}
+        clinicSlug="retina"
+        patientId={patients.selectedPatient?.id}
+        patientName={patients.selectedPatient?.fullName}
+        onOrderCreated={() => { if (patients.selectedPatient) records.fetchRecords(patients.selectedPatient.id); }}
+      />
+      <ImagingOrderModal
+        isOpen={showImagingOrder}
+        onClose={() => setShowImagingOrder(false)}
+        clinicSlug="retina"
+        patientId={patients.selectedPatient?.id}
+        patientName={patients.selectedPatient?.fullName}
+        onOrderCreated={() => { if (patients.selectedPatient) records.fetchRecords(patients.selectedPatient.id); }}
       />
       <ScheduleFollowUpModal
         open={showFollowUpModal}

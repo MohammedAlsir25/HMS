@@ -8,8 +8,8 @@ import { usePatientSearch } from '../../hooks/usePatients';
 
 const EMPTY_MEDICATION = { drugName: '', dosage: '', frequency: '', duration: '', route: 'oral', notes: '' };
 
-export default function CrossReferralModal({ open, onClose, fromClinicId, onCreated }) {
-  const [step, setStep] = useState('patient');
+export default function CrossReferralModal({ open, onClose, fromClinicId, onCreated, selectedPatient: preSelectedPatient }) {
+  const [step, setStep] = useState(preSelectedPatient ? 'type' : 'patient');
   const [referralType, setReferralType] = useState('INTERNAL_CLINIC');
   const [toClinicId, setToClinicId] = useState('');
   const [notes, setNotes] = useState('');
@@ -23,7 +23,9 @@ export default function CrossReferralModal({ open, onClose, fromClinicId, onCrea
   const [imagingClinicalInfo, setImagingClinicalInfo] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const { query: searchQuery, setQuery: setSearchQuery, results: searchResults, loading: searching, selectedPatient, selectPatient: setSelectedPatient } = usePatientSearch({ enabled: step === 'patient' });
+  const { query: searchQuery, setQuery: setSearchQuery, results: searchResults, loading: searching, selectedPatient: searchedPatient, selectPatient: setSelectedPatient } = usePatientSearch({ enabled: step === 'patient' });
+
+  const selectedPatient = preSelectedPatient || searchedPatient;
 
   useEffect(() => {
     if (open) api.get('/clinics').then(setClinics).catch((err) => notifyError(err));
@@ -31,7 +33,7 @@ export default function CrossReferralModal({ open, onClose, fromClinicId, onCrea
 
   useEffect(() => {
     if (!open) {
-      setStep('patient');
+      setStep(preSelectedPatient ? 'type' : 'patient');
       setSearchQuery('');
       setSelectedPatient(null);
       setReferralType('INTERNAL_CLINIC');
@@ -44,7 +46,7 @@ export default function CrossReferralModal({ open, onClose, fromClinicId, onCrea
       setImagingLaterality('OD');
       setImagingClinicalInfo('');
     }
-  }, [open]);
+  }, [open, preSelectedPatient]);
 
   useEffect(() => {
     if (referralType === 'LAB_DISPATCH' && step === 'type') {

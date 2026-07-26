@@ -54,6 +54,7 @@ export default function OpticsProducts() {
   const [items, setItems] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [deleteItem, setDeleteItem] = useState(null);
@@ -74,12 +75,14 @@ export default function OpticsProducts() {
   });
 
   const loadItems = useCallback(async () => {
+    setFetchError('');
     try {
       const params = search ? `?search=${encodeURIComponent(search)}` : "";
       const data = await api.get(`/pos/optics/items${params}`);
       setItems(data);
     } catch (err) {
       notifyError(err);
+      setFetchError(err.message || 'Failed to load items');
     } finally {
       setLoading(false);
     }
@@ -277,6 +280,8 @@ export default function OpticsProducts() {
           </form>
           {loading ? (
             <p className="text-body text-slate">{t("opticsProducts.loading")}</p>
+          ) : fetchError ? (
+            <p className="text-body text-red-500 text-center py-4">{fetchError}</p>
           ) : items.length === 0 ? (
             <p className="text-body text-slate text-center py-4">{t("opticsProducts.noProducts")}</p>
           ) : (
