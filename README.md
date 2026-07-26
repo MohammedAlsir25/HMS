@@ -1,4 +1,4 @@
-# Al Jawarih
+# HMS
 
 [![Backend CI](https://github.com/moham/AL-Jawahir-Hospital/actions/workflows/backend.yml/badge.svg)](https://github.com/moham/AL-Jawahir-Hospital/actions/workflows/backend.yml)
 [![Frontend CI](https://github.com/moham/AL-Jawahir-Hospital/actions/workflows/frontend.yml/badge.svg)](https://github.com/moham/AL-Jawahir-Hospital/actions/workflows/frontend.yml)
@@ -12,7 +12,7 @@ Hospital management system — reception, clinics, surgery, referrals, lab, phar
 | **Backend** | Node.js 20+, Express 4, TypeScript 5 (strict: true), Prisma 5, PostgreSQL 16, Supabase |
 | **Frontend** | React 18, Vite, Tailwind CSS 4, TypeScript, TanStack Query, Zustand, i18next, Vitest, Playwright |
 | **Testing** | Jest (backend unit), Vitest (frontend unit), Playwright (E2E), Supertest (API), custom stress test |
-| **Infrastructure** | Docker Compose, Railway (backend), Netlify (frontend), GitHub Actions (CI/CD) |
+| **Infrastructure** | Docker Compose, Caddy (reverse proxy + auto HTTPS), Railway (backend), Netlify (frontend), GitHub Actions (CI/CD) |
 
 ## Setup
 
@@ -21,7 +21,7 @@ Hospital management system — reception, clinics, surgery, referrals, lab, phar
 - PostgreSQL 16+
 - Supabase account (for file storage)
 
-### Quick Start
+### Quick Start (Development)
 
 ```bash
 # Install dependencies
@@ -41,6 +41,28 @@ npm run prisma:seed
 cd backend && npm run dev          # Express API on :4001
 cd frontend && npm run dev         # Vite dev server on :5173
 ```
+
+### Quick Start (Docker — Production)
+
+```bash
+# 1. Clone and configure
+cp backend/.env.example backend/.env
+# Edit .env with your database URL, JWT secrets, and Supabase keys
+
+# 2. Start all services
+docker compose up -d
+
+# 3. Run database migrations
+docker compose exec backend npx prisma migrate deploy
+docker compose exec backend npm run prisma:seed
+
+# 4. Access the application
+# Frontend: https://your-domain.com
+# API:      https://your-domain.com/api
+# Caddy automatically provisions TLS via Let's Encrypt
+```
+
+See [docs/deploy.md](docs/deploy.md) for full deployment instructions.
 
 ## Architecture
 
@@ -182,6 +204,8 @@ FRONTEND_URL=http://localhost:5173
 | `npm run test:stress` | 100 rapid + 50 concurrent request test |
 | `npm run prisma:seed` | Seed database with sample data |
 | `npm run lint` | ESLint |
+| `npm run backup` | Run database backup (see `scripts/backup.sh`) |
+| `npm run restore` | Restore database from backup (see `scripts/restore.sh`) |
 
 ### Frontend
 
@@ -258,10 +282,10 @@ cd backend && npm run test:stress
 
 ## CI/CD
 
-GitHub Actions runs on push/PR to `main`:
+GitHub Actions runs on push/PR to `main` via `.github/workflows/ci.yml`:
 
-- **Backend:** `npm run typecheck` → `npm test`
-- **Frontend:** `npm run typecheck` → `npm run build` → `npm test`
+- **Backend:** lint → typecheck → test
+- **Frontend:** lint → typecheck → build
 
 ## Troubleshooting
 

@@ -1,72 +1,132 @@
+version: "3.8"
+
+x-app-defaults: &app-defaults
+  restart: unless-stopped
+  networks:
+    - hms-network
+
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: jh-postgres
-    restart: unless-stopped
+    <<: *app-defaults
     environment:
-      POSTGRES_DB: jh_hospital
-      POSTGRES_USER: jh_admin
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-jh_dev_password_2026}
+      POSTGRES_USER: hms
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-hms-secret}
+      POSTGRES_DB: hms
     ports:
-      - '5432:5432'
+      - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U jh_admin -d jh_hospital']
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U hms"]
+      interval: 10s
       timeout: 5s
       retries: 5
 
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: jh-pgadmin
-    restart: unless-stopped
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@aljawarih.sd
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin_pass_2026}
-    ports:
-      - '5050:80'
+  pgbouncer:
+    image: edoburu/pgbouncer:1.23.1
+    <<: *app-defaults
     depends_on:
       postgres:
         condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://hms:${DB_PASSWORD:-hms-secret}@postgres:5432/hms
+      POOL_MODE: transaction
+      DEFAULT_POOL_SIZE: 20
+      MAX_CLIENT_CONN: 200
+      SERVER_IDLE_TIMEOUT: 300
+    ports:
+      - "6432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    <<: *app-defaults
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
     build:
       context: ./backend
-      target: production
-    container_name: jh-backend
-    restart: unless-stopped
-    ports:
-      - '4001:4001'
-    environment:
-      NODE_ENV: ${NODE_ENV:-development}
-      PORT: 4001
-      DATABASE_URL: ${DATABASE_URL:-postgresql://jh_admin:jh_dev_password_2026@postgres:5432/jh_hospital}
-      DIRECT_URL: ${DIRECT_URL:-postgresql://jh_admin:jh_dev_password_2026@postgres:5432/jh_hospital}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
-      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-random-64-char-string}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me-to-another-random-string}
-      JWT_EXPIRY: ${JWT_EXPIRY:-15m}
-      JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-7d}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
-      SUPABASE_URL: ${SUPABASE_URL}
-      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
-      SUPABASE_STORAGE_BUCKET: ${SUPABASE_STORAGE_BUCKET:-jh-uploads}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
+      dockerfile: Dockerfile
+    <<: *app-defaults
     depends_on:
       postgres:
         condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://hms:${DB_PASSWORD:-hms-secret}@pgbouncer:5432/hms
+      DIRECT_URL: postgresql://hms:${DB_PASSWORD:-hms-secret}@postgres:5432/hms
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      JWT_EXPIRY: 7d
+      JWT_REFRESH_EXPIRY: 30d
+      PATIENT_JWT_SECRET: ${PATIENT_JWT_SECRET:-patient-portal-secret-change}
+      PATIENT_JWT_EXPIRY: 7d
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      FRONTEND_URL: https://${DOMAIN:-localhost}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:-}
+      SUPABASE_STORAGE_BUCKET: ${SUPABASE_STORAGE_BUCKET:-jh-uploads}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: gemini-2.0-flash
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   frontend:
     build:
       context: ./frontend
-    container_name: jh-frontend
-    restart: unless-stopped
-    ports:
-      - '5173:80'
+      dockerfile: Dockerfile
+    <<: *app-defaults
     depends_on:
+      backend:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    <<: *app-defaults
+    depends_on:
+      - frontend
       - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+
+networks:
+  hms-network:
+    driver: bridge
 
 volumes:
-  postgres_data:
+  postgres-data:
+  redis-data:
+  caddy-data:
+  caddy-config:
