@@ -37,13 +37,26 @@ router.post('/diagnose', authenticate, requirePermission(PERMISSIONS.CLINICAL_RE
 }));
 
 router.get('/icd10', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), asyncHandler(async (req, res) => {
-  const { q } = req.query as { q?: string };
-  const where = q && q.length >= 2
-    ? { OR: [
-        { code: { contains: q, mode: 'insensitive' as const } },
-        { name: { contains: q, mode: 'insensitive' as const } },
-      ] }
-    : {};
+  const { q, category, code } = req.query as { q?: string; category?: string; code?: string };
+
+  if (code) {
+    const exact = await prisma.icd10Code.findUnique({ where: { code } });
+    return res.json(exact ? [exact] : []);
+  }
+
+  const where: Record<string, unknown> = {};
+
+  if (q && q.length >= 2) {
+    where.OR = [
+      { code: { contains: q, mode: 'insensitive' as const } },
+      { name: { contains: q, mode: 'insensitive' as const } },
+    ];
+  }
+
+  if (category) {
+    where.category = { contains: category, mode: 'insensitive' as const };
+  }
+
   const codes = await prisma.icd10Code.findMany({
     where,
     orderBy: { code: 'asc' },

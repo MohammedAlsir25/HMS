@@ -5,28 +5,32 @@ import { asyncHandler } from '../../middleware/errorHandler.js';
 import { validate } from '../../middleware/validate.js';
 import { ValidationError, NotFoundError } from '../../utils/errors.js';
 import { PERMISSIONS } from '../../middleware/rbac.js';
-import { completeScreeningSchema, scheduleFollowUpSchema } from '../../schemas/clinics.schema.js';
+import { completeScreeningSchema, scheduleFollowUpSchema, createLabOrderSchema, createImagingOrderSchema, createTemplateSchema } from '../../schemas/clinics.schema.js';
 import { completeScreening, generatePrintData } from './clinics.helpers.js';
 
 const router = Router();
 import prisma from '../../lib/prisma.js';
 import { nextToken } from '../reception/reception.utils.js';
 
-router.get('/', authenticate, asyncHandler(async (_req, res) => {
+router.get('/', authenticate, asyncHandler(async (req, res) => {
+  const hospitalId = req.user!.hospitalId;
+  const where: Record<string, unknown> = { isActive: true };
+  if (hospitalId) where.hospitalId = hospitalId;
   const clinics = await prisma.clinic.findMany({
-    where: { isActive: true },
+    where,
     orderBy: { name: 'asc' },
   });
   res.json(clinics);
 }));
 
 router.get('/:slug/dashboard', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), asyncHandler(async (req, res) => {
-  const clinic = await prisma.clinic.findUnique({ where: { slug: req.params.slug } });
+  const hospitalId = req.user!.hospitalId!;
+  const clinic = await prisma.clinic.findFirst({ where: { slug: req.params.slug, hospitalId } });
   if (!clinic) throw new NotFoundError('Clinic not found');
 
-  const patients = await prisma.patient.findMany({ take: 10, orderBy: { createdAt: 'desc' } });
+  const patients = await prisma.patient.findMany({ where: { hospitalId }, take: 10, orderBy: { createdAt: 'desc' } });
   const appointments = await prisma.appointment.findMany({
-    where: { clinicId: clinic.id, status: { in: ['WAITING', 'IN_PROGRESS'] } },
+    where: { clinicId: clinic.id, hospitalId, status: { in: ['WAITING', 'IN_PROGRESS'] } },
     include: { patient: { select: { fullName: true, mrn: true } } },
     orderBy: { createdAt: 'desc' },
     take: 20,
@@ -36,7 +40,8 @@ router.get('/:slug/dashboard', authenticate, requirePermission(PERMISSIONS.CLINI
 }));
 
 router.post('/:slug/record', authenticate, requirePermission(PERMISSIONS.CLINICAL_WRITE), asyncHandler(async (req, res) => {
-  const clinic = await prisma.clinic.findUnique({ where: { slug: req.params.slug } });
+  const hospitalId = req.user!.hospitalId!;
+  const clinic = await prisma.clinic.findFirst({ where: { slug: req.params.slug, hospitalId } });
   if (!clinic) throw new NotFoundError('Clinic not found');
 
   const { patientId, diagnosis, prescriptions, clinicSpecificJson, notes, vitalSigns, symptoms, medications } = req.body;
@@ -93,11 +98,12 @@ router.post('/:slug/record', authenticate, requirePermission(PERMISSIONS.CLINICA
 }));
 
 router.get('/:slug/records', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), asyncHandler(async (req, res) => {
-  const clinic = await prisma.clinic.findUnique({ where: { slug: req.params.slug } });
+  const hospitalId = req.user!.hospitalId!;
+  const clinic = await prisma.clinic.findFirst({ where: { slug: req.params.slug, hospitalId } });
   if (!clinic) throw new NotFoundError('Clinic not found');
 
   const { patientId } = req.query as { patientId?: string };
-  const where: Record<string, unknown> = { clinicId: clinic.id };
+  const where: Record<string, unknown> = { clinicId: clinic.id, hospitalId };
   if (patientId) where.patientId = patientId;
 
   const records = await prisma.clinicalRecord.findMany({
@@ -116,7 +122,8 @@ router.get('/:slug/records', authenticate, requirePermission(PERMISSIONS.CLINICA
 }));
 
 router.get('/:slug/queue', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), asyncHandler(async (req, res) => {
-  const clinic = await prisma.clinic.findUnique({ where: { slug: req.params.slug } });
+  const hospitalId = req.user!.hospitalId!;
+  const clinic = await prisma.clinic.findFirst({ where: { slug: req.params.slug, hospitalId } });
   if (!clinic) throw new NotFoundError('Clinic not found');
 
   const today = new Date();
@@ -125,6 +132,7 @@ router.get('/:slug/queue', authenticate, requirePermission(PERMISSIONS.CLINICAL_
   const queue = await prisma.appointment.findMany({
     where: {
       clinicId: clinic.id,
+      hospitalId,
       status: { in: ['WAITING', 'CALLED'] },
       createdAt: { gte: today },
     },
@@ -156,7 +164,8 @@ router.get('/:slug/queue', authenticate, requirePermission(PERMISSIONS.CLINICAL_
 }));
 
 router.get('/:slug/stats', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), asyncHandler(async (req, res) => {
-  const clinic = await prisma.clinic.findUnique({ where: { slug: req.params.slug } });
+  const hospitalId = req.user!.hospitalId!;
+  const clinic = await prisma.clinic.findFirst({ where: { slug: req.params.slug, hospitalId } });
   if (!clinic) throw new NotFoundError('Clinic not found');
 
   const today = new Date();
@@ -165,16 +174,16 @@ router.get('/:slug/stats', authenticate, requirePermission(PERMISSIONS.CLINICAL_
   const [totalPatients, todayAppointments, todayRecords, chronicPatients] = await Promise.all([
     prisma.clinicalRecord.groupBy({
       by: ['patientId'],
-      where: { clinicId: clinic.id },
+      where: { clinicId: clinic.id, hospitalId },
     }),
     prisma.appointment.count({
-      where: { clinicId: clinic.id, createdAt: { gte: today } },
+      where: { clinicId: clinic.id, hospitalId, createdAt: { gte: today } },
     }),
     prisma.clinicalRecord.count({
-      where: { clinicId: clinic.id, createdAt: { gte: today } },
+      where: { clinicId: clinic.id, hospitalId, createdAt: { gte: today } },
     }),
     prisma.patient.count({
-      where: { chronicConditions: { isEmpty: false } },
+      where: { hospitalId, chronicConditions: { isEmpty: false } },
     }),
   ]);
 
@@ -187,10 +196,11 @@ router.get('/:slug/stats', authenticate, requirePermission(PERMISSIONS.CLINICAL_
 }));
 
 router.get('/:slug/doctors', authenticate, asyncHandler(async (req, res) => {
-  const clinic = await prisma.clinic.findUnique({ where: { slug: req.params.slug } });
+  const hospitalId = req.user!.hospitalId!;
+  const clinic = await prisma.clinic.findFirst({ where: { slug: req.params.slug, hospitalId } });
   if (!clinic) throw new NotFoundError('Clinic not found');
   const doctors = await prisma.user.findMany({
-    where: { clinicId: clinic.id, isActive: true, role: { name: { contains: 'doctor', mode: 'insensitive' } } },
+    where: { clinicId: clinic.id, hospitalId, isActive: true, role: { name: { contains: 'doctor', mode: 'insensitive' } } },
     select: { id: true, fullName: true },
     orderBy: { fullName: 'asc' },
   });
@@ -198,8 +208,9 @@ router.get('/:slug/doctors', authenticate, asyncHandler(async (req, res) => {
 }));
 
 router.get('/:slug/medications', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), asyncHandler(async (req, res) => {
+  const hospitalId = req.user!.hospitalId!;
   const { search } = req.query as Record<string, string>;
-  const where: Record<string, unknown> = { isActive: true, category: { contains: 'medication', mode: 'insensitive' as const } };
+  const where: Record<string, unknown> = { isActive: true, hospitalId, category: { contains: 'medication', mode: 'insensitive' as const } };
   if (search && search.length >= 2) {
     where.OR = [
       { name: { contains: search, mode: 'insensitive' as const } },
@@ -211,7 +222,8 @@ router.get('/:slug/medications', authenticate, requirePermission(PERMISSIONS.CLI
 }));
 
 router.post('/:slug/complete-screening', authenticate, requirePermission(PERMISSIONS.CLINICAL_WRITE), validate(completeScreeningSchema), asyncHandler(async (req, res) => {
-  const clinic = await prisma.clinic.findUnique({ where: { slug: req.params.slug } });
+  const hospitalId = req.user!.hospitalId!;
+  const clinic = await prisma.clinic.findFirst({ where: { slug: req.params.slug, hospitalId } });
   if (!clinic) throw new NotFoundError('Clinic not found');
 
   if (!req.body.optometryAppointmentId) throw new NotFoundError('optometryAppointmentId is required');
@@ -236,7 +248,8 @@ router.get('/:slug/print-report/:recordId', authenticate, requirePermission(PERM
 }));
 
 router.get('/:slug/screening-queue', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), asyncHandler(async (req, res) => {
-  const clinic = await prisma.clinic.findUnique({ where: { slug: req.params.slug } });
+  const hospitalId = req.user!.hospitalId!;
+  const clinic = await prisma.clinic.findFirst({ where: { slug: req.params.slug, hospitalId } });
   if (!clinic) throw new NotFoundError('Clinic not found');
 
   const today = new Date();
@@ -245,6 +258,7 @@ router.get('/:slug/screening-queue', authenticate, requirePermission(PERMISSIONS
   const screeningAppts = await prisma.appointment.findMany({
     where: {
       clinicId: clinic.id,
+      hospitalId,
       status: 'WAITING',
       targetClinicId: { not: null },
       createdAt: { gte: today },
@@ -260,7 +274,8 @@ router.get('/:slug/screening-queue', authenticate, requirePermission(PERMISSIONS
 }));
 
 router.get('/:slug/history', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), asyncHandler(async (req, res) => {
-  const clinic = await prisma.clinic.findUnique({ where: { slug: req.params.slug } });
+  const hospitalId = req.user!.hospitalId!;
+  const clinic = await prisma.clinic.findFirst({ where: { slug: req.params.slug, hospitalId } });
   if (!clinic) throw new NotFoundError('Clinic not found');
 
   const { q, from, to, page: pageStr, limit: limitStr } = req.query as Record<string, string>;
@@ -270,6 +285,7 @@ router.get('/:slug/history', authenticate, requirePermission(PERMISSIONS.CLINICA
 
   const where: Record<string, unknown> = {
     clinicId: clinic.id,
+    hospitalId,
     status: { in: ['COMPLETED', 'NO_SHOW', 'CANCELLED'] },
   };
 
@@ -327,11 +343,13 @@ router.get('/:slug/history', authenticate, requirePermission(PERMISSIONS.CLINICA
 }));
 
 router.get('/:slug/upcoming-follow-ups', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), asyncHandler(async (req, res) => {
-  const clinic = await prisma.clinic.findUnique({ where: { slug: req.params.slug } });
+  const hospitalId = req.user!.hospitalId!;
+  const clinic = await prisma.clinic.findFirst({ where: { slug: req.params.slug, hospitalId } });
   if (!clinic) throw new NotFoundError('Clinic not found');
   const followUps = await prisma.appointment.findMany({
     where: {
       clinicId: clinic.id,
+      hospitalId,
       status: 'RESERVED',
       visitType: 'FOLLOW_UP',
       scheduledAt: { gte: new Date() },
@@ -344,10 +362,11 @@ router.get('/:slug/upcoming-follow-ups', authenticate, requirePermission(PERMISS
 }));
 
 router.post('/:slug/schedule-follow-up', authenticate, requirePermission(PERMISSIONS.CLINICAL_WRITE), validate(scheduleFollowUpSchema), asyncHandler(async (req, res) => {
-  const clinic = await prisma.clinic.findUnique({ where: { slug: req.params.slug } });
+  const hospitalId = req.user!.hospitalId!;
+  const clinic = await prisma.clinic.findFirst({ where: { slug: req.params.slug, hospitalId } });
   if (!clinic) throw new NotFoundError('Clinic not found');
   const { patientId, scheduledDate, notes } = req.body;
-  const patient = await prisma.patient.findUnique({ where: { id: patientId } });
+  const patient = await prisma.patient.findFirst({ where: { id: patientId, hospitalId } });
   if (!patient) throw new NotFoundError('Patient not found');
   const token = await nextToken(clinic.id);
   const appointment = await prisma.appointment.create({
@@ -366,6 +385,247 @@ router.post('/:slug/schedule-follow-up', authenticate, requirePermission(PERMISS
   });
   res.status(201).json(appointment);
 }));
+
+router.post('/:slug/lab-order',
+  authenticate,
+  requirePermission(PERMISSIONS.CLINICAL_WRITE),
+  validate(createLabOrderSchema),
+  asyncHandler(async (req, res) => {
+    const hospitalId = req.user!.hospitalId!;
+
+    const clinic = await prisma.clinic.findFirst({
+      where: { slug: req.params.slug, hospitalId },
+    });
+    if (!clinic) throw new NotFoundError('Clinic not found');
+
+    const { patientId, testIds, panelId, clinicalNotes, priority } = req.body;
+
+    const patient = await prisma.patient.findFirst({
+      where: { id: patientId, hospitalId },
+    });
+    if (!patient) throw new NotFoundError('Patient not found');
+
+    const tests = await prisma.diagnosticTest.findMany({
+      where: { id: { in: testIds }, isActive: true },
+    });
+    if (tests.length !== testIds.length) {
+      throw new ValidationError('One or more selected tests are invalid or inactive');
+    }
+
+    if (panelId) {
+      const panel = await prisma.diagnosticPanel.findFirst({
+        where: { id: panelId, isActive: true },
+      });
+      if (!panel) throw new NotFoundError('Panel not found');
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const order = await tx.diagnosticOrder.create({
+        data: {
+          orderType: 'LAB',
+          status: 'SUBMITTED',
+          priority: priority ?? 0,
+          clinicalNotes: clinicalNotes || null,
+          requestedById: req.user!.id,
+          fromClinicId: clinic.id,
+          patientId,
+          panelId: panelId || null,
+          hospitalId,
+          tests: {
+            create: testIds.map((testId: string) => {
+              const test = tests.find((t) => t.id === testId)!;
+              return {
+                testId,
+                refRangeLow: test.refRangeLow,
+                refRangeHigh: test.refRangeHigh,
+                refRangeText: test.refRangeText,
+              };
+            }),
+          },
+        },
+        include: {
+          tests: { include: { test: true } },
+          fromClinic: { select: { name: true } },
+          patient: { select: { fullName: true, mrn: true } },
+        },
+      });
+
+      const referral = await tx.referral.create({
+        data: {
+          type: 'LAB_DISPATCH',
+          status: 'PENDING',
+          notes: clinicalNotes || `Lab order for ${patient.fullName}`,
+          fromClinicId: clinic.id,
+          patientId,
+          hospitalId,
+        },
+      });
+
+      await tx.diagnosticOrder.update({
+        where: { id: order.id },
+        data: { referralId: referral.id },
+      });
+
+      return { ...order, referral };
+    });
+
+    res.status(201).json(result);
+  })
+);
+
+router.post('/:slug/imaging-order',
+  authenticate,
+  requirePermission(PERMISSIONS.CLINICAL_WRITE),
+  validate(createImagingOrderSchema),
+  asyncHandler(async (req, res) => {
+    const hospitalId = req.user!.hospitalId!;
+
+    const clinic = await prisma.clinic.findFirst({
+      where: { slug: req.params.slug, hospitalId },
+    });
+    if (!clinic) throw new NotFoundError('Clinic not found');
+
+    const { patientId, scanType, laterality, clinicalInfo, procedureTypeId } = req.body;
+
+    const patient = await prisma.patient.findFirst({
+      where: { id: patientId, hospitalId },
+    });
+    if (!patient) throw new NotFoundError('Patient not found');
+
+    const imagingClinic = await prisma.clinic.findFirst({
+      where: { slug: 'imaging', hospitalId, isActive: true },
+    });
+
+    if (procedureTypeId) {
+      const pt = await prisma.imagingProcedureType.findFirst({
+        where: { id: procedureTypeId, isActive: true },
+      });
+      if (!pt) throw new NotFoundError('Imaging procedure type not found');
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const order = await tx.imagingOrder.create({
+        data: {
+          patientId,
+          requestedByClinicId: clinic.id,
+          clinicId: imagingClinic?.id || clinic.id,
+          scanType,
+          laterality: laterality || null,
+          clinicalInfo: clinicalInfo || null,
+          createdById: req.user!.id,
+          procedureTypeId: procedureTypeId || null,
+          hospitalId,
+        },
+        include: {
+          procedureType: { select: { id: true, name: true, scanType: true } },
+        },
+      });
+
+      const referral = await tx.referral.create({
+        data: {
+          type: 'INTERNAL_CLINIC',
+          status: 'PENDING',
+          notes: clinicalInfo || `Imaging order: ${scanType} for ${patient.fullName}`,
+          fromClinicId: clinic.id,
+          toClinicId: imagingClinic?.id || undefined,
+          patientId,
+          hospitalId,
+        },
+      });
+
+      return { ...order, referral };
+    });
+
+    res.status(201).json(result);
+  })
+);
+
+router.get('/:slug/templates',
+  authenticate,
+  requirePermission(PERMISSIONS.CLINICAL_READ),
+  asyncHandler(async (req, res) => {
+    const hospitalId = req.user!.hospitalId!;
+    const clinic = await prisma.clinic.findFirst({
+      where: { slug: req.params.slug, hospitalId },
+    });
+    if (!clinic) throw new NotFoundError('Clinic not found');
+
+    const templates = await prisma.clinicalTemplate.findMany({
+      where: { clinicType: clinic.type, hospitalId, isActive: true },
+      include: { createdBy: { select: { fullName: true } } },
+      orderBy: { name: 'asc' },
+    });
+    res.json(templates);
+  })
+);
+
+router.post('/:slug/templates',
+  authenticate,
+  requirePermission(PERMISSIONS.CLINICAL_WRITE),
+  validate(createTemplateSchema),
+  asyncHandler(async (req, res) => {
+    const hospitalId = req.user!.hospitalId!;
+    const clinic = await prisma.clinic.findFirst({
+      where: { slug: req.params.slug, hospitalId },
+    });
+    if (!clinic) throw new NotFoundError('Clinic not found');
+
+    const { name, sections } = req.body;
+    const template = await prisma.clinicalTemplate.create({
+      data: {
+        name,
+        clinicType: clinic.type,
+        sections: sections || [],
+        createdById: req.user!.id,
+        hospitalId,
+      },
+      include: { createdBy: { select: { fullName: true } } },
+    });
+    res.status(201).json(template);
+  })
+);
+
+router.put('/:slug/templates/:id',
+  authenticate,
+  requirePermission(PERMISSIONS.CLINICAL_WRITE),
+  validate(createTemplateSchema),
+  asyncHandler(async (req, res) => {
+    const hospitalId = req.user!.hospitalId!;
+    const template = await prisma.clinicalTemplate.findFirst({
+      where: { id: req.params.id, hospitalId },
+    });
+    if (!template) throw new NotFoundError('Template not found');
+
+    const { name, sections } = req.body;
+    const updated = await prisma.clinicalTemplate.update({
+      where: { id: req.params.id },
+      data: {
+        name: name || template.name,
+        sections: sections ?? template.sections,
+      },
+      include: { createdBy: { select: { fullName: true } } },
+    });
+    res.json(updated);
+  })
+);
+
+router.delete('/:slug/templates/:id',
+  authenticate,
+  requirePermission(PERMISSIONS.CLINICAL_WRITE),
+  asyncHandler(async (req, res) => {
+    const hospitalId = req.user!.hospitalId!;
+    const template = await prisma.clinicalTemplate.findFirst({
+      where: { id: req.params.id, hospitalId },
+    });
+    if (!template) throw new NotFoundError('Template not found');
+
+    await prisma.clinicalTemplate.update({
+      where: { id: req.params.id },
+      data: { isActive: false },
+    });
+    res.json({ success: true });
+  })
+);
 
 export default router;
 

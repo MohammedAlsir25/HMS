@@ -20,8 +20,8 @@ const REFERRAL_INCLUDE = {
 };
 
 async function resolveClinic(identifier: string) {
-  let clinic = await prisma.clinic.findUnique({ where: { id: identifier } });
-  if (!clinic) clinic = await prisma.clinic.findUnique({ where: { slug: identifier } });
+  let clinic = await prisma.clinic.findFirst({ where: { id: identifier } });
+  if (!clinic) clinic = await prisma.clinic.findFirst({ where: { slug: identifier } });
   return clinic;
 }
 
@@ -133,7 +133,7 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.CLINICAL_WRITE), au
 }));
 
 router.get('/:id', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), asyncHandler(async (req, res) => {
-  const referral = await prisma.referral.findUnique({
+  const referral = await prisma.referral.findFirst({
     where: { id: req.params.id },
     include: REFERRAL_INCLUDE,
   });

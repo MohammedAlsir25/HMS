@@ -25,9 +25,19 @@ import appointmentsRoutes from './modules/appointments/appointments.routes.js';
 import procurementRoutes from './modules/procurement/procurement.routes.js';
 import syncRoutes from './modules/sync/sync.routes.js';
 import imagingRoutes from './modules/imaging/imaging.routes.js';
+import { modalityRoutes } from './modules/modality/index.js';
 import opticLabRoutes from './modules/optic-lab/optic-lab.routes.js';
+import pharmacyModule from './modules/pharmacy/index.js';
 import preoperativeRoutes from './modules/preoperative/preoperative.routes.js';
 import wardsRoutes from './modules/preoperative/wards.routes.js';
+import insuranceRouter from './modules/insurance/index.js';
+import reportsRouter from './modules/reports/index.js';
+import hospitalRoutes from './modules/admin/hospital.routes.js';
+import portalRouter from './modules/patient-portal/index.js';
+import emergencyRouter from './modules/emergency/index.js';
+import billingRouter from './modules/billing/billing.routes.js';
+import fhirRouter from './modules/fhir/fhir.routes.js';
+import { runWithContext } from './middleware/requestContext.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -79,6 +89,10 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+app.use((_req, _res, next) => {
+  runWithContext({ hospitalId: null, userId: null, role: null }, () => next());
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/clinics', clinicsRoutes);
@@ -89,6 +103,7 @@ app.use('/api/pos', posRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/accounting', accountingRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/hospitals', hospitalRoutes);
 app.use('/api/hr', hrRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/lab', labRoutes);
@@ -98,9 +113,17 @@ app.use('/api/appointments', appointmentsRoutes);
 app.use('/api/procurement', procurementRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/imaging', imagingRoutes);
+app.use('/api/modality', modalityRoutes);
 app.use('/api/optic-lab', opticLabRoutes);
+app.use('/api/pharmacy', pharmacyModule);
 app.use('/api/preoperative', preoperativeRoutes);
 app.use('/api/wards', wardsRoutes);
+app.use('/api/insurance', insuranceRouter);
+app.use('/api/reports', reportsRouter);
+app.use('/api/emergency', emergencyRouter);
+app.use('/api/portal', portalRouter);
+app.use('/api/billing', billingRouter);
+app.use('/api/fhir/R4', fhirRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ message: 'Route not found' });

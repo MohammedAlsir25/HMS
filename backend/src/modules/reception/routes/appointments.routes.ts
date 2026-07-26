@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { authenticate, requirePermission } from '../../../middleware/auth.js';
 import { asyncHandler } from '../../../middleware/errorHandler.js';
 import { validate } from '../../../middleware/validate.js';
-import { checkInSchema } from '../../../schemas/reception.schema.js';
+import { checkInSchema, createAppointmentSchema, checkInReservationSchema } from '../../../schemas/reception.schema.js';
 import { ValidationError, NotFoundError, ForbiddenError } from '../../../utils/errors.js';
 import { auditMiddleware } from '../../../middleware/auditLog.js';
 import { PERMISSIONS } from '../../../middleware/rbac.js';
@@ -14,15 +14,15 @@ const router = Router();
 
 router.post('/check-in', authenticate, requirePermission(PERMISSIONS.APPOINTMENT_WRITE), auditMiddleware('CHECK_IN', 'Appointment'), validate(checkInSchema), asyncHandler(async (req, res) => {
   const { patientId, clinicId, type, visitType, priority, notes, collectPayment, paymentMethod } = req.body;
+  const hospitalId = req.user!.hospitalId!;
   const patient = await prisma.patient.findUnique({ where: { id: patientId } });
   if (!patient) throw new NotFoundError('Patient not found');
   const clinic = await resolveClinic(clinicId);
   if (!clinic) throw new NotFoundError('Clinic not found');
 
-  // If clinic requires optometry pre-screening, route to optometry instead
   if (clinic.optometryPreScreeningRequired) {
     const optometryClinic = await prisma.clinic.findFirst({
-      where: { type: 'OPTOMETRY', isActive: true },
+      where: { type: 'OPTOMETRY', isActive: true, hospitalId },
     });
     if (!optometryClinic) throw new NotFoundError('Optometry clinic not found');
 
@@ -45,6 +45,7 @@ router.post('/check-in', authenticate, requirePermission(PERMISSIONS.APPOINTMENT
         clinicId: optometryClinic.id,
         doctorId: req.user!.id,
         targetClinicId: clinic.id,
+        hospitalId,
       },
       include: { patient: { select: { fullName: true, mrn: true, nationalId: true } } },
     });
@@ -66,6 +67,7 @@ router.post('/check-in', authenticate, requirePermission(PERMISSIONS.APPOINTMENT
           shiftId: shift.id,
           cashierId: req.user!.id,
           departmentId: department ? department.id : null,
+          hospitalId,
         },
         include: { cashier: { select: { id: true, fullName: true } } },
       });
@@ -99,6 +101,7 @@ router.post('/check-in', authenticate, requirePermission(PERMISSIONS.APPOINTMENT
       patientId,
       clinicId: clinic.id,
       doctorId: req.user!.id,
+      hospitalId,
     },
     include: { patient: { select: { fullName: true, mrn: true, nationalId: true } } },
   });
@@ -119,6 +122,7 @@ router.post('/check-in', authenticate, requirePermission(PERMISSIONS.APPOINTMENT
         shiftId: shift.id,
         cashierId: req.user!.id,
         departmentId: department ? department.id : null,
+        hospitalId,
       },
       include: { cashier: { select: { id: true, fullName: true } } },
     });
@@ -126,8 +130,67 @@ router.post('/check-in', authenticate, requirePermission(PERMISSIONS.APPOINTMENT
   res.status(201).json({ appointment, transaction });
 }));
 
+router.post('/appointments', authenticate, requirePermission(PERMISSIONS.APPOINTMENT_WRITE), auditMiddleware('CREATE_APPOINTMENT', 'Appointment'), validate(createAppointmentSchema), asyncHandler(async (req, res) => {
+  const { patientId, clinicId, doctorId, date, time, visitType, appointmentType, notes, priority } = req.body;
+  const hospitalId = req.user!.hospitalId!;
+
+  const patient = await prisma.patient.findUnique({ where: { id: patientId } });
+  if (!patient) throw new NotFoundError('Patient not found');
+
+  const clinic = await resolveClinic(clinicId);
+  if (!clinic) throw new NotFoundError('Clinic not found');
+
+  const doctor = await prisma.user.findFirst({ where: { id: doctorId, clinicId: clinic.id, isActive: true } });
+  if (!doctor) throw new ValidationError('Doctor not found or not assigned to this clinic');
+
+  const scheduledAt = new Date(`${date}T${time}:00`);
+
+  let token: number | null = null;
+  let status: string;
+
+  if (appointmentType === 'WALKIN') {
+    token = await nextToken(clinic.id);
+    status = 'WAITING';
+  } else {
+    status = 'RESERVED';
+  }
+
+  const appointment = await prisma.appointment.create({
+    data: {
+      token: token!,
+      type: appointmentType,
+      status: status as any,
+      priority: typeof priority === 'number' ? priority : 0,
+      visitType: visitType || 'NEW_VISIT',
+      notes: notes || null,
+      patientId,
+      clinicId: clinic.id,
+      doctorId,
+      scheduledAt,
+      hospitalId,
+    },
+    include: {
+      patient: { select: { fullName: true, mrn: true, phone: true } },
+      doctor: { select: { fullName: true } },
+      clinic: { select: { name: true } },
+    },
+  });
+
+  if (patient.phone) {
+    console.log(`[SMS] To ${patient.phone}: Appointment at ${appointment.clinic.name} on ${scheduledAt.toISOString()}`);
+  }
+
+  try {
+    const { NotificationService } = await import('../../procurement/services/NotificationService.js');
+    await NotificationService.notify(req.user!.id, 'New Appointment', `Appointment created for ${patient.fullName} at ${clinic.name}`);
+  } catch {}
+
+  res.status(201).json(appointment);
+}));
+
 router.post('/reservations', authenticate, requirePermission(PERMISSIONS.APPOINTMENT_WRITE), asyncHandler(async (req, res) => {
   const { patientId, clinicId, doctorId, scheduledAt, fullName, phone, notes } = req.body;
+  const hospitalId = req.user!.hospitalId!;
   if (!clinicId) throw new ValidationError('clinicId is required');
   if (!patientId && !fullName) throw new ValidationError('patientId or fullName is required');
   const clinic = await resolveClinic(clinicId);
@@ -141,7 +204,7 @@ router.post('/reservations', authenticate, requirePermission(PERMISSIONS.APPOINT
       data: {
         fullName,
         phone: phone || null,
-        mrn: generateMRN(),
+        mrn: await generateMRN(hospitalId),
         createdBy: { connect: { id: req.user!.id } },
       },
     });
@@ -162,6 +225,7 @@ router.post('/reservations', authenticate, requirePermission(PERMISSIONS.APPOINT
       patientId: patient.id,
       clinicId: clinic.id,
       doctorId: doctorId || req.user!.id,
+      hospitalId,
     },
     include: { patient: { select: { fullName: true, mrn: true, nationalId: true, phone: true } }, doctor: { select: { fullName: true } }, clinic: { select: { name: true } } },
   });
@@ -177,7 +241,8 @@ router.post('/reservations', authenticate, requirePermission(PERMISSIONS.APPOINT
 
 router.get('/reservations', authenticate, requirePermission(PERMISSIONS.APPOINTMENT_READ), asyncHandler(async (req, res) => {
   const { clinicId, q } = req.query as { clinicId?: string; q?: string };
-  const where: Record<string, unknown> = { status: 'RESERVED' };
+  const hospitalId = req.user!.hospitalId!;
+  const where: Record<string, unknown> = { status: 'RESERVED', hospitalId };
   if (clinicId) {
     const clinic = await resolveClinic(clinicId);
     if (clinic) where.clinicId = clinic.id;
@@ -199,14 +264,44 @@ router.get('/reservations', authenticate, requirePermission(PERMISSIONS.APPOINTM
   res.json(appointments);
 }));
 
+router.put('/reservations/:id/check-in', authenticate, requirePermission(PERMISSIONS.APPOINTMENT_WRITE), auditMiddleware('RESERVATION_CHECK_IN', 'Appointment'), validate(checkInReservationSchema), asyncHandler(async (req, res) => {
+  const { priority, visitType } = req.body;
+  const hospitalId = req.user!.hospitalId!;
+  const appointment = await prisma.appointment.findFirst({
+    where: { id: req.params.id!, hospitalId, status: 'RESERVED' },
+  });
+  if (!appointment) throw new NotFoundError('Reservation not found or already checked in');
+
+  const token = await nextToken(appointment.clinicId);
+  const updated = await prisma.appointment.update({
+    where: { id: req.params.id! },
+    data: {
+      status: 'WAITING',
+      priority: typeof priority === 'number' ? priority : 5,
+      visitType: visitType || 'NEW_VISIT',
+      token,
+    },
+    include: { patient: { select: { fullName: true, mrn: true } }, clinic: { select: { name: true, slug: true } } },
+  });
+  res.json(updated);
+}));
+
 router.patch('/reservations/:id/arrive', authenticate, requirePermission(PERMISSIONS.APPOINTMENT_WRITE), asyncHandler(async (req, res) => {
   const { priority, visitType } = req.body;
+  const hospitalId = req.user!.hospitalId!;
+  const existing = await prisma.appointment.findFirst({
+    where: { id: req.params.id!, hospitalId, status: 'RESERVED' },
+  });
+  if (!existing) throw new NotFoundError('Reservation not found');
+
+  const token = await nextToken(existing.clinicId);
   const appointment = await prisma.appointment.update({
     where: { id: req.params.id! },
     data: {
       status: 'WAITING',
       priority: typeof priority === 'number' ? priority : 5,
       visitType: visitType || 'NEW_VISIT',
+      token,
     },
     include: { patient: { select: { fullName: true, mrn: true } } },
   });
@@ -240,7 +335,8 @@ router.patch('/appointments/:id/priority', authenticate, requirePermission(PERMI
 
 router.get('/follow-ups', authenticate, requirePermission(PERMISSIONS.APPOINTMENT_READ), asyncHandler(async (req, res) => {
   const { clinicId, dateFrom, dateTo, q } = req.query as Record<string, string>;
-  const where: Record<string, unknown> = { status: 'RESERVED', visitType: 'FOLLOW_UP' };
+  const hospitalId = req.user!.hospitalId!;
+  const where: Record<string, unknown> = { status: 'RESERVED', visitType: 'FOLLOW_UP', hospitalId };
   if (clinicId) where.clinicId = clinicId;
   if (dateFrom || dateTo) {
     const dateFilter: Record<string, Date> = {};

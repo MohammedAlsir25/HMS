@@ -2,18 +2,26 @@ import 'dotenv/config';
 
 const FALLBACK_JWT_SECRET = 'fallback-dev-secret';
 const FALLBACK_JWT_REFRESH = 'fallback-dev-refresh';
+const FALLBACK_PATIENT_JWT_SECRET = 'fallback-patient-dev-secret';
 const FALLBACK_ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
 function validateConfig() {
   const isProduction = (process.env['NODE_ENV'] || 'development') === 'production';
+  const missing: string[] = [];
+
+  if (!process.env['DATABASE_URL']) missing.push('DATABASE_URL');
+  if (!process.env['JWT_SECRET']) missing.push('JWT_SECRET');
+  if (!process.env['JWT_REFRESH_SECRET']) missing.push('JWT_REFRESH_SECRET');
+
   if (isProduction) {
-    const missing: string[] = [];
-    if (!process.env['JWT_SECRET'] || process.env['JWT_SECRET'] === FALLBACK_JWT_SECRET) missing.push('JWT_SECRET');
-    if (!process.env['JWT_REFRESH_SECRET'] || process.env['JWT_REFRESH_SECRET'] === FALLBACK_JWT_REFRESH) missing.push('JWT_REFRESH_SECRET');
+    if (process.env['JWT_SECRET'] === FALLBACK_JWT_SECRET) missing.push('JWT_SECRET (must not use fallback in production)');
+    if (process.env['JWT_REFRESH_SECRET'] === FALLBACK_JWT_REFRESH) missing.push('JWT_REFRESH_SECRET (must not use fallback in production)');
     if (!process.env['ENCRYPTION_KEY'] || process.env['ENCRYPTION_KEY'] === FALLBACK_ENCRYPTION_KEY) missing.push('ENCRYPTION_KEY');
-    if (missing.length > 0) {
-      throw new Error(`Production config error: ${missing.join(', ')} must be set to real values`);
-    }
+  }
+
+  if (missing.length > 0) {
+    const prefix = isProduction ? 'Production config error' : 'Config error';
+    throw new Error(`${prefix}: ${missing.join(', ')}`);
   }
 }
 
@@ -28,6 +36,10 @@ export const config = {
     refreshSecret: process.env['JWT_REFRESH_SECRET'] || FALLBACK_JWT_REFRESH,
     expiry: process.env['JWT_EXPIRY'] || '7d',
     refreshExpiry: process.env['JWT_REFRESH_EXPIRY'] || '7d',
+  },
+  patientJwt: {
+    secret: process.env['PATIENT_JWT_SECRET'] || FALLBACK_PATIENT_JWT_SECRET,
+    expiry: process.env['PATIENT_JWT_EXPIRY'] || '7d',
   },
   encryption: {
     key: process.env['ENCRYPTION_KEY'] || FALLBACK_ENCRYPTION_KEY,

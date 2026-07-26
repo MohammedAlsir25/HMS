@@ -1,18 +1,29 @@
 import { Router } from 'express';
+import { Prisma } from '@prisma/client';
 import { authenticate, requirePermission } from '../../../middleware/auth.js';
 import { asyncHandler } from '../../../middleware/errorHandler.js';
-import { NotFoundError } from '../../../utils/errors.js';
+import { validate } from '../../../middleware/validate.js';
+import { NotFoundError, ValidationError } from '../../../utils/errors.js';
+import { queueStatusSchema } from '../../../schemas/reception.schema.js';
 import { PERMISSIONS } from '../../../middleware/rbac.js';
 import prisma from '../../../lib/prisma.js';
 import { resolveClinic } from '../reception.utils.js';
 
 const router = Router();
 
-router.get('/queue/stats', authenticate, requirePermission(PERMISSIONS.APPOINTMENT_READ), asyncHandler(async (_req, res) => {
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  WAITING: ['CALLED', 'CANCELLED', 'NO_SHOW'],
+  CALLED: ['IN_PROGRESS', 'CANCELLED', 'NO_SHOW'],
+  IN_PROGRESS: ['COMPLETED'],
+};
+
+router.get('/queue/stats', authenticate, requirePermission(PERMISSIONS.APPOINTMENT_READ), asyncHandler(async (req, res) => {
+  const hospitalId = req.user!.hospitalId!;
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const appointments = await prisma.appointment.findMany({
     where: {
+      hospitalId,
       createdAt: { gte: now },
       status: { in: ['WAITING', 'CALLED', 'IN_PROGRESS', 'COMPLETED'] },
     },
@@ -31,12 +42,14 @@ router.get('/queue/stats', authenticate, requirePermission(PERMISSIONS.APPOINTME
 }));
 
 router.get('/queue/:clinicId', authenticate, requirePermission(PERMISSIONS.APPOINTMENT_READ), asyncHandler(async (req, res) => {
+  const hospitalId = req.user!.hospitalId!;
   const clinic = await resolveClinic(req.params.clinicId!);
   if (!clinic) throw new NotFoundError('Clinic not found');
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const appointments = await prisma.appointment.findMany({
     where: {
+      hospitalId,
       clinicId: clinic.id,
       status: { in: ['WAITING', 'CALLED', 'IN_PROGRESS'] },
       createdAt: { gte: today },
@@ -56,10 +69,12 @@ router.get('/queue/:clinicId', authenticate, requirePermission(PERMISSIONS.APPOI
 }));
 
 router.post('/queue/:clinicId/call-next', authenticate, requirePermission(PERMISSIONS.APPOINTMENT_WRITE), asyncHandler(async (req, res) => {
+  const hospitalId = req.user!.hospitalId!;
   const clinic = await resolveClinic(req.params.clinicId!);
   if (!clinic) throw new NotFoundError('Clinic not found');
   const next = await prisma.appointment.findFirst({
     where: {
+      hospitalId,
       clinicId: clinic.id,
       status: 'WAITING',
     },
@@ -69,21 +84,61 @@ router.post('/queue/:clinicId/call-next', authenticate, requirePermission(PERMIS
   if (!next) throw new NotFoundError('No waiting patients');
   const updated = await prisma.appointment.update({
     where: { id: next.id },
-    data: { status: 'CALLED' },
+    data: { status: 'CALLED', calledAt: new Date() },
     include: { patient: { select: { fullName: true, mrn: true } } },
   });
   res.json(updated);
 }));
 
-router.get('/waiting-room', asyncHandler(async (_req, res) => {
+router.put('/queue/:appointmentId/status', authenticate, requirePermission(PERMISSIONS.APPOINTMENT_WRITE), validate(queueStatusSchema), asyncHandler(async (req, res) => {
+  const hospitalId = req.user!.hospitalId!;
+  const { status } = req.body;
+  const appointment = await prisma.appointment.findFirst({
+    where: { id: req.params.appointmentId!, hospitalId },
+  });
+  if (!appointment) throw new NotFoundError('Appointment not found');
+
+  const allowed = VALID_TRANSITIONS[appointment.status];
+  if (!allowed || !allowed.includes(status)) {
+    throw new ValidationError(`Cannot transition from ${appointment.status} to ${status}`);
+  }
+
+  const updateData: Prisma.AppointmentUpdateInput = { status: status as any };
+  if (status === 'CALLED') {
+    updateData.calledAt = new Date();
+  }
+  if (status === 'COMPLETED') {
+    updateData.completedAt = new Date();
+  }
+
+  const updated = await prisma.appointment.update({
+    where: { id: req.params.appointmentId! },
+    data: updateData,
+    include: {
+      patient: { select: { fullName: true, mrn: true } },
+      clinic: { select: { name: true, slug: true } },
+    },
+  });
+  res.json(updated);
+}));
+
+router.get('/waiting-room', asyncHandler(async (req, res) => {
+  const hospitalId = req.user?.hospitalId;
   const now = new Date();
   now.setHours(0, 0, 0, 0);
+
+  const where: Prisma.AppointmentWhereInput = {
+    createdAt: { gte: now },
+    status: { in: ['WAITING', 'CALLED', 'IN_PROGRESS'] },
+  };
+  if (hospitalId) where.hospitalId = hospitalId;
+
   const appointments = await prisma.appointment.findMany({
-    where: {
-      createdAt: { gte: now },
-      status: { in: ['WAITING', 'CALLED', 'IN_PROGRESS'] },
+    where,
+    include: {
+      clinic: { select: { name: true, slug: true } },
+      patient: { select: { fullName: true, mrn: true } },
     },
-    include: { clinic: { select: { name: true, slug: true } } },
     orderBy: [{ clinicId: 'asc' }, { priority: 'desc' }, { createdAt: 'asc' }],
   });
   const grouped: Record<string, { clinic: string; queue: Array<Record<string, unknown>> }> = {};
@@ -95,6 +150,8 @@ router.get('/waiting-room', asyncHandler(async (_req, res) => {
       status: a.status,
       type: a.type,
       priority: a.priority,
+      patientName: a.patient.fullName,
+      mrn: a.patient.mrn,
     });
   }
   res.json(grouped);

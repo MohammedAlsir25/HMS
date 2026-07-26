@@ -44,14 +44,24 @@ export const PERMISSIONS = {
   PREOP_WRITE: 'preoperative:write',
   WARD_READ: 'ward:read',
   WARD_WRITE: 'ward:write',
+  EMERGENCY_READ: 'emergency:read',
+  EMERGENCY_WRITE: 'emergency:write',
   PRICING_READ: 'pricing:read',
   PRICING_WRITE: 'pricing:write',
+  INSURANCE_READ: 'insurance:read',
+  INSURANCE_WRITE: 'insurance:write',
+  REPORTS_READ: 'reports:read',
+  DEPARTMENT_READ: 'department:read',
+  DEPARTMENT_WRITE: 'department:write',
+  FHIR_READ: 'fhir:read',
+  FHIR_WRITE: 'fhir:write',
+  INTEGRATION_MANAGE: 'integration:manage',
 };
 
 export const DEFAULT_ROLES = {
   SUPER_ADMIN: {
     name: 'Super Admin',
-    permissions: [...Object.values(PERMISSIONS)],
+    permissions: Object.values(PERMISSIONS).filter((p): p is string => typeof p === 'string'),
   },
   DOCTOR: {
     name: 'Doctor',
@@ -69,6 +79,10 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.PREOP_READ,
       PERMISSIONS.PREOP_WRITE,
       PERMISSIONS.WARD_READ,
+      PERMISSIONS.REPORTS_READ,
+      PERMISSIONS.EMERGENCY_READ,
+      PERMISSIONS.EMERGENCY_WRITE,
+      PERMISSIONS.FHIR_READ,
     ],
   },
   NURSE: {
@@ -80,6 +94,10 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.APPOINTMENT_WRITE,
       PERMISSIONS.WARD_READ,
       PERMISSIONS.WARD_WRITE,
+      PERMISSIONS.REPORTS_READ,
+      PERMISSIONS.EMERGENCY_READ,
+      PERMISSIONS.EMERGENCY_WRITE,
+      PERMISSIONS.FHIR_READ,
     ],
   },
   PREOP_OFFICE: {
@@ -95,6 +113,7 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.WARD_WRITE,
       PERMISSIONS.SURGERY_READ,
       PERMISSIONS.SURGERY_WRITE,
+      PERMISSIONS.REPORTS_READ,
     ],
   },
   RECEPTIONIST: {
@@ -107,6 +126,9 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.APPOINTMENT_WRITE,
       PERMISSIONS.ACCOUNTING_READ,
       PERMISSIONS.PREOP_READ,
+      PERMISSIONS.REPORTS_READ,
+      PERMISSIONS.EMERGENCY_READ,
+      PERMISSIONS.EMERGENCY_WRITE,
     ],
   },
   PHARMACIST: {
@@ -116,6 +138,7 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.CLINICAL_READ,
       PERMISSIONS.PHARMACY_READ,
       PERMISSIONS.PHARMACY_WRITE,
+      PERMISSIONS.REPORTS_READ,
     ],
   },
   OPTICIAN: {
@@ -132,6 +155,7 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.ACCOUNTING_READ,
       PERMISSIONS.ACCOUNTING_WRITE,
       PERMISSIONS.PREOP_READ,
+      PERMISSIONS.REPORTS_READ,
     ],
   },
   HR_MANAGER: {
@@ -139,6 +163,7 @@ export const DEFAULT_ROLES = {
     permissions: [
       PERMISSIONS.HR_READ,
       PERMISSIONS.HR_WRITE,
+      PERMISSIONS.REPORTS_READ,
     ],
   },
   LAB_TECHNICIAN: {
@@ -148,6 +173,8 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.DIAGNOSTICS_READ,
       PERMISSIONS.DIAGNOSTICS_WRITE,
       PERMISSIONS.DIAGNOSTICS_RESULTS,
+      PERMISSIONS.REPORTS_READ,
+      PERMISSIONS.FHIR_READ,
     ],
   },
   LAB_ADMIN: {

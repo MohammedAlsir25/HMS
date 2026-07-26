@@ -111,16 +111,26 @@ router.get('/initial', authenticate, asyncHandler(async (_req, res) => {
 router.get('/pull', authenticate, asyncHandler(async (req, res) => {
   const since = req.query.since as string;
   if (!since) throw new ValidationError('since query parameter is required');
+  const hospitalId = req.user!.hospitalId;
 
   const sinceDate = since;
   const queries = ALL_MODELS.map(async (table) => {
     const tbl = tableName(table);
     const col = hasCamelCaseUpdatedAt(table) ? 'updatedAt' : 'updated_at';
+    const isTransactional = TRANSACTIONAL_MODELS.includes(table as typeof TRANSACTIONAL_MODELS[number]);
     try {
-      const rows = await prisma.$queryRawUnsafe(
-        `SELECT * FROM "${tbl}" WHERE "${col}" >= $1::timestamptz`,
-        sinceDate,
-      );
+      let rows: unknown[];
+      if (isTransactional && hospitalId) {
+        rows = await prisma.$queryRawUnsafe(
+          `SELECT * FROM "${tbl}" WHERE "${col}" >= $1::timestamptz AND "hospitalId" = $2`,
+          sinceDate, hospitalId,
+        );
+      } else {
+        rows = await prisma.$queryRawUnsafe(
+          `SELECT * FROM "${tbl}" WHERE "${col}" >= $1::timestamptz`,
+          sinceDate,
+        );
+      }
       return { table, rows: Array.isArray(rows) ? rows : [] };
     } catch {
       return { table, rows: [] };
@@ -141,15 +151,20 @@ router.post('/push', authenticate, asyncHandler(async (req, res) => {
     mutations: Array<{ table: string; action: 'create' | 'update' | 'delete'; recordId: string; data: Record<string, unknown>; clientTimestamp: string }>;
   };
   if (!mutations || !Array.isArray(mutations)) throw new ValidationError('mutations array is required');
+  const hospitalId = req.user!.hospitalId;
 
   const results: Array<{ recordId: string; status: string; serverData?: unknown; error?: string }> = [];
 
   for (const mutation of mutations) {
     const { table, action, recordId, data } = mutation;
     const tbl = tableName(table);
+    const isTransactional = TRANSACTIONAL_MODELS.includes(table as typeof TRANSACTIONAL_MODELS[number]);
     try {
       if (action === 'create') {
         const safeData = { ...data };
+        if (isTransactional && hospitalId && !safeData.hospitalId) {
+          safeData.hospitalId = hospitalId;
+        }
         const now = new Date();
         if (!safeData.updated_at && !safeData.updatedAt) safeData.updated_at = now;
         if (!safeData.created_at && !safeData.createdAt) safeData.created_at = now;

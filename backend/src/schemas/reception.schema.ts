@@ -20,3 +20,24 @@ export const checkInSchema = z.object({
   collectPayment: z.boolean().optional().default(false),
   paymentMethod: z.enum(['CASH', 'CARD', 'INSURANCE', 'BANK_TRANSFER']).optional(),
 });
+
+export const createAppointmentSchema = z.object({
+  patientId: z.string().uuid('Invalid patient ID'),
+  clinicId: z.string().min(1, 'Clinic ID is required'),
+  doctorId: z.string().uuid('Invalid doctor ID'),
+  date: z.string().min(1, 'Date is required'),
+  time: z.string().min(1, 'Time is required'),
+  visitType: z.enum(['NEW_VISIT', 'FOLLOW_UP']).default('NEW_VISIT'),
+  appointmentType: z.enum(['WALKIN', 'RESERVATION']).default('WALKIN'),
+  notes: z.string().optional().nullable(),
+  priority: z.number().int().min(0).max(10).optional().default(0),
+});
+
+export const queueStatusSchema = z.object({
+  status: z.enum(['CALLED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW']),
+});
+
+export const checkInReservationSchema = z.object({
+  priority: z.number().int().min(0).max(10).optional().default(5),
+  visitType: z.enum(['NEW_VISIT', 'FOLLOW_UP']).optional().default('NEW_VISIT'),
+});

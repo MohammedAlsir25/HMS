@@ -6,6 +6,7 @@ import { PERMISSIONS } from '../../middleware/rbac.js';
 import { auditMiddleware } from '../../middleware/auditLog.js';
 
 const router = Router();
+import { Prisma } from '@prisma/client';
 import prisma from '../../lib/prisma.js';
 
 router.get('/wards', authenticate, requirePermission(PERMISSIONS.WARD_READ), asyncHandler(async (req: Request, res: Response) => {
@@ -18,6 +19,107 @@ router.get('/wards', authenticate, requirePermission(PERMISSIONS.WARD_READ), asy
     orderBy: { name: 'asc' },
   });
   res.json(wards);
+}));
+
+router.get('/wards/dashboard', authenticate, requirePermission(PERMISSIONS.WARD_READ), asyncHandler(async (_req: Request, res: Response) => {
+  const allBeds = await prisma.bed.findMany({
+    select: { status: true, wardId: true, assignedAt: true, dischargedAt: true },
+  });
+
+  const statusCounts: Record<string, number> = { OCCUPIED: 0, VACANT: 0, RESERVED: 0, MAINTENANCE: 0 };
+  for (const bed of allBeds) {
+    statusCounts[bed.status] = (statusCounts[bed.status] || 0) + 1;
+  }
+
+  const totalBeds = allBeds.length;
+  const occupiedBeds = statusCounts.OCCUPIED || 0;
+  const vacantBeds = statusCounts.VACANT || 0;
+  const reservedBeds = statusCounts.RESERVED || 0;
+  const maintenanceBeds = statusCounts.MAINTENANCE || 0;
+  const occupancyRate = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  let admissionsToday = 0;
+  let dischargesToday = 0;
+  for (const bed of allBeds) {
+    if (bed.assignedAt && bed.assignedAt >= today && bed.assignedAt < tomorrow) admissionsToday++;
+    if (bed.dischargedAt && bed.dischargedAt >= today && bed.dischargedAt < tomorrow) dischargesToday++;
+  }
+
+  const wards = await prisma.ward.findMany({
+    where: { is_deleted: false },
+    select: { id: true, name: true },
+  });
+
+  const wardBedMap = new Map<string, { name: string; total: number; occupied: number }>();
+  for (const ward of wards) {
+    wardBedMap.set(ward.id, { name: ward.name, total: 0, occupied: 0 });
+  }
+  for (const bed of allBeds) {
+    const entry = wardBedMap.get(bed.wardId);
+    if (entry) {
+      entry.total++;
+      if (bed.status === 'OCCUPIED') entry.occupied++;
+    }
+  }
+
+  const byWard = Array.from(wardBedMap.entries()).map(([wardId, data]) => ({
+    wardId,
+    wardName: data.name,
+    total: data.total,
+    occupied: data.occupied,
+    rate: data.total > 0 ? Math.round((data.occupied / data.total) * 100) : 0,
+  }));
+
+  res.json({ totalBeds, occupiedBeds, vacantBeds, reservedBeds, maintenanceBeds, occupancyRate, byWard, admissionsToday, dischargesToday });
+}));
+
+router.get('/wards/dashboard/trends', authenticate, requirePermission(PERMISSIONS.WARD_READ), asyncHandler(async (req: Request, res: Response) => {
+  const daysParam = parseInt(req.query.days as string, 10);
+  const days = Number.isFinite(daysParam) ? Math.min(Math.max(daysParam, 1), 90) : 7;
+
+  const endDate = new Date();
+  endDate.setHours(23, 59, 59, 999);
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - (days - 1));
+  startDate.setHours(0, 0, 0, 0);
+
+  const allBeds = await prisma.bed.findMany({
+    select: { assignedAt: true, dischargedAt: true, status: true },
+  });
+
+  const dateEntries: Array<{ date: string; admissions: number; discharges: number; occupiedCount: number }> = [];
+
+  for (let i = 0; i < days; i++) {
+    const dayStart = new Date(startDate);
+    dayStart.setDate(dayStart.getDate() + i);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+
+    let admissions = 0;
+    let discharges = 0;
+    for (const bed of allBeds) {
+      if (bed.assignedAt && bed.assignedAt >= dayStart && bed.assignedAt < dayEnd) admissions++;
+      if (bed.dischargedAt && bed.dischargedAt >= dayStart && bed.dischargedAt < dayEnd) discharges++;
+    }
+
+    const occupiedCount = allBeds.filter((bed) => {
+      if (bed.status !== 'OCCUPIED') return false;
+      const assigned = bed.assignedAt ? bed.assignedAt.getTime() : 0;
+      const discharged = bed.dischargedAt ? bed.dischargedAt.getTime() : dayEnd.getTime();
+      return assigned < dayEnd.getTime() && discharged > dayStart.getTime();
+    }).length;
+
+    const dateStr = dayStart.toISOString().split('T')[0]!;
+    dateEntries.push({ date: dateStr, admissions, discharges, occupiedCount });
+  }
+
+  res.json({ trends: dateEntries });
 }));
 
 router.post('/wards', authenticate, requirePermission(PERMISSIONS.WARD_WRITE), asyncHandler(async (req: Request, res: Response) => {
@@ -34,6 +136,31 @@ router.post('/wards', authenticate, requirePermission(PERMISSIONS.WARD_WRITE), a
   res.status(201).json(ward);
 }));
 
+router.get('/wards/:wardId/patients', authenticate, requirePermission(PERMISSIONS.WARD_READ), asyncHandler(async (req: Request, res: Response) => {
+  const beds = await prisma.bed.findMany({
+    where: { wardId: req.params.wardId, status: 'OCCUPIED' },
+    include: {
+      patient: { select: { id: true, fullName: true, mrn: true } },
+      vitals: { orderBy: { recordedAt: 'desc' }, take: 1, select: { recordedAt: true } },
+      _count: { select: { vitals: true } },
+    },
+    orderBy: { bedNumber: 'asc' },
+  });
+
+  const patients = beds.map((bed) => ({
+    bedId: bed.id,
+    bedNumber: bed.bedNumber,
+    patientId: bed.patientId,
+    patientMrn: bed.patient?.mrn ?? null,
+    patientName: bed.patient?.fullName ?? null,
+    assignedAt: bed.assignedAt,
+    lastVitalsAt: bed.vitals[0]?.recordedAt ?? null,
+    vitalsCount: bed._count.vitals,
+  }));
+
+  res.json({ patients });
+}));
+
 router.patch('/wards/:id', authenticate, requirePermission(PERMISSIONS.WARD_WRITE), asyncHandler(async (req: Request, res: Response) => {
   const { name, nameAr, isActive, dailyRate } = req.body as Record<string, unknown>;
   const data: Record<string, unknown> = {};
@@ -41,7 +168,7 @@ router.patch('/wards/:id', authenticate, requirePermission(PERMISSIONS.WARD_WRIT
   if (nameAr !== undefined) data.nameAr = nameAr;
   if (isActive !== undefined) data.isActive = isActive;
   if (dailyRate !== undefined) data.dailyRate = dailyRate === null ? null : Number(dailyRate);
-  const ward = await prisma.ward.update({ where: { id: req.params.id }, data });
+  const ward = await prisma.ward.update({ where: { id: req.params.id }, data: data as Prisma.WardUpdateInput });
   res.json(ward);
 }));
 
@@ -86,12 +213,24 @@ router.post('/beds', authenticate, requirePermission(PERMISSIONS.WARD_WRITE), as
 }));
 
 router.patch('/beds/:id/assign', authenticate, requirePermission(PERMISSIONS.WARD_WRITE), asyncHandler(async (req: Request, res: Response) => {
-  const { patientId, surgeryId } = req.body as Record<string, string>;
+  const { patientId, surgeryId, admissionDate } = req.body as Record<string, string>;
   if (!patientId) throw new ValidationError('patientId is required');
 
   const bed = await prisma.bed.findUnique({ where: { id: req.params.id } });
   if (!bed) throw new ValidationError('Bed not found');
   if (bed.status !== 'VACANT') throw new ValidationError('Bed is not vacant');
+
+  let assignedAt = new Date();
+  if (admissionDate) {
+    const parsed = new Date(admissionDate);
+    if (isNaN(parsed.getTime())) throw new ValidationError('Invalid admissionDate');
+    const now = new Date();
+    if (parsed.getTime() > now.getTime()) throw new ValidationError('admissionDate cannot be in the future');
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    if (parsed.getTime() < thirtyDaysAgo.getTime()) throw new ValidationError('admissionDate cannot be more than 30 days in the past');
+    assignedAt = parsed;
+  }
 
   const updated = await prisma.bed.update({
     where: { id: req.params.id },
@@ -99,7 +238,7 @@ router.patch('/beds/:id/assign', authenticate, requirePermission(PERMISSIONS.WAR
       status: 'OCCUPIED',
       patientId,
       surgeryId: surgeryId || null,
-      assignedAt: new Date(),
+      assignedAt,
     },
     include: {
       ward: { select: { id: true, name: true } },
@@ -110,9 +249,10 @@ router.patch('/beds/:id/assign', authenticate, requirePermission(PERMISSIONS.WAR
 }));
 
 router.patch('/beds/:id/discharge', authenticate, requirePermission(PERMISSIONS.WARD_WRITE), auditMiddleware('WARD_DISCHARGE', 'Bed'), asyncHandler(async (req: Request, res: Response) => {
-  const { paymentMethod } = req.body as { paymentMethod?: string };
-  const validMethods = ['CASH', 'CARD', 'INSURANCE', 'BANK_TRANSFER'];
-  const method = paymentMethod && validMethods.includes(paymentMethod) ? paymentMethod as any : 'CASH' as const;
+  const { paymentMethod, dischargeDate, dischargeNotes } = req.body as { paymentMethod?: string; dischargeDate?: string; dischargeNotes?: string };
+  const validMethods = ['CASH', 'CARD', 'INSURANCE', 'BANK_TRANSFER'] as const;
+  type PaymentMethodVal = (typeof validMethods)[number];
+  const method: PaymentMethodVal = paymentMethod && validMethods.includes(paymentMethod as PaymentMethodVal) ? paymentMethod as PaymentMethodVal : 'CASH';
 
   const bed = await prisma.bed.findUnique({
     where: { id: req.params.id },
@@ -121,14 +261,22 @@ router.patch('/beds/:id/discharge', authenticate, requirePermission(PERMISSIONS.
   if (!bed) throw new ValidationError('Bed not found');
   if (bed.status !== 'OCCUPIED') throw new ValidationError('Bed is not occupied');
 
+  let dischargedAt = new Date();
+  if (dischargeDate) {
+    const parsed = new Date(dischargeDate);
+    if (isNaN(parsed.getTime())) throw new ValidationError('Invalid dischargeDate');
+    dischargedAt = parsed;
+  }
+
   const discharged = await prisma.bed.update({
     where: { id: req.params.id },
-    data: { status: 'VACANT', patientId: null, surgeryId: null, dischargedAt: new Date() },
+    data: { status: 'VACANT', patientId: null, surgeryId: null, dischargedAt },
   });
 
   const ward = await prisma.ward.findUnique({ where: { id: bed.wardId } });
   if (ward?.dailyRate && bed.assignedAt) {
-    const days = Math.max(1, Math.ceil((Date.now() - bed.assignedAt.getTime()) / (1000 * 60 * 60 * 24)));
+    const billingDate = dischargedAt.getTime();
+    const days = Math.max(1, Math.ceil((billingDate - bed.assignedAt.getTime()) / (1000 * 60 * 60 * 24)));
     const amount = Number(ward.dailyRate) * days;
     let shift = await prisma.shift.findFirst({ where: { userId: req.user!.id, closedAt: null } });
     if (!shift) {
@@ -149,7 +297,7 @@ router.patch('/beds/:id/discharge', authenticate, requirePermission(PERMISSIONS.
     });
   }
 
-  res.json(discharged);
+  res.json({ ...discharged, dischargeNotes: dischargeNotes || null });
 }));
 
 router.patch('/beds/:id/reserve', authenticate, requirePermission(PERMISSIONS.WARD_WRITE), asyncHandler(async (req: Request, res: Response) => {

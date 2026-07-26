@@ -29,7 +29,7 @@ router.get('/search', authenticate, requirePermission(PERMISSIONS.PATIENT_READ),
 
 router.post('/patients', authenticate, requirePermission(PERMISSIONS.PATIENT_CREATE), validate(createPatientSchema), asyncHandler(async (req, res) => {
   const { fullName, phone, dateOfBirth, gender, diabetesType, address, notes } = req.body;
-  const mrn = generateMRN();
+  const mrn = await generateMRN(req.user!.hospitalId!);
   const patient = await prisma.patient.create({
     data: {
       mrn,

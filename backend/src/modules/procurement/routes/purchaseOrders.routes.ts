@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { Prisma } from '@prisma/client';
 import { authenticate, requirePermission } from '../../../middleware/auth.js';
 import { asyncHandler } from '../../../middleware/errorHandler.js';
 import { ValidationError } from '../../../utils/errors.js';
@@ -336,7 +337,7 @@ router.post(
     });
     const invItemMap = new Map(inventoryItems.map((i) => [i.id, i]));
 
-    await Promise.all(receivedItems.map(async (ri: { itemId?: string; quantityReceived: number }) => {
+    for (const ri of receivedItems) {
       const poItem = existing.items.find((i) => i.id === ri.itemId);
       if (!poItem) {
         throw new ValidationError(`Item ${ri.itemId} not found in purchase order`);
@@ -345,22 +346,43 @@ router.post(
       if (newReceived > poItem.quantity) {
         throw new ValidationError(`Cannot receive more than ordered quantity for item ${poItem.id}`);
       }
+    }
 
-      await prisma.purchaseOrderItem.update({
-        where: { id: poItem.id },
-        data: { quantityReceived: newReceived },
-      });
+    await prisma.$transaction(
+      receivedItems.flatMap((ri: { itemId?: string; quantityReceived: number }) => {
+        const poItem = existing.items.find((i) => i.id === ri.itemId)!;
+        const newReceived = poItem.quantityReceived + ri.quantityReceived;
+        const txs: Prisma.PrismaPromise<unknown>[] = [
+          prisma.purchaseOrderItem.update({
+            where: { id: poItem.id },
+            data: { quantityReceived: newReceived },
+          }),
+        ];
 
-      if (ri.itemId && ri.quantityReceived > 0) {
-        const invItem = invItemMap.get(ri.itemId);
-        if (invItem) {
-          await prisma.inventoryItem.update({
-            where: { id: ri.itemId },
-            data: { quantity: Number(invItem.quantity) + ri.quantityReceived },
-          });
+        if (ri.itemId && ri.quantityReceived > 0) {
+          const invItem = invItemMap.get(ri.itemId);
+          if (invItem) {
+            txs.push(
+              prisma.inventoryItem.update({
+                where: { id: ri.itemId },
+                data: { quantity: Number(invItem.quantity) + ri.quantityReceived },
+              }),
+              prisma.inventoryTransaction.create({
+                data: {
+                  type: 'IN',
+                  quantity: ri.quantityReceived,
+                  unitCost: Number(poItem.unitCost),
+                  notes: `PO ${existing.orderNumber || existing.id} received`,
+                  itemId: ri.itemId!,
+                },
+              })
+            );
+          }
         }
-      }
-    }));
+
+        return txs;
+      })
+    );
 
     const updatedItems = await prisma.purchaseOrderItem.findMany({
       where: { orderId: req.params.id },

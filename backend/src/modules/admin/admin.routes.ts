@@ -7,6 +7,7 @@ import { auditMiddleware } from '../../middleware/auditLog.js';
 import { PERMISSIONS, DEFAULT_ROLES } from '../../middleware/rbac.js';
 
 const router = Router();
+import { Prisma } from '@prisma/client';
 import prisma from '../../lib/prisma.js';
 
 router.get('/users', authenticate, requirePermission(PERMISSIONS.ADMIN_USERS), asyncHandler(async (_req, res) => {
@@ -18,7 +19,7 @@ router.get('/users', authenticate, requirePermission(PERMISSIONS.ADMIN_USERS), a
 }));
 
 router.get('/users/:id', authenticate, requirePermission(PERMISSIONS.ADMIN_USERS), asyncHandler(async (req, res) => {
-  const user = await prisma.user.findUnique({
+  const user = await prisma.user.findFirst({
     where: { id: req.params.id },
     select: { id: true, email: true, fullName: true, phone: true, isActive: true, lastLogin: true, createdAt: true, roleId: true, clinicId: true, role: true, clinic: true },
   });
@@ -31,7 +32,7 @@ router.post('/users', authenticate, requirePermission(PERMISSIONS.ADMIN_USERS), 
   if (!email || !password || !fullName || !roleId) {
     throw new ValidationError('Email, password, full name, and role are required');
   }
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const existing = await prisma.user.findFirst({ where: { email } });
   if (existing) throw new ConflictError('Email already in use');
   const passwordHash = await bcrypt.hash(password, 12);
   const user = await prisma.user.create({
@@ -151,7 +152,7 @@ router.patch('/pricing/wards/:id', authenticate, requirePermission(PERMISSIONS.P
   const { dailyRate } = req.body as Record<string, unknown>;
   const data: Record<string, unknown> = {};
   if (dailyRate !== undefined) data.dailyRate = dailyRate === null ? null : Number(dailyRate);
-  const ward = await prisma.ward.update({ where: { id: req.params.id }, data });
+  const ward = await prisma.ward.update({ where: { id: req.params.id }, data: data as Prisma.WardUpdateInput });
   res.json(ward);
 }));
 
@@ -195,6 +196,33 @@ router.post('/pricing/imaging-procedure-types/seed', authenticate, requirePermis
   }
   toCreate.forEach((t) => results.push(`Created: ${t.scanType}`));
   res.json({ message: 'Imaging procedure types seeded', results, count: results.length });
+}));
+
+router.get('/system/health', authenticate, asyncHandler(async (req, res) => {
+  const hospitalId = req.user?.hospitalId;
+  const [activeUsers, recentUsers, patientCount, departmentCount, appointmentCount, queueDepth, crashLogCount] = await Promise.all([
+    prisma.user.count({ where: { isActive: true, hospitalId } }),
+    prisma.user.count({
+      where: { hospitalId, lastLogin: { gte: new Date(Date.now() - 15 * 60 * 1000) } },
+    }),
+    prisma.patient.count({ where: { hospitalId, is_deleted: false } }),
+    prisma.department.count({ where: { hospitalId, is_deleted: false } }),
+    prisma.appointment.count({ where: { hospitalId: hospitalId || undefined } }),
+    prisma.appointment.count({
+      where: { hospitalId: hospitalId || undefined, status: { in: ['WAITING', 'CALLED', 'IN_PROGRESS'] } },
+    }),
+    prisma.crashLog.count({ where: { createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } } }),
+  ]);
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    db: { connected: true },
+    users: { total: activeUsers, activeLast15min: recentUsers },
+    patients: { total: patientCount },
+    departments: { total: departmentCount },
+    appointments: { total: appointmentCount, queueDepth },
+    errors: { last24h: crashLogCount },
+  });
 }));
 
 export default router;

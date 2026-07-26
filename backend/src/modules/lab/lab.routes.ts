@@ -3,7 +3,7 @@ import { $Enums, Prisma } from '@prisma/client';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
 import { asyncHandler } from '../../middleware/errorHandler.js';
 import { validate } from '../../middleware/validate.js';
-import { createOrderSchema, createTestSchema } from '../../schemas/lab.schema.js';
+import { createOrderSchema, createTestSchema, createSampleSchema, updateSampleStatusSchema } from '../../schemas/lab.schema.js';
 import { ValidationError, NotFoundError } from '../../utils/errors.js';
 import { PERMISSIONS } from '../../middleware/rbac.js';
 import { auditMiddleware } from '../../middleware/auditLog.js';
@@ -24,6 +24,13 @@ const ORDER_INCLUDE = {
       resultEnteredBy: { select: { id: true, fullName: true } },
     },
     orderBy: { test: { sortOrder: 'asc' as const } },
+  },
+  labSamples: {
+    select: {
+      id: true, label: true, status: true, collectedAt: true, rejectionReason: true, notes: true,
+      collectedBy: { select: { id: true, fullName: true } },
+    },
+    orderBy: { createdAt: 'asc' as const },
   },
 };
 
@@ -139,7 +146,7 @@ router.get('/orders', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_RE
 }));
 
 router.get('/orders/:id', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_READ), asyncHandler(async (req, res) => {
-  const order = await prisma.diagnosticOrder.findUnique({
+  const order = await prisma.diagnosticOrder.findFirst({
     where: { id: req.params.id },
     include: ORDER_INCLUDE,
   });
@@ -151,7 +158,7 @@ router.post('/orders', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_O
   const { patientId, fromClinicId, testIds, panelId, clinicalNotes, priority } = req.body;
   let allTestIds = testIds || [];
   if (panelId) {
-    const panel = await prisma.diagnosticPanel.findUnique({
+    const panel = await prisma.diagnosticPanel.findFirst({
       where: { id: panelId },
       include: { panelTests: true },
     });
@@ -168,6 +175,7 @@ router.post('/orders', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_O
       clinicalNotes: clinicalNotes || null,
       priority: typeof priority === 'number' ? priority : priority === 'URGENT' ? 1 : priority === 'STAT' ? 2 : 0,
       requestedById: req.user!.id, referralId: referral.id,
+      hospitalId: req.user!.hospitalId || null,
       tests: { create: (allTestIds as string[]).map(testId => ({ testId })) },
     },
     include: ORDER_INCLUDE,
@@ -176,13 +184,23 @@ router.post('/orders', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_O
 }));
 
 router.patch('/orders/:id/claim', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_WRITE), asyncHandler(async (req, res) => {
-  const existing = await prisma.diagnosticOrder.findUnique({ where: { id: req.params.id } });
+  const existing = await prisma.diagnosticOrder.findFirst({ where: { id: req.params.id } });
   if (!existing) throw new NotFoundError('Order not found');
   if (!existing.paid) throw new ValidationError('Order must be paid before it can be claimed');
   const order = await prisma.diagnosticOrder.update({
     where: { id: req.params.id },
     data: { status: 'IN_PROGRESS', assignedToId: req.user!.id },
     include: ORDER_INCLUDE,
+  });
+  const label = await generateSampleLabel(req.user!.hospitalId || null);
+  await prisma.labSample.create({
+    data: {
+      label,
+      orderId: order.id,
+      status: 'COLLECTED',
+      collectedAt: new Date(),
+      collectedById: req.user!.id,
+    },
   });
   res.json(order);
 }));
@@ -229,18 +247,36 @@ router.patch('/orders/:id/status', authenticate, requirePermission(PERMISSIONS.D
   res.json(order);
 }));
 
+function calculateFlag(value: string, test: { refRangeLow?: unknown; refRangeHigh?: unknown; lowCritical?: unknown; highCritical?: unknown }): { flag: $Enums.ResultFlag; isAbnormal: boolean } {
+  const num = parseFloat(value);
+  if (isNaN(num)) return { flag: 'NORMAL', isAbnormal: false };
+  if (test.highCritical != null && num > Number(test.highCritical)) return { flag: 'CRITICAL_HIGH', isAbnormal: true };
+  if (test.lowCritical != null && num < Number(test.lowCritical)) return { flag: 'CRITICAL_LOW', isAbnormal: true };
+  if (test.refRangeHigh != null && num > Number(test.refRangeHigh)) return { flag: 'HIGH', isAbnormal: true };
+  if (test.refRangeLow != null && num < Number(test.refRangeLow)) return { flag: 'LOW', isAbnormal: true };
+  return { flag: 'NORMAL', isAbnormal: false };
+}
+
 router.put('/orders/:id/results', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_RESULTS), asyncHandler(async (req, res) => {
   const { results } = req.body;
   if (!results?.length) throw new ValidationError('results array is required');
-  const order = await prisma.diagnosticOrder.findUnique({
+  const order = await prisma.diagnosticOrder.findFirst({
     where: { id: req.params.id },
-    include: { tests: true },
+    include: { tests: { include: { test: true } } },
   });
   if (!order) throw new NotFoundError('Order not found');
   await prisma.$transaction(
     (results as Array<Record<string, unknown>>).map(r => {
-      const r2 = r as { orderTestId: string; value?: string; unit?: string; refRangeLow?: string; refRangeHigh?: string; refRangeText?: string; flag?: string; notes?: string };
-      const isAbnormal = !!(r2.flag && r2.flag !== 'NORMAL');
+      const r2 = r as { orderTestId: string; value?: string; unit?: string; refRangeLow?: string; refRangeHigh?: string; refRangeText?: string; notes?: string };
+      const orderTest = order.tests.find(t => t.id === r2.orderTestId);
+      const test = orderTest?.test;
+      let flag: $Enums.ResultFlag = 'NORMAL';
+      let isAbnormal = false;
+      if (test && r2.value) {
+        const computed = calculateFlag(r2.value, test);
+        flag = computed.flag;
+        isAbnormal = computed.isAbnormal;
+      }
       return prisma.diagnosticOrderTest.update({
         where: { id: r2.orderTestId },
         data: {
@@ -248,7 +284,7 @@ router.put('/orders/:id/results', authenticate, requirePermission(PERMISSIONS.DI
           refRangeLow: r2.refRangeLow !== undefined ? parseFloat(r2.refRangeLow) : null,
           refRangeHigh: r2.refRangeHigh !== undefined ? parseFloat(r2.refRangeHigh) : null,
           refRangeText: r2.refRangeText ?? null,
-          flag: (r2.flag || 'NORMAL') as $Enums.ResultFlag, notes: r2.notes ?? null,
+          flag, notes: r2.notes ?? null,
           resultEnteredAt: new Date(), resultEnteredById: req.user!.id, isAbnormal,
         },
       });
@@ -299,12 +335,121 @@ router.get('/results', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_R
 }));
 
 router.get('/orders/:id/report', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_READ), asyncHandler(async (req, res) => {
-  const order = await prisma.diagnosticOrder.findUnique({
+  const order = await prisma.diagnosticOrder.findFirst({
     where: { id: req.params.id },
     include: ORDER_INCLUDE,
   });
   if (!order) throw new NotFoundError('Order not found');
-  res.json(order);
+  const flagColor = (flag: string) => {
+    switch (flag) {
+      case 'CRITICAL_HIGH': return '#dc2626';
+      case 'CRITICAL_LOW': return '#dc2626';
+      case 'HIGH': return '#ea580c';
+      case 'LOW': return '#2563eb';
+      case 'ABNORMAL': return '#d97706';
+      default: return '#16a34a';
+    }
+  };
+  const flagBg = (flag: string) => {
+    switch (flag) {
+      case 'CRITICAL_HIGH': return '#fef2f2';
+      case 'CRITICAL_LOW': return '#fef2f2';
+      case 'HIGH': return '#fff7ed';
+      case 'LOW': return '#eff6ff';
+      case 'ABNORMAL': return '#fffbeb';
+      default: return '#f0fdf4';
+    }
+  };
+  const resultsRows = (order.tests || []).map(ot => {
+    const refRange = ot.refRangeText || (ot.refRangeLow != null && ot.refRangeHigh != null ? `${ot.refRangeLow} - ${ot.refRangeHigh}` : '-');
+    const color = flagColor(ot.flag);
+    const bg = flagBg(ot.flag);
+    return `<tr>
+      <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${ot.test?.name || '-'}</td>
+      <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;">${ot.value || '-'}</td>
+      <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;">${ot.unit || ot.test?.unit || '-'}</td>
+      <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;">${refRange}</td>
+      <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;"><span style="color:${color};background:${bg};padding:2px 8px;border-radius:4px;font-weight:600;">${ot.flag}</span></td>
+    </tr>`;
+  }).join('');
+  const sampleRows = (order.labSamples || []).map(s => {
+    const statusColor = s.status === 'COMPLETED' ? '#16a34a' : s.status === 'REJECTED' ? '#dc2626' : s.status === 'IN_PROGRESS' ? '#2563eb' : '#d97706';
+    return `<tr>
+      <td style="padding:8px;border-bottom:1px solid #e5e7eb;font-family:monospace;">${s.label}</td>
+      <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;"><span style="color:${statusColor};font-weight:600;">${s.status}</span></td>
+      <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${s.collectedBy?.fullName || '-'}</td>
+      <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${s.collectedAt ? new Date(s.collectedAt).toLocaleString() : '-'}</td>
+    </tr>`;
+  }).join('');
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lab Report - ${order.id.slice(0, 8)}</title>
+<style>
+  @media print { body { margin: 0; } @page { margin: 1cm; } }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; color: #1e293b; margin: 20px; }
+  .header { text-align: center; border-bottom: 2px solid #1e40af; padding-bottom: 16px; margin-bottom: 24px; }
+  .header h1 { color: #1e40af; margin: 0; font-size: 24px; }
+  .header p { color: #64748b; margin: 4px 0 0; }
+  .section { margin-bottom: 20px; }
+  .section h2 { font-size: 14px; text-transform: uppercase; color: #64748b; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 10px; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; font-size: 13px; }
+  .info-grid dt { color: #64748b; }
+  .info-grid dd { font-weight: 600; margin: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #f1f5f9; padding: 8px; text-align: left; border-bottom: 2px solid #cbd5e1; font-size: 12px; text-transform: uppercase; color: #64748b; }
+  .footer { margin-top: 32px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 12px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>Laboratory Report</h1>
+  <p>AL Jawahir Hospital</p>
+</div>
+<div class="section">
+  <h2>Patient Information</h2>
+  <dl class="info-grid">
+    <dt>Name</dt><dd>${order.patient?.fullName || '-'}</dd>
+    <dt>MRN</dt><dd>${order.patient?.mrn || '-'}</dd>
+    <dt>Date of Birth</dt><dd>${order.patient?.dateOfBirth ? new Date(order.patient.dateOfBirth).toLocaleDateString() : '-'}</dd>
+    <dt>Gender</dt><dd>${order.patient?.gender || '-'}</dd>
+  </dl>
+</div>
+<div class="section">
+  <h2>Order Information</h2>
+  <dl class="info-grid">
+    <dt>Order ID</dt><dd>${order.id.slice(0, 8)}</dd>
+    <dt>Date</dt><dd>${new Date(order.createdAt).toLocaleString()}</dd>
+    <dt>Requested By</dt><dd>${order.requestedBy?.fullName || '-'}</dd>
+    <dt>Priority</dt><dd>${order.priority === 1 ? 'URGENT' : order.priority === 2 ? 'STAT' : 'ROUTINE'}</dd>
+    <dt>Status</dt><dd>${order.status}</dd>
+    ${order.clinicalNotes ? `<dt>Clinical Notes</dt><dd>${order.clinicalNotes}</dd>` : ''}
+  </dl>
+</div>
+${(order.labSamples || []).length > 0 ? `
+<div class="section">
+  <h2>Samples</h2>
+  <table>
+    <thead><tr><th>Label</th><th style="text-align:center;">Status</th><th>Collected By</th><th>Collected At</th></tr></thead>
+    <tbody>${sampleRows}</tbody>
+  </table>
+</div>` : ''}
+<div class="section">
+  <h2>Results</h2>
+  <table>
+    <thead><tr><th>Test</th><th style="text-align:center;">Value</th><th style="text-align:center;">Unit</th><th style="text-align:center;">Ref Range</th><th style="text-align:center;">Flag</th></tr></thead>
+    <tbody>${resultsRows}</tbody>
+  </table>
+</div>
+${order.resultNotes ? `<div class="section"><h2>Notes</h2><p style="font-size:13px;">${order.resultNotes}</p></div>` : ''}
+<div class="footer">
+  Report generated on ${new Date().toLocaleString()} | AL Jawahir Hospital Laboratory
+</div>
+</body>
+</html>`;
+  res.json({ html });
 }));
 
 router.post('/checkout', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_ORDER), auditMiddleware('LAB_CHECKOUT', 'Transaction'), asyncHandler(async (req, res) => {
@@ -316,7 +461,7 @@ router.post('/checkout', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS
     throw new ValidationError('Invalid payment method');
   }
   const orders = await prisma.diagnosticOrder.findMany({
-    where: { id: { in: orderIds }, orderType: 'LAB' },
+    where: { id: { in: orderIds }, orderType: 'LAB', hospitalId: req.user!.hospitalId || undefined },
     include: { tests: { include: { test: true } } },
   });
   if (orders.length === 0) throw new NotFoundError('No orders found');
@@ -338,7 +483,7 @@ router.post('/checkout', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS
   if (!shift) {
     shift = await prisma.shift.create({ data: { userId: req.user!.id } });
   }
-  const labDept = await prisma.department.findUnique({ where: { slug: 'lab-dept' } });
+  const labDept = await prisma.department.findFirst({ where: { slug: 'lab-dept' } });
   const [transaction] = await prisma.$transaction([
     prisma.transaction.create({
       data: {
@@ -358,14 +503,117 @@ router.post('/checkout', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS
   res.status(201).json({ transaction, totalAmount, orderCount: orders.length });
 }));
 
-router.get('/stats', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_READ), asyncHandler(async (_req, res) => {
+router.get('/stats', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_READ), asyncHandler(async (req, res) => {
   const [pending, inProgress, completed, total] = await Promise.all([
-    prisma.diagnosticOrder.count({ where: { orderType: 'LAB', status: 'SUBMITTED' } }),
-    prisma.diagnosticOrder.count({ where: { orderType: 'LAB', status: 'IN_PROGRESS' } }),
-    prisma.diagnosticOrder.count({ where: { orderType: 'LAB', status: 'COMPLETED', completedAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } } }),
+    prisma.diagnosticOrder.count({ where: { orderType: 'LAB', status: 'SUBMITTED', hospitalId: req.user!.hospitalId || undefined } }),
+    prisma.diagnosticOrder.count({ where: { orderType: 'LAB', status: 'IN_PROGRESS', hospitalId: req.user!.hospitalId || undefined } }),
+    prisma.diagnosticOrder.count({ where: { orderType: 'LAB', status: 'COMPLETED', completedAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) }, hospitalId: req.user!.hospitalId || undefined } }),
     prisma.diagnosticTest.count({ where: { orderType: 'LAB', isActive: true } }),
   ]);
   res.json({ pending, inProgress, completedToday: completed, catalogCount: total });
+}));
+
+async function generateSampleLabel(hospitalId: string | null): Promise<string> {
+  const now = new Date();
+  const y = String(now.getFullYear()).slice(2);
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const datePart = `${y}${m}${d}`;
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const endOfDay = new Date(startOfDay.getTime() + 86400000);
+  const count = await prisma.labSample.count({
+    where: {
+      createdAt: { gte: startOfDay, lt: endOfDay },
+      ...(hospitalId ? { hospitalId } : {}),
+    },
+  });
+  return `LAB-${datePart}-${String(count + 1).padStart(4, '0')}`;
+}
+
+router.get('/samples', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_READ), asyncHandler(async (req, res) => {
+  const { status, orderId } = req.query as Record<string, string>;
+  const where: Record<string, unknown> = {};
+  if (status) where.status = status;
+  if (orderId) where.orderId = orderId;
+  const samples = await prisma.labSample.findMany({
+    where,
+    include: {
+      collectedBy: { select: { id: true, fullName: true } },
+      order: {
+        select: {
+          id: true,
+          status: true,
+          patient: { select: { id: true, fullName: true, mrn: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 50,
+  });
+  res.json(samples);
+}));
+
+router.post('/samples', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_WRITE), validate(createSampleSchema), asyncHandler(async (req, res) => {
+  const { orderId, notes } = req.body;
+  const order = await prisma.diagnosticOrder.findFirst({ where: { id: orderId } });
+  if (!order) throw new NotFoundError('Order not found');
+  const label = await generateSampleLabel(req.user!.hospitalId || null);
+  const sample = await prisma.labSample.create({
+    data: {
+      label,
+      orderId,
+      notes: notes || null,
+      status: 'COLLECTED',
+    },
+    include: {
+      collectedBy: { select: { id: true, fullName: true } },
+      order: { select: { id: true, patient: { select: { fullName: true, mrn: true } } } },
+    },
+  });
+  res.status(201).json(sample);
+}));
+
+router.patch('/samples/:id/collect', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_WRITE), asyncHandler(async (req, res) => {
+  const sample = await prisma.labSample.findFirst({ where: { id: req.params.id } });
+  if (!sample) throw new NotFoundError('Sample not found');
+  const updated = await prisma.labSample.update({
+    where: { id: req.params.id },
+    data: {
+      collectedAt: sample.collectedAt || new Date(),
+      collectedById: sample.collectedById || req.user!.id,
+      status: sample.status === 'COLLECTED' ? 'COLLECTED' : sample.status,
+    },
+    include: {
+      collectedBy: { select: { id: true, fullName: true } },
+      order: { select: { id: true, patient: { select: { fullName: true, mrn: true } } } },
+    },
+  });
+  res.json(updated);
+}));
+
+router.patch('/samples/:id/status', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_WRITE), validate(updateSampleStatusSchema), asyncHandler(async (req, res) => {
+  const { status, rejectionReason } = req.body;
+  const sample = await prisma.labSample.findFirst({ where: { id: req.params.id } });
+  if (!sample) throw new NotFoundError('Sample not found');
+  const updated = await prisma.labSample.update({
+    where: { id: req.params.id },
+    data: {
+      status,
+      rejectionReason: status === 'REJECTED' ? (rejectionReason || null) : null,
+    },
+    include: {
+      collectedBy: { select: { id: true, fullName: true } },
+      order: { select: { id: true, patient: { select: { fullName: true, mrn: true } } } },
+    },
+  });
+  res.json(updated);
+}));
+
+router.delete('/samples/:id', authenticate, requirePermission(PERMISSIONS.DIAGNOSTICS_WRITE), asyncHandler(async (req, res) => {
+  const sample = await prisma.labSample.findFirst({ where: { id: req.params.id } });
+  if (!sample) throw new NotFoundError('Sample not found');
+  await prisma.labSample.delete({ where: { id: req.params.id } });
+  res.json({ success: true });
 }));
 
 export default router;

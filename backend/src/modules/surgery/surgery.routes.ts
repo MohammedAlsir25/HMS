@@ -80,9 +80,16 @@ router.get('/stats', authenticate, requirePermission(PERMISSIONS.SURGERY_READ), 
 }));
 
 router.post('/', authenticate, requirePermission(PERMISSIONS.SURGERY_WRITE), asyncHandler(async (req, res) => {
-  const { patientId, departmentId, orRoom, startTime, endTime, notes, operationTypeId, disposition, admittedWardId } = req.body as Record<string, unknown>;
-  if (!patientId || !departmentId || !orRoom || !startTime || !endTime) {
-    throw new ValidationError('patientId, departmentId, orRoom, startTime, endTime are required');
+  const { patientId, departmentId, orRoom, startTime, endTime, notes, operationTypeId, disposition, admittedWardId, anesthesiaType } = req.body as Record<string, unknown>;
+  if (!patientId || !orRoom || !startTime || !endTime) {
+    throw new ValidationError('patientId, orRoom, startTime, endTime are required');
+  }
+
+  let resolvedDepartmentId = departmentId as string | undefined;
+  if (!resolvedDepartmentId) {
+    const surgeryDept = await prisma.department.findFirst({ where: { slug: 'surgery-dept' } });
+    resolvedDepartmentId = surgeryDept?.id;
+    if (!resolvedDepartmentId) throw new ValidationError('departmentId is required (no default surgery department found)');
   }
 
   const validDispositions = ['PENDING', 'DISCHARGE_HOME', 'ADMIT_WARD'];
@@ -92,18 +99,37 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.SURGERY_WRITE), asy
   const surgery = await prisma.surgery.create({
     data: {
       patientId: patientId as string,
-      departmentId: departmentId as string,
+      departmentId: resolvedDepartmentId,
       orRoom: parseInt(orRoom as string, 10),
       startTime: new Date(startTime as string),
       endTime: new Date(endTime as string),
       notes: (notes as string) || null,
       operationTypeId: (operationTypeId as string) || undefined,
-      disposition: disp as any,
+      anesthesiaType: (anesthesiaType as string) || null,
+      disposition: disp as 'PENDING' | 'DISCHARGE_HOME' | 'ADMIT_WARD',
       admittedWardId: (admittedWardId as string) || null,
     },
     include: { patient: { select: { fullName: true, mrn: true } } },
   });
   res.status(201).json(surgery);
+}));
+
+router.get('/or-roles', authenticate, requirePermission(PERMISSIONS.SURGERY_READ), asyncHandler(async (_req, res) => {
+  const roles = await prisma.oRRole.findMany({
+    where: { isActive: true, is_deleted: false },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+  });
+  res.json(roles);
+}));
+
+router.get('/event-types', authenticate, requirePermission(PERMISSIONS.SURGERY_READ), asyncHandler(async (_req, res) => {
+  const types = await prisma.intraoperativeEventType.findMany({
+    where: { isActive: true, is_deleted: false },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+  });
+  res.json(types);
 }));
 
 router.patch('/:id/status', authenticate, requirePermission(PERMISSIONS.SURGERY_WRITE), asyncHandler(async (req, res) => {
@@ -127,7 +153,7 @@ router.patch('/:id/disposition', authenticate, requirePermission(PERMISSIONS.SUR
   const surgery = await prisma.surgery.update({
     where: { id: req.params.id },
     data: {
-      disposition: disposition as any,
+      disposition: disposition as 'PENDING' | 'DISCHARGE_HOME' | 'ADMIT_WARD',
       admittedWardId: disposition === 'ADMIT_WARD' ? (admittedWardId || null) : null,
     },
     include: { patient: { select: { fullName: true, mrn: true } } },

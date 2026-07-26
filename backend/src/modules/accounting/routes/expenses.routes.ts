@@ -6,6 +6,7 @@ import { PERMISSIONS } from '../../../middleware/rbac.js';
 import { auditMiddleware } from '../../../middleware/auditLog.js';
 import { $Enums } from '@prisma/client';
 import prisma from '../../../lib/prisma.js';
+import { createJournalFromExpense } from '../utils/journalHelper.js';
 
 const router = Router();
 
@@ -59,6 +60,9 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_WRITE), 
     },
     include: { department: { select: { id: true, name: true, slug: true } } },
   });
+
+  await createJournalFromExpense({ ...expense, amount: Number(expense.amount) }).catch(() => {});
+
   res.status(201).json(expense);
 }));
 

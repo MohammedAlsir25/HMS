@@ -1,6 +1,7 @@
 import app from './app.js';
 import { config } from './config/index.js';
 import prisma from './lib/prisma.js';
+import { startReminderJob } from './modules/appointments/appointment-reminder.job.js';
 
 process.on('unhandledRejection', (reason) => {
   console.error('[JH Hospital] Unhandled Rejection:', reason);
@@ -12,6 +13,7 @@ process.on('uncaughtException', (err) => {
 
 const server = app.listen(config.port, () => {
   console.log(`[JH Hospital] Server running on port ${config.port} (${config.nodeEnv})`);
+  startReminderJob();
 });
 
 function gracefulShutdown(signal: string) {

@@ -5,6 +5,7 @@ import { ValidationError, NotFoundError } from '../../../utils/errors.js';
 import { PERMISSIONS } from '../../../middleware/rbac.js';
 import { auditMiddleware } from '../../../middleware/auditLog.js';
 import prisma from '../../../lib/prisma.js';
+import { createJournalFromTransaction } from '../utils/journalHelper.js';
 
 const router = Router();
 
@@ -48,9 +49,7 @@ router.get('/:id', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_READ),
     include: {
       cashier: { select: { id: true, fullName: true } },
       department: { select: { id: true, name: true, slug: true } },
-      inventoryTransactions: {
-        include: { item: { select: { id: true, name: true, packSize: true } } },
-      },
+
     },
   });
   if (!tx) throw new NotFoundError('Transaction not found');
@@ -71,6 +70,9 @@ router.post('/', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_WRITE), 
     },
     include: { cashier: { select: { id: true, fullName: true } }, department: { select: { id: true, name: true, slug: true } } },
   });
+
+  await createJournalFromTransaction({ ...tx, amount: Number(tx.amount) }).catch(() => {});
+
   res.status(201).json(tx);
 }));
 

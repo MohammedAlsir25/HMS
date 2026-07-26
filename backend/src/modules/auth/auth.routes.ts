@@ -28,9 +28,10 @@ function generateTokens(user: Prisma.UserGetPayload<{ include: { role: true; cli
     clinicId: user.clinicId,
     clinicSlug: user.clinic?.slug || null,
     permissions: user.role.permissions,
+    hospitalId: user.hospitalId,
   };
   const token = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiry as SignOptions['expiresIn'] });
-  const refreshToken = jwt.sign({ id: user.id }, config.jwt.refreshSecret, {
+  const refreshToken = jwt.sign({ id: user.id, hospitalId: user.hospitalId }, config.jwt.refreshSecret, {
     expiresIn: config.jwt.refreshExpiry as SignOptions['expiresIn'],
   });
   return { token, refreshToken };
@@ -38,7 +39,7 @@ function generateTokens(user: Prisma.UserGetPayload<{ include: { role: true; cli
 
 router.post('/login', loginLimiter, validate(loginSchema), asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  const user = await prisma.user.findUnique({
+  const user = await prisma.user.findFirst({
     where: { email },
     include: { role: true, clinic: true },
   });
@@ -69,6 +70,7 @@ router.post('/login', loginLimiter, validate(loginSchema), asyncHandler(async (r
       clinic: user.clinic ? { id: user.clinic.id, name: user.clinic.name, slug: user.clinic.slug, type: user.clinic.type } : null,
       permissions: user.role.permissions,
       avatarUrl: user.avatarUrl,
+      hospitalId: user.hospitalId,
     },
   });
 }));
@@ -76,7 +78,7 @@ router.post('/login', loginLimiter, validate(loginSchema), asyncHandler(async (r
 router.post('/refresh', validate(refreshSchema), asyncHandler(async (req, res) => {
   const { refreshToken } = req.body;
   const decoded = jwt.verify(refreshToken, config.jwt.refreshSecret) as { id: string };
-  const user = await prisma.user.findUnique({
+  const user = await prisma.user.findFirst({
     where: { id: decoded.id },
     include: { role: true, clinic: true },
   });
@@ -86,7 +88,7 @@ router.post('/refresh', validate(refreshSchema), asyncHandler(async (req, res) =
 }));
 
 router.get('/me', authenticate, asyncHandler(async (req, res) => {
-  const user = await prisma.user.findUnique({
+  const user = await prisma.user.findFirst({
     where: { id: req.user!.id },
     include: { role: true, clinic: true },
   });
@@ -99,6 +101,7 @@ router.get('/me', authenticate, asyncHandler(async (req, res) => {
     clinic: user.clinic ? { id: user.clinic.id, name: user.clinic.name, slug: user.clinic.slug, type: user.clinic.type } : null,
     permissions: user.role.permissions,
     avatarUrl: user.avatarUrl,
+    hospitalId: user.hospitalId,
   });
 }));
 

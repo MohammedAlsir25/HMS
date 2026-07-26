@@ -11,15 +11,27 @@ export const upload = multer({
 });
 
 export async function resolveClinic(identifier: string) {
-  let clinic = await prisma.clinic.findUnique({ where: { id: identifier } });
-  if (!clinic) clinic = await prisma.clinic.findUnique({ where: { slug: identifier } });
+  let clinic = await prisma.clinic.findFirst({ where: { id: identifier } });
+  if (!clinic) clinic = await prisma.clinic.findFirst({ where: { slug: identifier } });
   return clinic;
 }
 
-export function generateMRN() {
+export async function generateMRN(hospitalId: string): Promise<string> {
   const year = new Date().getFullYear();
-  const rand = String(Math.floor(Math.random() * 99999)).padStart(5, '0');
-  return `MRN-${year}-${rand}`;
+  const lastPatient = await prisma.patient.findFirst({
+    where: {
+      hospitalId,
+      mrn: { startsWith: `MRN-${year}-` },
+    },
+    orderBy: { mrn: 'desc' },
+    select: { mrn: true },
+  });
+  let sequence = 1;
+  if (lastPatient) {
+    const lastSeq = parseInt(lastPatient.mrn.split('-')[2]!);
+    sequence = lastSeq + 1;
+  }
+  return `MRN-${year}-${String(sequence).padStart(5, '0')}`;
 }
 
 export async function nextToken(clinicId: string) {

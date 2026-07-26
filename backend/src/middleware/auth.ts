@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/index.js';
+import { getRequestContext } from './requestContext.js';
 
 export function authenticate(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
@@ -12,6 +13,15 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
   try {
     const decoded = jwt.verify(token, config.jwt.secret);
     req.user = decoded as Request['user'];
+
+    const ctx = getRequestContext();
+    if (ctx) {
+      const d = decoded as Record<string, unknown>;
+      ctx.hospitalId = (d['hospitalId'] as string) || null;
+      ctx.userId = req.user!.id;
+      ctx.role = req.user!.role;
+    }
+
     next();
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'TokenExpiredError') {

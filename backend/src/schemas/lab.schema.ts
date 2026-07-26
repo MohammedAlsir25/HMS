@@ -26,3 +26,15 @@ export const createTestSchema = z.object({
   price: z.number().optional().nullable(),
   sortOrder: z.number().int().optional().default(0),
 });
+
+export const createSampleSchema = z.object({
+  orderId: z.string().uuid('Invalid order ID'),
+  notes: z.string().optional().nullable(),
+});
+
+export const updateSampleStatusSchema = z.object({
+  status: z.enum(['COLLECTED', 'IN_PROGRESS', 'COMPLETED', 'REJECTED']),
+  rejectionReason: z.string().optional(),
+}).refine(data => data.status !== 'REJECTED' || data.rejectionReason, {
+  message: 'rejectionReason is required when status is REJECTED',
+});

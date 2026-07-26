@@ -9,7 +9,7 @@ export function generateSurgeryPrintHtml(surgery: any): string {
 
   return `
     <div style="font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 40px;">
-      <h1 style="text-align: center; font-size: 24px; margin-bottom: 4px;">AL Jawahir Hospital</h1>
+      <h1 style="text-align: center; font-size: 24px; margin-bottom: 4px;">HMS</h1>
       <p style="text-align: center; color: #666; margin-bottom: 24px;">Surgical Report</p>
 
       <div style="border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
@@ -91,7 +91,7 @@ export function generateSurgeryPrintHtml(surgery: any): string {
       </div>` : ''}
 
       <div style="text-align: center; color: #999; font-size: 12px; margin-top: 32px; border-top: 1px solid #ddd; padding-top: 16px;">
-        <p>AL Jawahir Hospital &mdash; Surgical Department</p>
+        <p>HMS &mdash; Surgical Department</p>
         <p>Report generated on ${new Date().toLocaleString()}</p>
       </div>
     </div>`;

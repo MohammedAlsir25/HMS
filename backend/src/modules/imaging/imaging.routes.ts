@@ -15,14 +15,15 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-    if (allowed.includes(file.mimetype)) cb(null, true);
-    else cb(new Error('Only JPEG, PNG, WebP, and PDF files are allowed'));
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'application/dicom'];
+    const ext = file.originalname.toLowerCase().split('.').pop();
+    if (allowed.includes(file.mimetype) || ext === 'dcm') cb(null, true);
+    else cb(new Error('Only JPEG, PNG, WebP, PDF, and DICOM files are allowed'));
   },
 });
 
 async function resolveOrder(id: string) {
-  const order = await prisma.imagingOrder.findUnique({ where: { id } });
+  const order = await prisma.imagingOrder.findFirst({ where: { id } });
   if (!order) throw new NotFoundError('Imaging order not found');
   return order;
 }
@@ -31,7 +32,7 @@ router.get('/', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), asyn
   const { clinicId, clinicSlug, status, patientId, search } = req.query as Record<string, string | undefined>;
   let resolvedClinicId = clinicId;
   if (clinicSlug && !resolvedClinicId) {
-    const clinic = await prisma.clinic.findUnique({ where: { slug: clinicSlug } });
+    const clinic = await prisma.clinic.findFirst({ where: { slug: clinicSlug } });
     if (clinic) resolvedClinicId = clinic.id;
   }
   const where: Record<string, unknown> = {};
@@ -83,8 +84,8 @@ router.get('/:id', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), a
   const id = req.params.id!;
   const order = await resolveOrder(id);
   const [patient, requestedByClinic, files] = await Promise.all([
-    prisma.patient.findUnique({ where: { id: order.patientId }, select: { id: true, fullName: true, mrn: true, phone: true, gender: true, dateOfBirth: true } }),
-    prisma.clinic.findUnique({ where: { id: order.requestedByClinicId }, select: { id: true, name: true, slug: true } }),
+    prisma.patient.findFirst({ where: { id: order.patientId }, select: { id: true, fullName: true, mrn: true, phone: true, gender: true, dateOfBirth: true } }),
+    prisma.clinic.findFirst({ where: { id: order.requestedByClinicId }, select: { id: true, name: true, slug: true } }),
     prisma.imagingFile.findMany({ where: { imagingOrderId: id }, orderBy: { createdAt: 'desc' } }),
   ]);
   res.json({ ...order, patient, requestedByClinic, files });
@@ -92,7 +93,7 @@ router.get('/:id', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), a
 
 router.post('/:id/start', authenticate, requirePermission(PERMISSIONS.CLINICAL_WRITE), asyncHandler(async (req, res) => {
   const id = req.params.id!;
-  const order = await prisma.imagingOrder.findUnique({ where: { id } });
+  const order = await prisma.imagingOrder.findFirst({ where: { id } });
   if (!order) throw new NotFoundError('Imaging order not found');
   if (order.status !== 'PENDING') throw new ValidationError('Order must be PENDING to start');
 
@@ -108,7 +109,7 @@ router.post('/:id/complete', authenticate, requirePermission(PERMISSIONS.CLINICA
   const { findings, impression } = req.body as { findings?: string; impression?: string };
   const result = await completeImagingOrder(id, req.user!.id, { findings, impression });
 
-  const order = await prisma.imagingOrder.findUnique({
+  const order = await prisma.imagingOrder.findFirst({
     where: { id },
     include: { procedureType: { select: { name: true, price: true } } },
   });
@@ -142,7 +143,7 @@ router.post('/:id/dismiss', authenticate, requirePermission(PERMISSIONS.CLINICAL
 
 router.post('/:id/upload', authenticate, requirePermission(PERMISSIONS.CLINICAL_WRITE), upload.array('files', 20), asyncHandler(async (req, res) => {
   const id = req.params.id!;
-  const order = await prisma.imagingOrder.findUnique({ where: { id } });
+  const order = await prisma.imagingOrder.findFirst({ where: { id } });
   if (!order) throw new NotFoundError('Imaging order not found');
   if (order.status === 'DISMISSED') throw new ValidationError('Cannot upload to a dismissed order');
   if (!req.files || (req.files as Express.Multer.File[]).length === 0) throw new ValidationError('No files uploaded');
@@ -183,7 +184,7 @@ router.get('/:id/files', authenticate, requirePermission(PERMISSIONS.CLINICAL_RE
 
 router.get('/files/:fileId/download', authenticate, requirePermission(PERMISSIONS.CLINICAL_READ), asyncHandler(async (req, res) => {
   const fileId = req.params.fileId!;
-  const file = await prisma.imagingFile.findUnique({ where: { id: fileId } });
+  const file = await prisma.imagingFile.findFirst({ where: { id: fileId } });
   if (!file) throw new NotFoundError('File not found');
 
   const supabase = await getSupabase();

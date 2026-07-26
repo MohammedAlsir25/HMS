@@ -9,7 +9,8 @@ const router = Router();
 
 router.get('/', authenticate, requirePermission(PERMISSIONS.PHARMACY_READ), asyncHandler(async (req, res) => {
   const { category } = req.query as Record<string, string>;
-  const where: Record<string, unknown> = {};
+  const hospitalId = req.user!.hospitalId!;
+  const where: Record<string, unknown> = { hospitalId };
   if (category) where.category = category;
   const suppliers = await prisma.supplier.findMany({ where, orderBy: { name: 'asc' } });
   res.json(suppliers);
@@ -18,15 +19,17 @@ router.get('/', authenticate, requirePermission(PERMISSIONS.PHARMACY_READ), asyn
 router.post('/', authenticate, requirePermission(PERMISSIONS.PHARMACY_WRITE), asyncHandler(async (req, res) => {
   const { name, contactPerson, phone, email, category } = req.body;
   if (!name) throw new ValidationError('Supplier name is required');
+  const hospitalId = req.user!.hospitalId!;
   const supplier = await prisma.supplier.create({
-    data: { name, contactPerson, phone, email, category: category || 'pharmacy' },
+    data: { name, contactPerson, phone, email, category: category || 'pharmacy', hospitalId },
   });
   res.status(201).json(supplier);
 }));
 
 router.put('/:id', authenticate, requirePermission(PERMISSIONS.PHARMACY_WRITE), asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const existing = await prisma.supplier.findUnique({ where: { id } });
+  const hospitalId = req.user!.hospitalId!;
+  const existing = await prisma.supplier.findFirst({ where: { id, hospitalId } });
   if (!existing) throw new NotFoundError('Supplier not found');
   const { name, contactPerson, phone, email, category } = req.body;
   const supplier = await prisma.supplier.update({
@@ -44,10 +47,11 @@ router.put('/:id', authenticate, requirePermission(PERMISSIONS.PHARMACY_WRITE), 
 
 router.get('/:id/balance', authenticate, asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const supplier = await prisma.supplier.findUnique({ where: { id } });
+  const hospitalId = req.user!.hospitalId!;
+  const supplier = await prisma.supplier.findFirst({ where: { id, hospitalId } });
   if (!supplier) throw new NotFoundError('Supplier not found');
   const invoices = await prisma.supplierInvoice.findMany({
-    where: { supplierId: id },
+    where: { supplierId: id, hospitalId },
     orderBy: { createdAt: 'desc' },
     include: { items: { include: { item: { select: { id: true, name: true } } } } },
   });
@@ -69,9 +73,10 @@ router.get('/:id/balance', authenticate, asyncHandler(async (req, res) => {
 
 router.delete('/:id', authenticate, requirePermission(PERMISSIONS.PHARMACY_WRITE), asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const existing = await prisma.supplier.findUnique({ where: { id } });
+  const hospitalId = req.user!.hospitalId!;
+  const existing = await prisma.supplier.findFirst({ where: { id, hospitalId } });
   if (!existing) throw new NotFoundError('Supplier not found');
-  const hasInvoices = await prisma.supplierInvoice.findFirst({ where: { supplierId: id } });
+  const hasInvoices = await prisma.supplierInvoice.findFirst({ where: { supplierId: id, hospitalId } });
   if (hasInvoices) {
     await prisma.supplier.update({ where: { id }, data: { name: `${existing.name} (archived)` } });
     return res.json({ message: 'Supplier archived (has existing invoices)' });

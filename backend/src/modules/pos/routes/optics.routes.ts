@@ -11,7 +11,7 @@ const router = Router();
 router.post('/', authenticate, requirePermission(PERMISSIONS.OPTICS_WRITE), asyncHandler(async (req, res) => {
   const { name, nameAr, sku, price, costPrice, initialQuantity, minStock } = req.body;
   if (!name || !sku) throw new ValidationError('Name and SKU are required');
-  const existing = await prisma.inventoryItem.findUnique({ where: { sku } });
+  const existing = await prisma.inventoryItem.findFirst({ where: { sku } });
   if (existing) throw new ConflictError('Item with this SKU already exists');
   const item = await prisma.inventoryItem.create({
     data: {
@@ -59,7 +59,7 @@ router.put('/:id', authenticate, requirePermission(PERMISSIONS.OPTICS_WRITE), as
   const existing = await prisma.inventoryItem.findFirst({ where: { id, category: 'optics' } });
   if (!existing) throw new NotFoundError('Item not found');
   if (sku && sku !== existing.sku) {
-    const dupe = await prisma.inventoryItem.findUnique({ where: { sku } });
+    const dupe = await prisma.inventoryItem.findFirst({ where: { sku } });
     if (dupe) throw new ConflictError('SKU already in use');
   }
   const item = await prisma.inventoryItem.update({

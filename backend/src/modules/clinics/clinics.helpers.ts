@@ -166,7 +166,7 @@ export async function completeScreening(optometryAppointmentId: string, userId: 
       </div>`,
     thermalText: [
       '================================',
-      '  AL JAWAHIR HOSPITAL',
+      '  HMS',
       '  Optometry Pre-Screening',
       '================================',
       '',
@@ -212,7 +212,7 @@ export async function generatePrintData(clinicalRecordId: string) {
   return {
     htmlPrint: `
       <div style="font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 40px;">
-        <h1 style="text-align: center; font-size: 24px; margin-bottom: 8px;">AL Jawahir Hospital</h1>
+        <h1 style="text-align: center; font-size: 24px; margin-bottom: 8px;">HMS</h1>
         <p style="text-align: center; color: #666; margin-bottom: 24px;">Optometry Pre-Screening Report</p>
         <div style="border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
           <h2 style="font-size: 18px; margin-bottom: 12px;">Patient Information</h2>
@@ -249,13 +249,13 @@ export async function generatePrintData(clinicalRecordId: string) {
           <p style="white-space: pre-wrap;">${record.notes}</p>
         </div>` : ''}
         <div style="text-align: center; color: #999; font-size: 12px; margin-top: 32px; border-top: 1px solid #ddd; padding-top: 16px;">
-          <p>AL Jawahir Hospital &mdash; Optometry Department</p>
+          <p>HMS &mdash; Optometry Department</p>
           <p>Report generated on ${new Date(record.encounterDate).toLocaleString()}</p>
         </div>
       </div>`,
     thermalText: [
       '================================',
-      '  AL JAWAHIR HOSPITAL',
+      '  HMS',
       '  Optometry Pre-Screening',
       '================================',
       '',

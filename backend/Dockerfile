@@ -1,20 +1,23 @@
-FROM node:20-alpine AS build
+FROM node:22-alpine AS builder
 WORKDIR /app
-COPY package*.json ./
+COPY package.json package-lock.json ./
 RUN npm ci
+COPY tsconfig.json ./
 COPY prisma/ ./prisma/
 RUN npx prisma generate
-COPY . .
+COPY src/ ./src/
 RUN npm run build
 
-FROM node:20-alpine AS production
-RUN apk add --no-cache openssl
+FROM node:22-alpine AS runner
 WORKDIR /app
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/package*.json ./
-COPY --from=build /app/prisma ./prisma
-COPY docker-entrypoint.sh /app/
-RUN chmod +x /app/docker-entrypoint.sh
-EXPOSE 4001
-CMD ["/app/docker-entrypoint.sh"]
+RUN apk add --no-cache curl
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/dist ./dist
+COPY prisma/ ./prisma/
+RUN npx prisma generate
+EXPOSE 4000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD curl -f http://localhost:4000/api/health || exit 1
+CMD ["node", "dist/server.js"]

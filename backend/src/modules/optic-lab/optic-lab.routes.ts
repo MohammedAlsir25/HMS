@@ -23,11 +23,11 @@ function requireAnyPermission(...permissions: string[]) {
   };
 }
 
-async function generateJobNumber() {
+async function generateJobNumber(hospitalId: string) {
   const today = new Date();
   const prefix = `LJ-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
   const count = await prisma.opticLabJob.count({
-    where: { jobNumber: { startsWith: prefix } },
+    where: { hospitalId, jobNumber: { startsWith: prefix } },
   });
   return `${prefix}-${String(count + 1).padStart(3, '0')}`;
 }
@@ -66,7 +66,7 @@ router.post('/jobs', authenticate, requireAnyPermission(PERMISSIONS.OPTIC_LAB_WR
   if (!transaction) throw new NotFoundError('Transaction not found');
   const existing = await prisma.opticLabJob.findUnique({ where: { transactionId: body.transactionId } });
   if (existing) throw new ConflictError('Lab job already exists for this transaction');
-  const jobNumber = await generateJobNumber();
+  const jobNumber = await generateJobNumber(req.user!.hospitalId!);
   const job = await prisma.opticLabJob.create({
     data: {
       jobNumber,
@@ -125,6 +125,7 @@ router.put('/jobs/:id/status', authenticate, requireAnyPermission(PERMISSIONS.OP
 router.get('/customers', authenticate, requireAnyPermission(PERMISSIONS.OPTIC_LAB_READ, PERMISSIONS.OPTICS_READ), asyncHandler(async (_req, res) => {
   const jobs = await prisma.opticLabJob.findMany({
     where: { customerName: { not: null } },
+    take: 500,
     orderBy: { createdAt: 'desc' },
     select: {
       customerName: true,

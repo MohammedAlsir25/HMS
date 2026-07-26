@@ -6,6 +6,34 @@ export const scheduleFollowUpSchema = z.object({
   notes: z.string().optional().nullable(),
 });
 
+export const createLabOrderSchema = z.object({
+  patientId: z.string().uuid('Invalid patient ID'),
+  testIds: z.array(z.string().uuid()).min(1, 'At least one test is required'),
+  panelId: z.string().uuid().optional().nullable(),
+  clinicalNotes: z.string().optional().nullable(),
+  priority: z.number().int().min(0).max(5).optional().default(0),
+});
+
+export const createImagingOrderSchema = z.object({
+  patientId: z.string().uuid('Invalid patient ID'),
+  scanType: z.enum(['A_SCAN', 'B_SCAN', 'OTT', 'BIOMETRY']),
+  laterality: z.enum(['Left', 'Right', 'Both']).optional().nullable(),
+  clinicalInfo: z.string().optional().nullable(),
+  procedureTypeId: z.string().uuid().optional().nullable(),
+});
+
+export const createTemplateSchema = z.object({
+  name: z.string().min(1, 'Template name is required').max(100),
+  sections: z.array(z.object({
+    title: z.string(),
+    fieldType: z.enum(['text', 'textarea', 'number', 'select', 'checkbox']),
+    fieldName: z.string(),
+    defaultValue: z.string().optional(),
+    options: z.array(z.string()).optional(),
+    required: z.boolean().optional(),
+  })).optional().default([]),
+});
+
 export const completeScreeningSchema = z.object({
   optometryAppointmentId: z.string().uuid('Invalid appointment ID'),
   diagnosis: z.string().optional().nullable(),

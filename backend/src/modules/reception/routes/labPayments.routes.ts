@@ -38,7 +38,7 @@ router.post('/lab/pay', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_W
     shift = await prisma.shift.create({ data: { userId: req.user!.id } });
   }
 
-  const labDept = await prisma.department.findUnique({ where: { slug: 'lab-dept' } });
+  const labDept = await prisma.department.findFirst({ where: { slug: 'lab-dept' } });
 
   const [transaction] = await prisma.$transaction([
     prisma.transaction.create({

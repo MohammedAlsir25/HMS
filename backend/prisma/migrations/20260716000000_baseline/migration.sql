@@ -1,0 +1,2 @@
+-- Baseline: existing database created outside of Prisma migrations.
+-- All tables and enums already exist in the production database.

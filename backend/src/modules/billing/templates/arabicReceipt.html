@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>إيصال - {{hospitalName}}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Noto Kufi Arabic', 'Segoe UI', Tahoma, sans-serif;
+      background: #f5f5f5;
+      color: #1a1a2e;
+      direction: rtl;
+      text-align: right;
+    }
+    .receipt-container {
+      max-width: 400px;
+      margin: 20px auto;
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .receipt-header {
+      background: linear-gradient(135deg, #1a1a6c 0%, #2d2d8e 100%);
+      color: #fff;
+      padding: 24px 20px;
+      text-align: center;
+    }
+    .receipt-header .hospital-name {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .receipt-header .hospital-address {
+      font-size: 11px;
+      opacity: 0.85;
+      line-height: 1.5;
+    }
+    .receipt-body {
+      padding: 20px;
+    }
+    .receipt-title {
+      text-align: center;
+      font-size: 22px;
+      font-weight: 700;
+      color: #1a1a6c;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 2px dashed #ddd;
+    }
+    .receipt-field {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #f5f5f5;
+      font-size: 14px;
+    }
+    .receipt-field .field-label {
+      color: #888;
+      font-weight: 500;
+    }
+    .receipt-field .field-value {
+      font-weight: 600;
+      color: #1a1a2e;
+    }
+    .receipt-amount-box {
+      margin: 16px 0;
+      padding: 16px;
+      background: #f0f0f8;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .receipt-amount-box .amount-label {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 4px;
+    }
+    .receipt-amount-box .amount-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1a1a6c;
+    }
+    .receipt-amount-box .amount-words {
+      font-size: 12px;
+      color: #666;
+      margin-top: 6px;
+      font-style: italic;
+    }
+    .receipt-divider {
+      border: none;
+      border-top: 2px dashed #ddd;
+      margin: 16px 0;
+    }
+    .receipt-barcode {
+      text-align: center;
+      margin: 16px 0 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      letter-spacing: 2px;
+      color: #333;
+    }
+    .receipt-barcode-lines {
+      text-align: center;
+      margin: 4px auto;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1px;
+    }
+    .receipt-barcode-lines span {
+      display: inline-block;
+      height: 35px;
+      background: #1a1a2e;
+    }
+    .receipt-footer {
+      padding: 16px 20px;
+      background: #fafafa;
+      border-top: 1px solid #e8e8e8;
+      text-align: center;
+      font-size: 11px;
+      color: #888;
+    }
+    .receipt-footer .thank-you {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a1a6c;
+      margin-bottom: 4px;
+    }
+    @media print {
+      body { background: #fff; }
+      .receipt-container {
+        border: none;
+        border-radius: 0;
+        margin: 0;
+        box-shadow: none;
+        max-width: 100%;
+      }
+      .receipt-header {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="receipt-container">
+    <div class="receipt-header">
+      <div class="hospital-name">{{hospitalName}}</div>
+      <div class="hospital-address">{{hospitalAddress}}</div>
+    </div>
+
+    <div class="receipt-body">
+      <div class="receipt-title">إيصال دفع</div>
+
+      <div class="receipt-field">
+        <span class="field-label">رقم الإيصال</span>
+        <span class="field-value">{{receiptNumber}}</span>
+      </div>
+      <div class="receipt-field">
+        <span class="field-label">التاريخ</span>
+        <span class="field-value">{{receiptDate}}</span>
+      </div>
+      <div class="receipt-field">
+        <span class="field-label">الساعة</span>
+        <span class="field-value">{{receiptTime}}</span>
+      </div>
+      <div class="receipt-field">
+        <span class="field-label">المريض</span>
+        <span class="field-value">{{patientName}}</span>
+      </div>
+      <div class="receipt-field">
+        <span class="field-label">رقم المريض</span>
+        <span class="field-value">{{patientMrn}}</span>
+      </div>
+      <div class="receipt-field">
+        <span class="field-label">رقم الفاتورة</span>
+        <span class="field-value">{{invoiceNumber}}</span>
+      </div>
+      <div class="receipt-field">
+        <span class="field-label">طريقة الدفع</span>
+        <span class="field-value">{{paymentMethod}}</span>
+      </div>
+
+      <hr class="receipt-divider" />
+
+      <div class="receipt-amount-box">
+        <div class="amount-label">المبلغ المدفوع</div>
+        <div class="amount-value">{{amountPaidFormatted}}</div>
+        <div class="amount-words">{{amountInWords}}</div>
+      </div>
+
+      {{#if remainingBalance}}
+      <div class="receipt-field">
+        <span class="field-label">المتبقي</span>
+        <span class="field-value" style="color: #e74c3c;">{{remainingBalanceFormatted}}</span>
+      </div>
+      {{/if}}
+
+      <hr class="receipt-divider" />
+
+      <div class="receipt-barcode-lines">
+        <span style="width:2px"></span><span style="width:1px"></span><span style="width:3px"></span>
+        <span style="width:1px"></span><span style="width:2px"></span><span style="width:1px"></span>
+        <span style="width:3px"></span><span style="width:1px"></span><span style="width:2px"></span>
+        <span style="width:1px"></span><span style="width:3px"></span><span style="width:2px"></span>
+        <span style="width:1px"></span><span style="width:2px"></span><span style="width:1px"></span>
+        <span style="width:3px"></span><span style="width:1px"></span><span style="width:2px"></span>
+        <span style="width:1px"></span><span style="width:2px"></span><span style="width:3px"></span>
+        <span style="width:1px"></span><span style="width:2px"></span><span style="width:1px"></span>
+        <span style="width:3px"></span><span style="width:2px"></span><span style="width:1px"></span>
+        <span style="width:2px"></span><span style="width:1px"></span><span style="width:3px"></span>
+      </div>
+      <div class="receipt-barcode">{{barcodeNumber}}</div>
+    </div>
+
+    <div class="receipt-footer">
+      <div class="thank-you">شكراً لزيارتكم</div>
+      <div>{{hospitalName}}</div>
+    </div>
+  </div>
+</body>
+</html>

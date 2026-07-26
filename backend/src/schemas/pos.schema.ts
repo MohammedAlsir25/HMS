@@ -13,6 +13,15 @@ export const posTransactSchema = z.object({
   amount: z.number().positive('amount is required'),
   description: z.string().optional().nullable(),
   patientName: z.string().optional().nullable(),
+  patientId: z.string().optional().nullable(),
+  insurancePolicyId: z.string().optional().nullable(),
   departmentId: z.string().optional().nullable(),
   referralId: z.string().optional().nullable(),
+});
+
+export const validateItemsSchema = z.object({
+  items: z.array(z.object({
+    id: z.string().min(1),
+    quantity: z.number().positive().optional().default(1),
+  })).min(1, 'items array is required'),
 });

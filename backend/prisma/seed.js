@@ -611,6 +611,28 @@ async function main() {
   }
   console.log(`Seeded ${eventTypeNames.length} intraoperative event types.`);
 
+  // Seed operation types
+  const surgeryDept = await prisma.department.findFirst({ where: { slug: 'surgery-dept' } });
+  if (surgeryDept) {
+    const operationTypes = [
+      { name: 'Cataract Surgery', nameAr: 'جراحة الساد', price: 5000 },
+      { name: 'Vitrectomy', nameAr: 'استئصال الزجاجية', price: 8000 },
+      { name: 'LASIK', nameAr: 'الليزك', price: 3000 },
+      { name: 'Trabeculectomy', nameAr: 'استئصال الترابيق', price: 6000 },
+      { name: 'Ptosis Repair', nameAr: 'إصلاح تدلي الجفن', price: 4500 },
+      { name: 'Entropion Repair', nameAr: 'إصلاح الشتر الداخلي', price: 3500 },
+      { name: 'Enucleation', nameAr: 'استئصال العين', price: 7000 },
+      { name: 'Orbital Decompression', nameAr: 'تخفيف ضغط المحجر', price: 9000 },
+    ];
+    for (const op of operationTypes) {
+      const existing = await prisma.operationType.findFirst({ where: { name: op.name, departmentId: surgeryDept.id } });
+      if (!existing) await prisma.operationType.create({ data: { ...op, departmentId: surgeryDept.id } });
+    }
+    console.log(`Seeded ${operationTypes.length} operation types.`);
+  } else {
+    console.warn('Surgery department not found — skipping operation type seeding.');
+  }
+
   // Seed PreOp Office user
   await prisma.user.upsert({
     where: { email: 'preop@aljawarih.sd' },
@@ -623,6 +645,46 @@ async function main() {
     },
   });
   console.log('Seeded PreOp Office user.');
+
+  // Seed chart of accounts
+  const chartOfAccounts = [
+    { code: '1100', name: 'Cash on Hand', type: 'ASSET' },
+    { code: '1200', name: 'Bank Account', type: 'ASSET' },
+    { code: '1300', name: 'Accounts Receivable', type: 'ASSET' },
+    { code: '1400', name: 'Inventory', type: 'ASSET' },
+    { code: '1500', name: 'Fixed Assets', type: 'ASSET' },
+    { code: '1600', name: 'Accumulated Depreciation', type: 'ASSET' },
+    { code: '2100', name: 'Accounts Payable', type: 'LIABILITY' },
+    { code: '2200', name: 'Accrued Expenses', type: 'LIABILITY' },
+    { code: '2300', name: 'Unearned Revenue', type: 'LIABILITY' },
+    { code: '3100', name: 'Opening Balance Equity', type: 'EQUITY' },
+    { code: '3200', name: 'Retained Earnings', type: 'EQUITY' },
+    { code: '3300', name: 'Current Year Earnings', type: 'EQUITY' },
+    { code: '4100', name: 'Consultation Revenue', type: 'REVENUE' },
+    { code: '4200', name: 'Surgery Revenue', type: 'REVENUE' },
+    { code: '4300', name: 'Lab Revenue', type: 'REVENUE' },
+    { code: '4400', name: 'Imaging Revenue', type: 'REVENUE' },
+    { code: '4500', name: 'Pharmacy Revenue', type: 'REVENUE' },
+    { code: '4600', name: 'Ward Revenue', type: 'REVENUE' },
+    { code: '4900', name: 'Other Revenue', type: 'REVENUE' },
+    { code: '5100', name: 'Salaries', type: 'EXPENSE' },
+    { code: '5200', name: 'Supplies', type: 'EXPENSE' },
+    { code: '5300', name: 'Utilities', type: 'EXPENSE' },
+    { code: '5400', name: 'Rent', type: 'EXPENSE' },
+    { code: '5500', name: 'Equipment', type: 'EXPENSE' },
+    { code: '5600', name: 'Maintenance', type: 'EXPENSE' },
+    { code: '5700', name: 'Marketing', type: 'EXPENSE' },
+    { code: '5800', name: 'Depreciation', type: 'EXPENSE' },
+    { code: '5900', name: 'Other Expenses', type: 'EXPENSE' },
+  ];
+
+  for (const acct of chartOfAccounts) {
+    const existing = await prisma.account.findFirst({ where: { code: acct.code } });
+    if (!existing) {
+      await prisma.account.create({ data: acct });
+    }
+  }
+  console.log(`Seeded ${chartOfAccounts.length} chart of accounts entries.`);
 
   console.log('Seed complete.');
 }

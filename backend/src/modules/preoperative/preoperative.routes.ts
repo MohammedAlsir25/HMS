@@ -6,6 +6,7 @@ import { PERMISSIONS } from '../../middleware/rbac.js';
 import { auditMiddleware } from '../../middleware/auditLog.js';
 
 const router = Router();
+import { Prisma } from '@prisma/client';
 import prisma from '../../lib/prisma.js';
 
 const REQUEST_INCLUDE = {
@@ -302,7 +303,7 @@ router.patch('/operation-types/:id', authenticate, requirePermission(PERMISSIONS
   if (name !== undefined) data.name = name;
   if (nameAr !== undefined) data.nameAr = nameAr;
   if (isActive !== undefined) data.isActive = isActive;
-  const type = await prisma.operationType.update({ where: { id: req.params.id }, data });
+  const type = await prisma.operationType.update({ where: { id: req.params.id }, data: data as Prisma.OperationTypeUpdateInput });
   res.json(type);
 }));
 

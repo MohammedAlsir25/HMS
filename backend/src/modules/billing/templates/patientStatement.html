@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Patient Statement - {{hospitalName}}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', 'Segoe UI', Tahoma, sans-serif;
+      background: #f5f5f5;
+      color: #1a1a2e;
+    }
+    .statement-container {
+      max-width: 850px;
+      margin: 20px auto;
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .statement-header {
+      background: linear-gradient(135deg, #1a1a6c 0%, #2d2d8e 100%);
+      color: #fff;
+      padding: 30px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .hospital-info { flex: 1; }
+    .hospital-name {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .hospital-address {
+      font-size: 12px;
+      opacity: 0.85;
+      line-height: 1.5;
+    }
+    .statement-title-block {
+      text-align: center;
+      min-width: 200px;
+    }
+    .statement-title {
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .statement-subtitle {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+    .statement-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 16px;
+      padding: 20px 40px;
+      background: #fafafa;
+      border-bottom: 1px solid #e8e8e8;
+    }
+    .meta-item label {
+      display: block;
+      font-size: 11px;
+      color: #888;
+      margin-bottom: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .meta-item span {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a1a2e;
+    }
+    .transactions-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .transactions-table thead {
+      background: #f0f0f5;
+    }
+    .transactions-table th {
+      padding: 12px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #555;
+      text-align: left;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 2px solid #ddd;
+    }
+    .transactions-table th.right { text-align: right; }
+    .transactions-table td {
+      padding: 12px 16px;
+      font-size: 14px;
+      border-bottom: 1px solid #f0f0f0;
+      text-align: left;
+    }
+    .transactions-table td.right { text-align: right; }
+    .transactions-table td.amount {
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .transactions-table td.debit { color: #e74c3c; }
+    .transactions-table td.credit { color: #27ae60; }
+    .transactions-table tbody tr:hover {
+      background: #fafaff;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .status-paid {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+    .status-pending {
+      background: #fff3e0;
+      color: #e65100;
+    }
+    .status-partial {
+      background: #fff8e1;
+      color: #f57f17;
+    }
+    .status-voided {
+      background: #f5f5f5;
+      color: #999;
+      text-decoration: line-through;
+    }
+    .balance-summary {
+      padding: 25px 40px;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .balance-box {
+      width: 350px;
+      border: 2px solid #1a1a6c;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .balance-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 20px;
+      font-size: 14px;
+    }
+    .balance-row:nth-child(even) {
+      background: #fafaff;
+    }
+    .balance-row.total {
+      background: #1a1a6c;
+      color: #fff;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .statement-footer {
+      padding: 20px 40px;
+      background: #fafafa;
+      border-top: 1px solid #e8e8e8;
+      font-size: 11px;
+      color: #888;
+      display: flex;
+      justify-content: space-between;
+    }
+    @media print {
+      body { background: #fff; }
+      .statement-container {
+        border: none;
+        border-radius: 0;
+        margin: 0;
+        box-shadow: none;
+      }
+      .statement-header {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .balance-row.total {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="statement-container">
+    <div class="statement-header">
+      <div class="hospital-info">
+        <div class="hospital-name">{{hospitalName}}</div>
+        <div class="hospital-address">{{hospitalAddress}}</div>
+      </div>
+      <div class="statement-title-block">
+        <div class="statement-title">Patient Statement</div>
+        <div class="statement-subtitle">كشف حساب المريض</div>
+      </div>
+    </div>
+
+    <div class="statement-meta">
+      <div class="meta-item">
+        <label>Patient Name</label>
+        <span>{{patientName}}</span>
+      </div>
+      <div class="meta-item">
+        <label>MRN</label>
+        <span>{{patientMrn}}</span>
+      </div>
+      <div class="meta-item">
+        <label>Statement Period</label>
+        <span>{{periodFrom}} — {{periodTo}}</span>
+      </div>
+      <div class="meta-item">
+        <label>Generated On</label>
+        <span>{{generatedDate}}</span>
+      </div>
+    </div>
+
+    <div style="padding: 0;">
+      <table class="transactions-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Description</th>
+            <th>Invoice #</th>
+            <th>Status</th>
+            <th class="right">Amount</th>
+            <th class="right">Paid</th>
+            <th class="right">Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each transactions}}
+          <tr>
+            <td>{{this.date}}</td>
+            <td>{{this.description}}</td>
+            <td>{{this.invoiceNumber}}</td>
+            <td>
+              <span class="status-badge status-{{this.statusClass}}">{{this.statusLabel}}</span>
+            </td>
+            <td class="right amount debit">{{this.amountFormatted}}</td>
+            <td class="right amount credit">{{this.paidFormatted}}</td>
+            <td class="right amount {{this.balanceClass}}">{{this.balanceFormatted}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="balance-summary">
+      <div class="balance-box">
+        <div class="balance-row">
+          <span>Total Invoiced</span>
+          <span>{{totalInvoicedFormatted}}</span>
+        </div>
+        <div class="balance-row">
+          <span>Total Paid</span>
+          <span>{{totalPaidFormatted}}</span>
+        </div>
+        <div class="balance-row">
+          <span>Insurance Covered</span>
+          <span>{{insuranceCoveredFormatted}}</span>
+        </div>
+        <div class="balance-row">
+          <span>Credit Memos</span>
+          <span>{{creditMemosFormatted}}</span>
+        </div>
+        <div class="balance-row total">
+          <span>Outstanding Balance</span>
+          <span>{{outstandingBalanceFormatted}}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="statement-footer">
+      <div>{{hospitalName}} — {{hospitalPhone}}</div>
+      <div>This is a computer-generated statement.</div>
+    </div>
+  </div>
+</body>
+</html>

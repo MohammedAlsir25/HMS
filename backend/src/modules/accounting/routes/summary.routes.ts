@@ -201,4 +201,70 @@ router.get('/pnl', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_READ),
   res.json({ departments: deptRows, totals });
 }));
 
+router.get('/balance-sheet', authenticate, requirePermission(PERMISSIONS.ACCOUNTING_READ), asyncHandler(async (req, res) => {
+  const asOfDate = req.query.asOfDate as string | undefined;
+  const date = asOfDate ? new Date(asOfDate) : new Date();
+  date.setHours(23, 59, 59, 999);
+
+  const allLines = await prisma.journalEntryLine.findMany({
+    where: { entry: { date: { lte: date } } },
+    include: { account: true },
+  });
+
+  const accountBalances: Record<string, { accountId: string; accountCode: string; accountName: string; accountType: string; debit: number; credit: number }> = {};
+
+  for (const line of allLines) {
+    const key = line.accountId;
+    if (!accountBalances[key]) {
+      accountBalances[key] = {
+        accountId: line.accountId,
+        accountCode: line.account.code,
+        accountName: line.account.name,
+        accountType: line.account.type,
+        debit: 0,
+        credit: 0,
+      };
+    }
+    accountBalances[key].debit += Number(line.debit);
+    accountBalances[key].credit += Number(line.credit);
+  }
+
+  const accountsByType: Record<string, Array<{ code: string; name: string; balance: number }>> = {
+    ASSET: [], LIABILITY: [], EQUITY: [], REVENUE: [], EXPENSE: [],
+  };
+
+  for (const ab of Object.values(accountBalances)) {
+    let balance: number;
+    if (ab.accountType === 'ASSET' || ab.accountType === 'EXPENSE') {
+      balance = ab.debit - ab.credit;
+    } else {
+      balance = ab.credit - ab.debit;
+    }
+    accountsByType[ab.accountType]?.push({
+      code: ab.accountCode,
+      name: ab.accountName,
+      balance,
+    });
+  }
+
+  const assetsTotal = (accountsByType.ASSET ?? []).reduce((s, a) => s + a.balance, 0);
+  const liabilitiesTotal = (accountsByType.LIABILITY ?? []).reduce((s, a) => s + a.balance, 0);
+  const equityTotal = (accountsByType.EQUITY ?? []).reduce((s, a) => s + a.balance, 0);
+  const revenueTotal = (accountsByType.REVENUE ?? []).reduce((s, a) => s + a.balance, 0);
+  const expenseTotal = (accountsByType.EXPENSE ?? []).reduce((s, a) => s + a.balance, 0);
+  const netIncome = revenueTotal - expenseTotal;
+  const totalEquity = equityTotal + netIncome;
+  const balanceCheck = Math.abs(assetsTotal - (liabilitiesTotal + totalEquity)) < 0.02;
+
+  res.json({
+    asOfDate: date,
+    assets: { total: assetsTotal, byAccount: accountsByType.ASSET ?? [] },
+    liabilities: { total: liabilitiesTotal, byAccount: accountsByType.LIABILITY ?? [] },
+    equity: { total: totalEquity, byAccount: [...(accountsByType.EQUITY ?? []), { code: '0000', name: 'Net Income', balance: netIncome }] },
+    revenue: { total: revenueTotal, byAccount: accountsByType.REVENUE ?? [] },
+    expenses: { total: expenseTotal, byAccount: accountsByType.EXPENSE ?? [] },
+    balanceCheck,
+  });
+}));
+
 export default router;

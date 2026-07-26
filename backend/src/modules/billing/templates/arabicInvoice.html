@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>فاتورة - {{hospitalName}}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Noto Kufi Arabic', 'Segoe UI', Tahoma, sans-serif;
+      background: #f5f5f5;
+      color: #1a1a2e;
+      direction: rtl;
+      text-align: right;
+    }
+    .invoice-container {
+      max-width: 800px;
+      margin: 20px auto;
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .invoice-header {
+      background: linear-gradient(135deg, #1a1a6c 0%, #2d2d8e 100%);
+      color: #fff;
+      padding: 30px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .hospital-info { flex: 1; }
+    .hospital-name {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .hospital-address {
+      font-size: 13px;
+      opacity: 0.85;
+      line-height: 1.6;
+    }
+    .invoice-title-block {
+      text-align: center;
+      min-width: 180px;
+    }
+    .invoice-title {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .invoice-number {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+    .invoice-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 20px;
+      padding: 25px 40px;
+      background: #fafafa;
+      border-bottom: 1px solid #e8e8e8;
+    }
+    .meta-item label {
+      display: block;
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+    .meta-item span {
+      font-size: 15px;
+      font-weight: 600;
+      color: #1a1a2e;
+    }
+    .patient-section {
+      padding: 20px 40px;
+      border-bottom: 1px solid #e8e8e8;
+    }
+    .patient-section h3 {
+      font-size: 14px;
+      color: #888;
+      margin-bottom: 8px;
+    }
+    .patient-details {
+      display: flex;
+      gap: 40px;
+    }
+    .patient-details .detail {
+      font-size: 14px;
+    }
+    .patient-details .detail label {
+      color: #888;
+      font-size: 12px;
+      margin-left: 6px;
+    }
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .items-table thead {
+      background: #f0f0f5;
+    }
+    .items-table th {
+      padding: 12px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #555;
+      text-align: right;
+      border-bottom: 2px solid #ddd;
+    }
+    .items-table th.num {
+      text-align: center;
+      width: 60px;
+    }
+    .items-table td {
+      padding: 12px 16px;
+      font-size: 14px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .items-table td.num {
+      text-align: center;
+    }
+    .items-table td.price {
+      text-align: left;
+      white-space: nowrap;
+    }
+    .items-table tbody tr:hover {
+      background: #fafaff;
+    }
+    .summary-section {
+      padding: 25px 40px;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .summary-box {
+      width: 320px;
+    }
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      font-size: 14px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .summary-row.total {
+      border-bottom: none;
+      border-top: 2px solid #1a1a6c;
+      margin-top: 4px;
+      padding-top: 12px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #1a1a6c;
+    }
+    .summary-row .label {
+      color: #555;
+    }
+    .insurance-row .value {
+      color: #27ae60;
+      font-weight: 600;
+    }
+    .responsibility-row .value {
+      color: #e74c3c;
+      font-weight: 600;
+    }
+    .invoice-footer {
+      padding: 20px 40px;
+      background: #fafafa;
+      border-top: 1px solid #e8e8e8;
+      text-align: center;
+      font-size: 12px;
+      color: #888;
+    }
+    .invoice-footer .thank-you {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1a1a6c;
+      margin-bottom: 6px;
+    }
+    .stamp-area {
+      margin-top: 30px;
+      display: flex;
+      justify-content: space-between;
+      padding: 0 40px 30px;
+    }
+    .stamp-box {
+      width: 180px;
+      height: 80px;
+      border: 1px dashed #ccc;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: #aaa;
+    }
+    @media print {
+      body { background: #fff; }
+      .invoice-container {
+        border: none;
+        border-radius: 0;
+        margin: 0;
+        box-shadow: none;
+      }
+      .invoice-header {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="invoice-container">
+    <div class="invoice-header">
+      <div class="hospital-info">
+        <div class="hospital-name">{{hospitalName}}</div>
+        <div class="hospital-address">{{hospitalAddress}}</div>
+      </div>
+      <div class="invoice-title-block">
+        <div class="invoice-title">فاتورة</div>
+        <div class="invoice-number">رقم: {{invoiceNumber}}</div>
+      </div>
+    </div>
+
+    <div class="invoice-meta">
+      <div class="meta-item">
+        <label>رقم الفاتورة</label>
+        <span>{{invoiceNumber}}</span>
+      </div>
+      <div class="meta-item">
+        <label>تاريخ الفاتورة</label>
+        <span>{{invoiceDate}}</span>
+      </div>
+      <div class="meta-item">
+        <label>تاريخ الاستحقاق</label>
+        <span>{{dueDate}}</span>
+      </div>
+    </div>
+
+    <div class="patient-section">
+      <h3>بيانات المريض</h3>
+      <div class="patient-details">
+        <div class="detail">
+          <span>{{patientNameAr}}</span>
+          <label>({{patientNameEn}})</label>
+        </div>
+        <div class="detail">
+          <label>رقم المريض:</label>
+          <span>{{patientMrn}}</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding: 0;">
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th class="num">#</th>
+            <th>الخدمة</th>
+            <th class="num">الكمية</th>
+            <th>سعر الوحدة</th>
+            <th>الإجمالي</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each items}}
+          <tr>
+            <td class="num">{{@index1}}</td>
+            <td>{{this.description}}</td>
+            <td class="num">{{this.quantity}}</td>
+            <td class="price">{{this.unitPriceFormatted}}</td>
+            <td class="price">{{this.totalFormatted}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="summary-section">
+      <div class="summary-box">
+        <div class="summary-row">
+          <span class="label">الفرعي</span>
+          <span>{{subtotalFormatted}}</span>
+        </div>
+        {{#if discountAmount}}
+        <div class="summary-row">
+          <span class="label">الخصم</span>
+          <span style="color: #e74c3c;">-{{discountFormatted}}</span>
+        </div>
+        {{/if}}
+        {{#if taxAmount}}
+        <div class="summary-row">
+          <span class="label">الضريبة</span>
+          <span>{{taxFormatted}}</span>
+        </div>
+        {{/if}}
+        {{#if insuranceCoverage}}
+        <div class="summary-row insurance-row">
+          <span class="label">تغطية التأمين</span>
+          <span class="value">-{{insuranceCoverageFormatted}}</span>
+        </div>
+        {{/if}}
+        <div class="summary-row">
+          <span class="label">مسؤولية المريض</span>
+          <span>{{patientResponsibilityFormatted}}</span>
+        </div>
+        <div class="summary-row total">
+          <span class="label">المجموع</span>
+          <span>{{totalFormatted}}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stamp-area">
+      <div class="stamp-box">ختم المستشفى</div>
+      <div class="stamp-box">توقيع المريض</div>
+    </div>
+
+    <div class="invoice-footer">
+      <div class="thank-you">شكراً لثقتكم بنا</div>
+      <div>{{hospitalName}} - {{hospitalPhone}}</div>
+    </div>
+  </div>
+</body>
+</html>
