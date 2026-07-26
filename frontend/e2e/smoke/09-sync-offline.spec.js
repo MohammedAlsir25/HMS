@@ -44,7 +44,7 @@ async function indexedDbTableCount(page, tableName) {
   return page.evaluate(async (tbl) => {
     try {
       const db = await new Promise((resolve, reject) => {
-        const req = indexedDB.open('al-jawarih');
+        const req = indexedDB.open('hms');
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
       });
@@ -64,7 +64,7 @@ async function indexedDbStoreNames(page) {
   return page.evaluate(async () => {
     try {
       const db = await new Promise((resolve, reject) => {
-        const req = indexedDB.open('al-jawarih');
+        const req = indexedDB.open('hms');
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
       });
@@ -77,7 +77,7 @@ async function indexedDbMetaValue(page, key) {
   return page.evaluate(async (k) => {
     try {
       const db = await new Promise((resolve, reject) => {
-        const req = indexedDB.open('al-jawarih');
+        const req = indexedDB.open('hms');
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
       });

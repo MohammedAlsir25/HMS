@@ -24,16 +24,15 @@ describe('ReceptionPage', () => {
     render(<WithRouter><ReceptionPage /></WithRouter>);
     expect(screen.getByText('reception.title')).toBeInTheDocument();
     expect(screen.getByText('reception.description')).toBeInTheDocument();
-    expect(screen.getByText('reception.newPatient')).toBeInTheDocument();
+    expect(screen.getByText('reception.checkin')).toBeInTheDocument();
     expect(screen.getByText('reception.reservations')).toBeInTheDocument();
     expect(screen.getAllByText('reception.queue').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('renders search area and register form on new patient tab', () => {
+  it('renders search area on checkin tab', () => {
     render(<WithRouter><ReceptionPage /></WithRouter>);
-    fireEvent.click(screen.getByText('reception.newPatient'));
+    fireEvent.click(screen.getByText('reception.checkin'));
     expect(screen.getByText('reception.search')).toBeInTheDocument();
-    expect(screen.getByText('reception.registerPatient')).toBeInTheDocument();
   });
 });
 
