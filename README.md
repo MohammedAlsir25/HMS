@@ -1,18 +1,18 @@
 # HMS
 
-[![Backend CI](https://github.com/moham/AL-Jawahir-Hospital/actions/workflows/backend.yml/badge.svg)](https://github.com/moham/AL-Jawahir-Hospital/actions/workflows/backend.yml)
-[![Frontend CI](https://github.com/moham/AL-Jawahir-Hospital/actions/workflows/frontend.yml/badge.svg)](https://github.com/moham/AL-Jawahir-Hospital/actions/workflows/frontend.yml)
+[![CI](https://github.com/MohammedAlsir25/HMS/actions/workflows/ci.yml/badge.svg)](https://github.com/MohammedAlsir25/HMS/actions/workflows/ci.yml)
 
-Hospital management system — reception, clinics, surgery, referrals, lab, pharmacy, optics, inventory, accounting, HR, and AI-powered diagnosis support.
+Hospital management system — a multi-tenant SaaS platform by **Tass.co** for managing reception, clinics, surgery, referrals, lab, pharmacy, optics, inventory, accounting, HR, insurance, emergency, patient portal, FHIR R4 interoperability, and more.
 
 ## Tech Stack
 
 | Layer | Stack |
 |-------|-------|
-| **Backend** | Node.js 20+, Express 4, TypeScript 5 (strict: true), Prisma 5, PostgreSQL 16, Supabase |
-| **Frontend** | React 18, Vite, Tailwind CSS 4, TypeScript, TanStack Query, Zustand, i18next, Vitest, Playwright |
-| **Testing** | Jest (backend unit), Vitest (frontend unit), Playwright (E2E), Supertest (API), custom stress test |
-| **Infrastructure** | Docker Compose, Caddy (reverse proxy + auto HTTPS), Railway (backend), Netlify (frontend), GitHub Actions (CI/CD) |
+| **Backend** | Node.js 20+, Express 4, TypeScript 6 (strict: true), Prisma 5, PostgreSQL 16, Redis 7, BullMQ |
+| **Frontend** | React 18, Vite, Tailwind CSS 4, TanStack Query v5, Zustand, i18next (en/ar), Vitest, Playwright |
+| **Desktop** | Tauri v2 (EXE/APK), Capacitor (Android), offline-first sync via IndexedDB |
+| **Testing** | Jest (backend), Vitest (frontend), Playwright (E2E), Supertest (API) |
+| **Infrastructure** | Docker Compose, Caddy (reverse proxy + auto HTTPS), PgBouncer, Railway, Netlify, GitHub Actions CI |
 
 ## Setup
 
@@ -86,31 +86,42 @@ backend/
 ├── src/
 │   ├── modules/          # Domain modules (one per bounded context)
 │   │   ├── auth/         # JWT auth, refresh tokens, rate limiting
-│   │   ├── patients/     # CRUD, file upload/download via Supabase
-│   │   ├── appointments/ # Status & priority management
+│   │   ├── patients/     # CRUD, search, file upload/download, merge
+│   │   ├── appointments/ # Status & priority management, reminders
 │   │   ├── reception/    # Check-in, queue, reservations, waiting room
-│   │   ├── clinics/      # Clinical records, queue, dashboards
-│   │   ├── surgery/      # Surgery scheduling
+│   │   ├── clinics/      # Clinical records, queue, dashboards, templates
+│   │   ├── surgery/      # Surgery scheduling, Gantt, preoperative
 │   │   ├── referral/     # Internal/external referrals
-│   │   ├── lab/          # Test catalog, orders, results
+│   │   ├── lab/          # Test catalog, orders, results, sample tracking
 │   │   ├── pos/          # Pharmacy POS + Optics POS
-│   │   ├── inventory/    # Stock management, low-stock alerts
-│   │   ├── accounting/   # Shift management, expense tracking
-│   │   ├── hr/           # Employees, payroll, attendance, leaves
-│   │   ├── admin/        # User & role management
+│   │   ├── inventory/    # Stock management, low-stock alerts, barcode
+│   │   ├── accounting/   # Journal, invoices, AR aging, fixed assets, cost centers
+│   │   ├── hr/           # Employees, payroll, attendance, leaves, shifts
+│   │   ├── admin/        # User & role management, hospital CRUD
 │   │   ├── ai/           # AI diagnosis (Gemini API + mock)
 │   │   ├── departments/  # Department CRUD
-│   │   └── users/        # User profile & lookup
-│   ├── middleware/        # auth, rbac, validate, auditLog, errorHandler
-│   ├── config/           # Env config, CORS, constants
+│   │   ├── billing/      # Tap payments, multi-currency, Arabic PDF templates
+│   │   ├── emergency/    # Triage (ESI 5-level), rapid registration, dashboard
+│   │   ├── fhir/         # FHIR R4 resources, C-CDA, inbound handler
+│   │   ├── insurance/    # Companies, policies, claims, pre-auth, COB, denials
+│   │   ├── modality/     # DICOM worklist stubs
+│   │   ├── patient-portal/ # Patient auth, appointments, records, billing
+│   │   ├── pharmacy/     # Pharmacy dashboard
+│   │   ├── preoperative/ # Preop requests, consent, scheduling
+│   │   ├── procurement/  # Purchase orders, requisitions, cost centers
+│   │   ├── reports/      # Revenue, patient, occupancy, lab, surgery, HR reports
+│   │   └── sync/         # Offline-first sync engine
+│   ├── workers/          # BullMQ background jobs (statements, denials, payment plans)
+│   ├── middleware/        # auth, rbac, validate, auditLog, tenant, errorHandler
+│   ├── config/           # Env config, CORS, Redis, constants
 │   ├── schemas/          # Zod validation schemas
-│   ├── utils/            # errors, audit, encryption, supabase client
+│   ├── utils/            # errors, audit, encryption, name parser
 │   ├── lib/              # Prisma singleton
 │   └── types/            # Express type augmentations
 ├── prisma/
-│   ├── schema.prisma     # Full data model (19 models, 19 enums)
+│   ├── schema.prisma     # Full data model (93 models, 44 enums)
 │   └── migrations/       # Migration history
-└── tests/                # 21 test suites (198 tests + stress)
+└── tests/                # 32 test files (integration + unit)
 ```
 
 ### Frontend Structure
@@ -131,20 +142,31 @@ frontend/
 | Module | Route Prefix | Auth | Description |
 |--------|-------------|------|-------------|
 | Auth | `/api/auth` | Public + JWT | Login, refresh, profile |
-| Patients | `/api/patients` | Required | CRUD, search, file upload/download |
-| Appointments | `/api/appointments` | Required | Status transitions, priority |
-| Reception | `/api/reception` | Required | Check-in, queue, waiting room |
-| Clinics | `/api/clinics` | Required | Clinical records, vitals, queue dashboards |
-| Surgery | `/api/surgery` | Required | Scheduling |
+| Patients | `/api/patients` | Required | CRUD, search, duplicate detection, merge |
+| Appointments | `/api/appointments` | Required | Calendar, status transitions, reminders |
+| Reception | `/api/reception` | Required | Check-in, queue, waiting room, lab payments |
+| Clinics | `/api/clinics` | Required | Clinical records, vitals, templates, queue dashboards |
+| Surgery | `/api/surgery` | Required | Scheduling, Gantt, preoperative, discharge |
 | Referrals | `/api/referrals` | Required | Internal/external, pharmacy/lab dispatch |
-| Lab | `/api/lab` | Required | Tests, categories, orders, results |
+| Lab | `/api/lab` | Required | Tests, categories, orders, results, sample tracking |
 | POS | `/api/pos` | Required | Pharmacy + Optics transactions, shifts |
-| Inventory | `/api/inventory` | Required | Items, categories, stock alerts |
-| Accounting | `/api/accounting` | Required | Expenses, shifts, reports |
-| HR | `/api/hr` | Required | Employees, payroll, attendance |
-| Admin | `/api/admin` | Admin | Users, roles, permissions |
+| Inventory | `/api/inventory` | Required | Items, categories, stock alerts, barcode |
+| Accounting | `/api/accounting` | Required | Journal, invoices, AR aging, fixed assets, cost centers |
+| HR | `/api/hr` | Required | Employees, payroll, attendance, leaves, shifts |
+| Admin | `/api/admin` | Admin | Users, roles, permissions, hospital CRUD |
 | AI | `/api/ai` | Required | Diagnosis suggestions (Gemini/mock) |
 | Departments | `/api/departments` | Required | Lookup |
+| Billing | `/api/billing` | Required | Tap payments, multi-currency, Arabic PDF templates |
+| Emergency | `/api/emergency` | Required | Triage (ESI 5-level), rapid registration, dashboard |
+| FHIR | `/api/fhir/R4` | FHIR Auth | FHIR R4 resources, C-CDA, inbound handler |
+| Insurance | `/api/insurance` | Required | Companies, policies, claims, pre-auth, COB, denials |
+| Modality | `/api/modality` | Required | DICOM worklist stubs |
+| Patient Portal | `/api/portal` | Patient JWT | Patient auth, appointments, records, billing |
+| Pharmacy | `/api/pharmacy` | Required | Pharmacy dashboard |
+| Preoperative | `/api/preoperative` | Required | Preop requests, consent, scheduling |
+| Procurement | `/api/procurement` | Required | Purchase orders, requisitions, cost centers |
+| Reports | `/api/reports` | Required | Revenue, patient, occupancy, lab, surgery, HR reports |
+| Sync | `/api/sync` | Required | Offline-first sync engine |
 
 ## API Reference
 
@@ -199,9 +221,10 @@ FRONTEND_URL=http://localhost:5173
 | Script | Description |
 |--------|-------------|
 | `npm run dev` | Dev server with `tsx watch` |
-| `npm test` | Run all 21 test suites + stress |
+| `npm test` | Run all test suites |
+| `npm run test:ci` | CI-optimized test run (single worker) |
+| `npm run test:coverage` | Tests with coverage report |
 | `npm run typecheck` | `tsc --noEmit` (strict mode) |
-| `npm run test:stress` | 100 rapid + 50 concurrent request test |
 | `npm run prisma:seed` | Seed database with sample data |
 | `npm run lint` | ESLint |
 | `npm run backup` | Run database backup (see `scripts/backup.sh`) |
@@ -213,6 +236,8 @@ FRONTEND_URL=http://localhost:5173
 |--------|-------------|
 | `npm run dev` | Vite dev server |
 | `npm test` | Unit tests (Vitest) |
+| `npm run test:ci` | CI-optimized test run |
+| `npm run test:coverage` | Tests with coverage report |
 | `npm run build` | Production build |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
@@ -220,13 +245,9 @@ FRONTEND_URL=http://localhost:5173
 
 ## Database
 
-### Models (19)
+### Models (93) · Enums (44)
 
-User, Patient, PatientFile, Apppointment, ClinicAppointment, ClinicalRecord, Symptom, Medication, Surgery, Referral, ReferralMedication, DiagnosticOrder, DiagnosticTest, DiagnosticOrderTest, InventoryItem, InventoryTransaction, Transaction, Expense, Shift, Department, AuditLog, Employee, Payroll, Attendance, Leave, Role
-
-### Enums (19)
-
-ClinicType, DepartmentType, ExpenseCategory, DiabetesType, AppointmentType, AppointmentStatus, VisitType, ReferralType, ReferralStatus, SurgeryStatus, TransactionType, PaymentMethod, DiagnosticOrderType, DiagnosticOrderStatus, ResultFlag, PayrollStatus, AttendanceStatus, LeaveType, LeaveStatus
+See `backend/prisma/schema.prisma` for the full data model including: User, Patient, PatientFile, Appointment, ClinicalRecord, Symptom, Medication, Surgery, Referral, LabSample, LabOrder, LabResult, InventoryItem, Transaction, Expense, Employee, Payroll, Attendance, Leave, Role, InsuranceCompany, InsurancePolicy, PreAuthorization, InsuranceClaim, InsuranceSettlement, FhirEndpoint, TriageAssessment, PaymentPlan, PaymentInstallment, CreditMemo, Refund, BadDebtWriteOff, DenialAppeal, ClinicalTemplate, and 59 more.
 
 ### Migrations
 
@@ -285,7 +306,7 @@ cd backend && npm run test:stress
 GitHub Actions runs on push/PR to `main` via `.github/workflows/ci.yml`:
 
 - **Backend:** lint → typecheck → test
-- **Frontend:** lint → typecheck → build
+- **Frontend:** lint → typecheck → test → build
 
 ## Troubleshooting
 

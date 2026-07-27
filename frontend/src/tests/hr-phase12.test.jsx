@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
-vi.mock('../../hooks/queries/useHR', () => ({
+const testQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+vi.mock('../hooks/queries/useHR', () => ({
   useHREmployeeDetail: vi.fn(),
   useHRAttendance: vi.fn(),
   useHRLeaves: vi.fn(),
@@ -13,10 +16,10 @@ vi.mock('../../hooks/queries/useHR', () => ({
   useMyAttendance: vi.fn(),
   useMyLeaves: vi.fn(),
   useMyPayroll: vi.fn(),
-  useSubmitMyLeave: vi.fn(),
+  useSubmitMyLeave: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
-vi.mock('../../hooks/queries/useAdmin', () => ({
+vi.mock('../hooks/queries/useAdmin', () => ({
   useDepartments: vi.fn(() => ({ data: [] })),
   useAdminRoles: vi.fn(() => ({ data: [] })),
 }));
@@ -26,17 +29,26 @@ vi.mock('react-hot-toast', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-import EmployeeDetail from '../../features/hr/EmployeeDetail';
-import MyHRPage from '../../features/hr/MyHRPage';
-import { useHREmployeeDetail, useHRAttendance, useHRLeaves, useHRPayroll, useMyProfile, useMyAttendance, useMyLeaves, useMyPayroll } from '../../hooks/queries/useHR';
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key) => key,
+    i18n: { changeLanguage: vi.fn() },
+  }),
+}));
+
+import EmployeeDetail from '../features/hr/EmployeeDetail';
+import MyHRPage from '../features/hr/MyHRPage';
+import { useHREmployeeDetail, useHRAttendance, useHRLeaves, useHRPayroll, useMyProfile, useMyAttendance, useMyLeaves, useMyPayroll } from '../hooks/queries/useHR';
 
 function renderWithRouter(ui, { route = '/' } = {}) {
   return render(
-    <MemoryRouter initialEntries={[route]}>
-      <Routes>
-        <Route path="*" element={ui} />
-      </Routes>
-    </MemoryRouter>
+    <QueryClientProvider client={testQueryClient}>
+      <MemoryRouter initialEntries={[route]}>
+        <Routes>
+          <Route path="*" element={ui} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 }
 
@@ -74,7 +86,7 @@ describe('EmployeeDetail', () => {
     useHRLeaves.mockReturnValue({ data: [], isLoading: false });
     useHRPayroll.mockReturnValue({ data: [], isLoading: false });
     renderWithRouter(<EmployeeDetail />, { route: '/hr/employees/1' });
-    expect(screen.getByText('Ahmed Ali')).toBeInTheDocument();
+    expect(screen.getAllByText('Ahmed Ali').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('EMP001')).toBeInTheDocument();
     expect(screen.getByText('Profile')).toBeInTheDocument();
     expect(screen.getByText('Attendance')).toBeInTheDocument();
@@ -107,6 +119,7 @@ describe('EmployeeDetail', () => {
     useHRLeaves.mockReturnValue({ data: [], isLoading: false });
     useHRPayroll.mockReturnValue({ data: [], isLoading: false });
     renderWithRouter(<EmployeeDetail />, { route: '/hr/employees/1' });
+    fireEvent.click(screen.getByText('Attendance'));
     expect(screen.getByText('Attendance History')).toBeInTheDocument();
   });
 });
@@ -145,7 +158,7 @@ describe('MyHRPage', () => {
     useMyPayroll.mockReturnValue({ data: [], isLoading: false });
     renderWithRouter(<MyHRPage />);
     expect(screen.getByText('My HR Portal')).toBeInTheDocument();
-    expect(screen.getByText('My Profile')).toBeInTheDocument();
+    expect(screen.getAllByText('My Profile').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('My Attendance')).toBeInTheDocument();
     expect(screen.getByText('My Leaves')).toBeInTheDocument();
     expect(screen.getByText('My Payslips')).toBeInTheDocument();

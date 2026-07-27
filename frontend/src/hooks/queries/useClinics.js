@@ -18,15 +18,6 @@ export function useClinics() {
   });
 }
 
-export function useClinicQueue(slug, refetchInterval = 15000) {
-  return useQuery({
-    queryKey: clinicKeys.queue(slug),
-    queryFn: () => api.get(`/clinics/${slug}/queue`),
-    enabled: !!slug,
-    refetchInterval,
-  });
-}
-
 export function useClinicStats(slug) {
   return useQuery({
     queryKey: clinicKeys.stats(slug),

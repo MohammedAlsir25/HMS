@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import CrossReferralModal from '../referral/CrossReferralModal';
+import { useState, useEffect, useCallback, Suspense, lazy } from 'react';
+const CrossReferralModal = lazy(() => import('../referral/CrossReferralModal'));
 import ClinicDashboardShell, { ClinicSection, StatCard } from '../../components/clinic/ClinicDashboardShell';
 import ClinicHistoryPanel from '../../components/clinic/ClinicHistoryPanel';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -520,12 +520,14 @@ export default function ENTDashboard() {
         />
       )}
 
-      <CrossReferralModal
-        open={showReferral}
-        onClose={() => setShowReferral(false)}
-        fromClinicId="ent"
-        selectedPatient={patients.selectedPatient}
-      />
+      <Suspense fallback={null}>
+        <CrossReferralModal
+          open={showReferral}
+          onClose={() => setShowReferral(false)}
+          fromClinicId="ent"
+          selectedPatient={patients.selectedPatient}
+        />
+      </Suspense>
             <LabOrderModal
         isOpen={showLabOrder}
         onClose={() => setShowLabOrder(false)}

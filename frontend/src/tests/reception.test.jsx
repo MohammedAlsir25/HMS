@@ -39,17 +39,17 @@ describe('ReceptionPage', () => {
 describe('WaitingRoomTV', () => {
   it('renders hospital name and waiting room header', () => {
     render(<WithRouter><WaitingRoomTV /></WithRouter>);
-    expect(screen.getByText('Al Jawarih')).toBeInTheDocument();
-    expect(screen.getByText('Waiting Room Status')).toBeInTheDocument();
+    expect(screen.getByText('app.title')).toBeInTheDocument();
+    expect(screen.getByText('waitingRoom.description')).toBeInTheDocument();
   });
 
   it('shows loading state initially', () => {
     render(<WithRouter><WaitingRoomTV /></WithRouter>);
-    expect(screen.getByText('Loading queue data...')).toBeInTheDocument();
+    expect(screen.getByText('common.loading')).toBeInTheDocument();
   });
 
   it('shows auto-refresh indicator', () => {
     render(<WithRouter><WaitingRoomTV /></WithRouter>);
-    expect(screen.getByText('Live · Updates every 8 seconds')).toBeInTheDocument();
+    expect(screen.getByText('waitingRoom.live')).toBeInTheDocument();
   });
 });

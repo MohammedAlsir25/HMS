@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { useLocation } from 'react-router-dom';
-import CrossReferralModal from '../referral/CrossReferralModal';
+const CrossReferralModal = lazy(() => import('../referral/CrossReferralModal'));
 import ClinicDashboardShell, { ClinicSection, StatCard } from '../../components/clinic/ClinicDashboardShell';
 import ClinicHistoryPanel from '../../components/clinic/ClinicHistoryPanel';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -452,12 +452,14 @@ export default function MedicineDashboard() {
         />
       )}
 
-      <CrossReferralModal
-        open={showReferral}
-        onClose={() => setShowReferral(false)}
-        fromClinicId="medicine"
-        selectedPatient={patients.selectedPatient}
-      />
+      <Suspense fallback={null}>
+        <CrossReferralModal
+          open={showReferral}
+          onClose={() => setShowReferral(false)}
+          fromClinicId="medicine"
+          selectedPatient={patients.selectedPatient}
+        />
+      </Suspense>
       <LabOrderModal
         isOpen={showLabOrder}
         onClose={() => setShowLabOrder(false)}

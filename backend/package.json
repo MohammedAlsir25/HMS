@@ -12,6 +12,8 @@
     "prisma:seed": "node prisma/seed.js",
     "prisma:studio": "prisma studio",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit --detectOpenHandles",
+    "test:ci": "node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit --detectOpenHandles --ci --maxWorkers=1",
+    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit --detectOpenHandles --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit --pretty",
     "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch",
